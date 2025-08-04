@@ -16,6 +16,7 @@ if __name__ == "__main__":
         "cirro.services",
         "cirro.models",
         "cirro.config",
+        "cirro.helpers.preprocess_dataset",
         "cirro_api_client",
         "cirro_api_client.cirro_client",
         "cirro_api_client.cirro_auth",

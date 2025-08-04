@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def write_json(dat, local_path: str, indent=4):
+    """Write a JSON object to a local file."""
     with Path(local_path).open(mode="wt") as handle:
         return json.dump(dat, handle, indent=indent)
 
@@ -34,7 +35,7 @@ def read_csv(path: str, required_columns=None) -> 'DataFrame':
 
 
 def read_json(path: str):
-    """Read a JSON from the dataset"""
+    """Read a JSON object from a local file or S3 path."""
     s3_path = S3Path(path)
 
     if s3_path.valid:
@@ -53,6 +54,9 @@ class PreprocessDataset:
     """
     Helper functions for performing preparatory tasks immediately before launching
     the analysis workflow for a dataset.
+
+    For use in the `preprocess.py` script.
+    More info: https://docs.cirro.bio/pipelines/preprocess-script/
     """
     samplesheet: 'DataFrame'
     """
@@ -84,8 +88,13 @@ class PreprocessDataset:
 
     More info: https://docs.cirro.bio/pipelines/preprocess-script/#dsmetadata
     """
+    dataset_root: str
+    """
+    Base path to the dataset
+    """
 
     _PARAMS_FILE = "params.json"
+    _REFERENCES_BASE = "s3://pubweb-references"
 
     def __init__(self,
                  samplesheet: Union['DataFrame', str, Path],
@@ -157,6 +166,14 @@ class PreprocessDataset:
         dataset_path = os.getenv("PW_S3_DATASET")
         return cls.from_path(dataset_path)
 
+    @property
+    def references_base(self):
+        """
+        Returns the base URL for references.
+        This is used to access public references in the Cirro system.
+        """
+        return self._REFERENCES_BASE
+
     def log(self):
         """Print logging messages about the dataset."""
         logger.info(f"Storage location for dataset: {self.dataset_root}")
@@ -224,7 +241,7 @@ class PreprocessDataset:
         each sample on a row and each file in a column.
         The file column indexes are created by default from the `read` column, but can be customized.
 
-        For example, if the `files` table has columns `sample``, `read`, and `file`,
+        For example, if the `files` table has columns `sample`, `read`, and `file`,
         and the `samplesheet` has columns `sample`, `status`, and `group`, the output
         will have columns `sample`, `fastq_1`, `fastq_2`, `status`, and `group`.
 
