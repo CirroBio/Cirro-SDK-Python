@@ -4,7 +4,7 @@ import os
 import warnings
 from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Union, Optional
 
 import boto3
 
@@ -231,7 +231,7 @@ class PreprocessDataset:
     def pivot_samplesheet(
             self,
             index=None,
-            pivot_columns: Union[str, list[str]] = 'read',
+            pivot_columns: Union[Optional[str], list[str]] = 'read',
             metadata_columns: list[str] = None,
             column_prefix: str = "fastq_",
             file_filter_predicate: str = None
@@ -247,6 +247,7 @@ class PreprocessDataset:
 
         Args:
             index: List[str], used to make the frames new index, defaults to
+             `["sampleIndex", "sample", "lane"]`
             pivot_columns: str or List[str], columns to pivot on and create the new column,
              defaults to 'read'. This effectively makes the column `<column_prefix><read>'.
              If the column is not defined or not present, the pivot column will be generated
@@ -322,7 +323,9 @@ class PreprocessDataset:
 
         # If we don't have access to the column defined, just use the file number
         # By default this is 'read' but the data might not be paired
-        if pivot_columns not in files.columns.values:
+        pivot_columns_defined = pivot_columns is not None and len(pivot_columns) > 0
+        if not pivot_columns_defined or pivot_columns not in files.columns.values:
+            logger.warning("Pivot column not found, grouping by sample instead.")
             files['file_num'] = files.groupby('sample').cumcount() + 1
             pivot_columns = 'file_num'
 
