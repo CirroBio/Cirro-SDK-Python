@@ -1,0 +1,5 @@
+sample,file,read,readType
+SAMPLE_1,SAMPLE_1_R1.fastq.gz,1,R
+SAMPLE_1,SAMPLE_1_R2.fastq.gz,2,R
+SAMPLE_1,SAMPLE_1_I1.fastq.gz,1,I
+SAMPLE_1,SAMPLE_1_I2.fastq.gz,2,I

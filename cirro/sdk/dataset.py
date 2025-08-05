@@ -2,8 +2,7 @@ import datetime
 from typing import Union, List, Optional
 
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
-    DatasetDetailParams, RunAnalysisRequestParams, DatasetDetailInfo, \
-    Tag, ArtifactType
+    RunAnalysisRequestParams, Tag, ArtifactType, NamedItem
 
 from cirro.cirro_client import CirroApi
 from cirro.models.assets import DatasetAssets
@@ -50,7 +49,7 @@ class DataPortalDataset(DataPortalAsset):
 
     @property
     def name(self) -> str:
-        """Editible name for the dataset"""
+        """Editable name for the dataset"""
         return self._data.name
 
     @property
@@ -101,18 +100,18 @@ class DataPortalDataset(DataPortalAsset):
         ]
 
     @property
-    def params(self) -> DatasetDetailParams:
+    def params(self) -> dict:
         """
         Parameters used to generate the dataset
         """
-        return self._get_detail().params
+        return self._get_detail().params.to_dict()
 
     @property
-    def info(self) -> DatasetDetailInfo:
+    def info(self) -> dict:
         """
-        Detailed information about the dataset
+        Extra information about the dataset
         """
-        return self._get_detail().info
+        return self._get_detail().info.to_dict()
 
     @property
     def tags(self) -> List[Tag]:
@@ -120,6 +119,13 @@ class DataPortalDataset(DataPortalAsset):
         Tags applied to the dataset
         """
         return self._data.tags
+
+    @property
+    def share(self) -> Optional[NamedItem]:
+        """
+        Share associated with the dataset, if any.
+        """
+        return self._get_detail().share
 
     @property
     def created_by(self) -> str:

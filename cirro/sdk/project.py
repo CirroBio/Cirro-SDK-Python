@@ -2,7 +2,7 @@ from functools import cache
 from time import sleep
 from typing import List, Union
 
-from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag
+from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag, Status
 
 from cirro.cirro_client import CirroApi
 from cirro.file_utils import get_files_in_directory
@@ -56,6 +56,13 @@ class DataPortalProject(DataPortalAsset):
         Longer description of the project
         """
         return self._data.description
+
+    @property
+    def status(self) -> Status:
+        """
+        Status of the project
+        """
+        return self._data.status
 
     def __str__(self):
         """Control how the Project is rendered as a string."""

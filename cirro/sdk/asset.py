@@ -33,7 +33,7 @@ class DataPortalAssets(List[T]):
         super().__init__(input_list)
 
     def __str__(self):
-        return "\n\n".join([str(i) for i in self])
+        return "\n".join([str(i) for i in self])
 
     def description(self):
         """Render a text summary of the assets."""

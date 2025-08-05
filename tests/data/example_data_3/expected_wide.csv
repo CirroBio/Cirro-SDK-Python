@@ -1,0 +1,2 @@
+sample,file_1,file_2,status,sampleIndex
+sample1,/path/to/sample1.fastq.gz,/path/to/sample1.bam.gz,TUMOR,1
