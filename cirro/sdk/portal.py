@@ -1,8 +1,8 @@
 from cirro_api_client.v1.models import Executor
 
 from cirro.cirro_client import CirroApi
-from cirro.sdk.developer import DeveloperHelper
 from cirro.sdk.dataset import DataPortalDataset
+from cirro.sdk.developer import DeveloperHelper
 from cirro.sdk.exceptions import DataPortalAssetNotFound
 from cirro.sdk.process import DataPortalProcess, DataPortalProcesses
 from cirro.sdk.project import DataPortalProject, DataPortalProjects
@@ -156,5 +156,5 @@ class DataPortal:
         )
 
     @property
-    def developer_helper(self):
+    def developer_helper(self) -> DeveloperHelper:
         return DeveloperHelper(self._client)
