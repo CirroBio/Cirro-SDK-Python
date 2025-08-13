@@ -133,6 +133,7 @@ class PreprocessDataset:
         self.params = params
         self.metadata = metadata
         self.dataset_root = dataset_root
+        self.logger = logger
 
     @classmethod
     def from_path(cls, dataset_root: str, config_directory='config'):
