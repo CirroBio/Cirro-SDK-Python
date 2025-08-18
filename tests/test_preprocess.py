@@ -9,6 +9,7 @@ from cirro.helpers.preprocess_dataset import PreprocessDataset
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 DATA_PATH = Path(__location__, 'data')
+TEST_DATA_PATH = 's3://cirro-public-resources-20250818192017584600000001/test_data'
 
 
 class PreprocessTestCase(NamedTuple):
@@ -84,6 +85,17 @@ class TestPreprocess(unittest.TestCase):
                     expected_df.sort_index(axis=1).to_csv(index=False),
                     df.sort_index(axis=1).to_csv(index=False)
                 )
+
+    def test_load_running(self):
+        ds = PreprocessDataset.from_path(dataset_root=f'{TEST_DATA_PATH}/dataset1')
+
+        self.assertGreater(len(ds.params), 0)
+        self.assertGreater(len(ds.metadata), 0)
+        self.assertGreater(ds.samplesheet.shape[0], 0)
+        self.assertGreater(ds.files.shape[0], 0)
+
+        df = ds.pivot_samplesheet()
+        self.assertGreater(df.shape[0], 0)
 
 
 if __name__ == '__main__':
