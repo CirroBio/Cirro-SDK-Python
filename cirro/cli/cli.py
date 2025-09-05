@@ -59,8 +59,8 @@ def download(**kwargs):
               default='')
 @click.option('--project',
               help='Name or ID of the project')
-@click.option('--process',
-              help='Name or ID of the ingest process')
+@click.option('--data-type', '--process',
+              help='Name or ID of the data type (ingest process)')
 @click.option('--data-directory',
               help='Directory you wish to upload')
 @click.option('-i', '--interactive',
