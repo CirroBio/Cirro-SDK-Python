@@ -85,7 +85,7 @@ class FileAccessContext:
                 access_type=ProjectAccessType.SAMPLESHEET_UPLOAD,
                 dataset_id=dataset_id
             ),
-            base_url=base_url,
+            base_url=f'{base_url}/data',
             project_id=project_id
         )
 

@@ -1,11 +1,14 @@
 import datetime
+from pathlib import Path
 from typing import Union, List, Optional
 
+from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
-    RunAnalysisRequestParams, Tag, ArtifactType, NamedItem
+    RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, Executor, ValidateFileRequirementsRequest
 
 from cirro.cirro_client import CirroApi
 from cirro.models.assets import DatasetAssets
+from cirro.models.file import PathLike
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.exceptions import DataPortalAssetNotFound
 from cirro.sdk.exceptions import DataPortalInputError
@@ -301,6 +304,53 @@ class DataPortalDataset(DataPortalAsset):
             )
         )
         return resp.id
+
+    def update_samplesheet(self,
+                           contents: str = None,
+                           file_path: PathLike = None):
+        """
+        Updates the samplesheet metadata of a dataset.
+        Provide either the contents (as a string) or a file path.
+        Both must be in the format of a CSV.
+
+        Args:
+            contents (str): Samplesheet contents to update (should be a CSV string)
+            file_path (PathLike): Path of file to update (should be a CSV file)
+
+        Example:
+        ```python
+        dataset.update_samplesheet(
+            file_path=Path('~/samplesheet.csv')
+        )
+        ```
+        """
+
+        if contents is None and file_path is None:
+            raise DataPortalInputError("Must specify either 'contents' or 'file_path' when updating samplesheet")
+
+        if self.process.executor != Executor.INGEST:
+            raise DataPortalInputError("Cannot update a samplesheet on a non-ingest dataset")
+
+        samplesheet_contents = contents
+        if file_path is not None:
+            samplesheet_contents = Path(file_path).expanduser().read_text()
+
+        # Validate samplesheet
+        file_names = [f.file_name for f in self.list_files()]
+        request = ValidateFileRequirementsRequest(
+            file_names=file_names,
+            sample_sheet=samplesheet_contents,
+        )
+        requirements = validate_file_requirements.sync(process_id=self.process_id, body=request, client=self._client._api_client)
+        if error_msg := requirements.error_msg:
+            raise DataPortalInputError(error_msg)
+
+        # Update the samplesheet if everything looks ok
+        self._client.datasets.update_samplesheet(
+            project_id=self.project_id,
+            dataset_id=self.id,
+            samplesheet=samplesheet_contents
+        )
 
 
 class DataPortalDatasets(DataPortalAssets[DataPortalDataset]):
