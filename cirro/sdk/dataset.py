@@ -341,7 +341,9 @@ class DataPortalDataset(DataPortalAsset):
             file_names=file_names,
             sample_sheet=samplesheet_contents,
         )
-        requirements = validate_file_requirements.sync(process_id=self.process_id, body=request, client=self._client._api_client)
+        requirements = validate_file_requirements.sync(process_id=self.process_id,
+                                                       body=request,
+                                                       client=self._client.api_client)
         if error_msg := requirements.error_msg:
             raise DataPortalInputError(error_msg)
 
