@@ -168,7 +168,7 @@ def gather_upload_arguments(input_params: UploadArguments, projects: List[Projec
 
     confirm_data_files(input_params['data_directory'], files)
 
-    input_params['process'] = ask_process(processes, input_params.get('process'))
+    input_params['data_type'] = ask_process(processes, input_params.get('data_type'))
 
     data_directory_name = Path(input_params['data_directory']).name
     default_name = input_params.get('name') or data_directory_name
