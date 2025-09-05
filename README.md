@@ -53,7 +53,7 @@ Options:
   --name TEXT             Name of the dataset
   --description TEXT      Description of the dataset (optional)
   --project TEXT          Name or ID of the project
-  --process TEXT          Name or ID of the ingest process
+  --data-type TEXT        Name or ID of the data type (ingest process)
   --data-directory TEXT   Directory you wish to upload
   -i, --interactive       Gather arguments interactively
   --help                  Show this message and exit.
