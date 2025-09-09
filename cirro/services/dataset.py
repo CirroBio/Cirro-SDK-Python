@@ -339,3 +339,30 @@ class DatasetService(FileEnabledService):
                                                             base_url=dataset.s3)
 
         self._file_service.download_files(access_context, download_location, files)
+
+    def update_samplesheet(
+        self,
+        project_id: str,
+        dataset_id: str,
+        samplesheet: str
+    ):
+        """
+        Updates a samplesheet on a dataset
+
+        Args:
+            project_id (str): ID of the Project
+            dataset_id (str): ID of the Dataset
+            samplesheet (str): Samplesheet contents to update (should be a CSV string)
+        """
+        dataset = self.get(project_id, dataset_id)
+        access_context = FileAccessContext.upload_sample_sheet(project_id=project_id,
+                                                               dataset_id=dataset_id,
+                                                               base_url=dataset.s3)
+
+        samplesheet_key = f'{access_context.prefix}/samplesheet.csv'
+        self._file_service.create_file(
+            access_context=access_context,
+            key=samplesheet_key,
+            contents=samplesheet,
+            content_type='text/csv'
+        )
