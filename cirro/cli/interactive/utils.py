@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import List, Union, Callable, TypeVar, Optional
 
-from prompt_toolkit.validation import Validator, ValidationError
 import questionary
+from prompt_toolkit.validation import Validator, ValidationError
 from questionary import prompt
 
 
@@ -108,3 +108,9 @@ def get_item_from_name_or_id(items: List[T], name_or_id: str) -> Optional[T]:
     if matched:
         return matched
     return next((p for p in items if p.name == name_or_id), None)
+
+
+def validate_files(all_files: List[str], files: List[str], directory: str):
+    for file in files:
+        if file not in all_files:
+            raise InputError(f"File '{file}' not found in directory '{directory}'")

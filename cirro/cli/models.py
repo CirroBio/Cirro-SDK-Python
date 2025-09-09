@@ -1,4 +1,4 @@
-from typing import TypedDict, List, Optional
+from typing import TypedDict, Optional
 
 
 class DownloadArguments(TypedDict):
@@ -6,6 +6,7 @@ class DownloadArguments(TypedDict):
     dataset: str
     data_directory: str
     interactive: bool
+    file: Optional[list[str]]
 
 
 class UploadArguments(TypedDict):
@@ -16,7 +17,7 @@ class UploadArguments(TypedDict):
     data_directory: str
     include_hidden: bool
     interactive: bool
-    files: Optional[List[str]]
+    file: Optional[list[str]]
 
 
 class ListArguments(TypedDict):
