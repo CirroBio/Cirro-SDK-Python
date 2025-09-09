@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Union, Optional
 
 import boto3
+from botocore import UNSIGNED
+from botocore.config import Config
+from botocore.exceptions import NoCredentialsError
 
 if TYPE_CHECKING:
     from pandas import DataFrame
@@ -50,8 +53,12 @@ def read_json(path: str):
     s3_path = S3Path(path)
 
     if s3_path.valid:
-        s3 = boto3.client('s3')
-        retr = s3.get_object(Bucket=s3_path.bucket, Key=s3_path.key)
+        try:
+            s3 = boto3.client('s3')
+            retr = s3.get_object(Bucket=s3_path.bucket, Key=s3_path.key)
+        except NoCredentialsError:
+            s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+            retr = s3.get_object(Bucket=s3_path.bucket, Key=s3_path.key)
         text = retr['Body'].read().decode()
     else:
         with Path(path).open() as handle:
