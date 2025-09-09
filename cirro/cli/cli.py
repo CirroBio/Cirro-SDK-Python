@@ -60,7 +60,7 @@ def download(**kwargs):
 @click.option('--project',
               help='Name or ID of the project')
 @click.option('--data-type', '--process',
-              help='Name or ID of the data type (--process flag is deprecated)')
+              help='Name or ID of the data type (--process is deprecated)')
 @click.option('--data-directory',
               help='Directory you wish to upload')
 @click.option('-i', '--interactive',
