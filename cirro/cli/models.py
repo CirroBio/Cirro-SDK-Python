@@ -12,7 +12,7 @@ class UploadArguments(TypedDict):
     name: str
     description: str
     project: str
-    process: str
+    data_type: str
     data_directory: str
     include_hidden: bool
     interactive: bool

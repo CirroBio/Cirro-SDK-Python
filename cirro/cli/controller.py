@@ -82,14 +82,14 @@ def run_ingest(input_params: UploadArguments, interactive=False):
         directory = input_params['data_directory']
     else:
         input_params['project'] = get_id_from_name(projects, input_params['project'])
-        input_params['process'] = get_id_from_name(processes, input_params['process'])
+        input_params['data_type'] = get_id_from_name(processes, input_params['data_type'])
         directory = input_params['data_directory']
         files = get_files_in_directory(directory)
 
     if len(files) == 0:
         raise InputError("No files to upload")
 
-    process = get_item_from_name_or_id(processes, input_params['process'])
+    process = get_item_from_name_or_id(processes, input_params['data_type'])
     logger.info(f"Validating expected files: {process.name}")
     try:
         cirro.processes.check_dataset_files(process_id=process.id, files=files, directory=directory)
