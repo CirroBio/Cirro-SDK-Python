@@ -1,4 +1,7 @@
+import importlib
+
 import click
+import requests
 from cirro_api_client.v1.errors import CirroException
 
 from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets, run_create_pipeline_config
@@ -125,8 +128,30 @@ def create_pipeline_config(**kwargs):
     run_create_pipeline_config(kwargs, interactive=kwargs.get('interactive'))
 
 
+def _check_version():
+    """
+    Prompts the user to update their package version if needed
+    """
+    yellow_color = '\033[93m'
+    reset_color = '\033[0m'
+
+    try:
+        current_version = importlib.metadata.version('cirro')
+        response = requests.get("https://pypi.org/pypi/cirro/json")
+        response.raise_for_status()
+        latest_version = response.json()["info"]["version"]
+
+        if current_version != latest_version:
+            print(f"{yellow_color}Warning:{reset_color} Cirro version {current_version} "
+                  f"is out of date. Update to {latest_version} with 'pip install cirro --upgrade'.")
+
+    except Exception:
+        return
+
+
 def main():
     try:
+        _check_version()
         run()
     except InputError as e:
         handle_error(e)
