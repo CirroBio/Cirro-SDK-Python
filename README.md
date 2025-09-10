@@ -105,14 +105,12 @@ Usage: cirro create-pipeline-config [OPTIONS]
 
 Options:
   -p, --pipeline-dir DIRECTORY  Directory containing the pipeline definition
-                                files (e.g., WDL or Nextflow)  [default: .;
-                                required]
+                                files (e.g., WDL or Nextflow)  [default: .]
   -e, --entrypoint TEXT         Entrypoint WDL file (optional, if not
                                 specified, the first WDL file found will be
                                 used). Ignored for Nextflow pipelines.
   -o, --output-dir TEXT         Directory to store the generated configuration
-                                files (default: current directory)  [default:
-                                .cirro]
+                                files  [default: .cirro]
   -i, --interactive             Gather arguments interactively
   --help                        Show this message and exit.
 ```
