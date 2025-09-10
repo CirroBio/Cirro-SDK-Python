@@ -104,9 +104,8 @@ def configure():
     run_configure()
 
 
-@run.command(help='Create pipeline configuration files', no_args_is_help=True)
+@run.command(help='Create pipeline configuration files')
 @click.option('-p', '--pipeline-dir',
-              required=True,
               metavar='DIRECTORY',
               help='Directory containing the pipeline definition files (e.g., WDL or Nextflow)',
               default='.',
@@ -117,7 +116,7 @@ def configure():
                   ' Ignored for Nextflow pipelines.'),
               default='main.wdl')
 @click.option('-o', '--output-dir',
-              help='Directory to store the generated configuration files (default: current directory)',
+              help='Directory to store the generated configuration files',
               default='.cirro',
               show_default=True)
 @click.option('-i', '--interactive',

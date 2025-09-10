@@ -17,6 +17,16 @@ or you can install the main branch of the repo by running:
 
 `pip install git+https://github.com/CirroBio/Cirro-client.git`
 
+To enable [pipeline configuration](#configuring-a-pipeline) you need to install extras using:
+
+```bash
+pip install cirro[nextflow]      # just nextflow pipeline configuration support
+pip install cirro[wdl]           # just wdl pipeline configuraiton support
+pip install cirro[nextflow,wdl]  # both nextflow and wdl pipeline configuration support
+```
+
+**NOTE**: Configuring Nextflow pipelines also requires a local installation of [`nextflow`](https://www.nextflow.io/).
+
 ## Authentication
 
 Upon first use, the Cirro client will ask you what Cirro instance to use and if you would like to save your login information.
@@ -98,6 +108,28 @@ Options:
   -i, --interactive      Gather arguments interactively
   --help                 Show this message and exit.
 ```
+
+#### Configuring a pipeline
+```bash
+Usage: cirro create-pipeline-config [OPTIONS]
+
+  Create pipeline configuration files
+
+Options:
+  -p, --pipeline-dir DIRECTORY  Directory containing the pipeline definition
+                                files (e.g., WDL or Nextflow)  [default: .]
+  -e, --entrypoint TEXT         Entrypoint WDL file (optional, if not
+                                specified, the first WDL file found will be
+                                used). Ignored for Nextflow pipelines.
+  -o, --output-dir TEXT         Directory to store the generated configuration
+                                files  [default: .cirro]
+  -i, --interactive             Gather arguments interactively
+  --help                        Show this message and exit.
+```
+
+It is highly recommended that:
+- Nextflow pipelines utilize a [`nextflow_schema.json`](https://nextflow-io.github.io/nf-schema/latest/nextflow_schema/nextflow_schema_specification/) file. (If your pipeline originates from [NF-Core](https://nf-co.re/), this should already be the case.)
+- WDL pipelines are defined in WDL v1.0 or higher and explicitly define an `input` section in the root-level workflow.
 
 ### Interactive Commands
 
