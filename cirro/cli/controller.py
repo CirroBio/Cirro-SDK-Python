@@ -16,7 +16,7 @@ from cirro.cli.interactive.download_args import gather_download_arguments_datase
 from cirro.cli.interactive.list_dataset_args import gather_list_arguments
 from cirro.cli.interactive.upload_args import gather_upload_arguments
 from cirro.cli.interactive.upload_reference_args import gather_reference_upload_arguments
-from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError
+from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError, validate_files
 from cirro.cli.models import ListArguments, UploadArguments, DownloadArguments, CreatePipelineConfigArguments, \
     UploadReferenceArguments
 from cirro.config import UserConfig, save_user_config, load_user_config
@@ -84,7 +84,14 @@ def run_ingest(input_params: UploadArguments, interactive=False):
         input_params['project'] = get_id_from_name(projects, input_params['project'])
         input_params['data_type'] = get_id_from_name(processes, input_params['data_type'])
         directory = input_params['data_directory']
-        files = get_files_in_directory(directory)
+        all_files = get_files_in_directory(directory)
+        if input_params['file']:
+            files = input_params['file']
+            validate_files(all_files, files, directory)
+
+        # Default to all files if file param is not provided
+        else:
+            files = all_files
 
     if len(files) == 0:
         raise InputError("No files to upload")

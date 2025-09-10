@@ -29,6 +29,7 @@ If you need to change your credentials after this point, and you've opted to sav
 ## Command Line Usage
 
 #### Downloading a dataset:
+
 ```bash
 Usage: cirro download [OPTIONS]
 
@@ -37,29 +38,41 @@ Usage: cirro download [OPTIONS]
 Options:
   --project TEXT         Name or ID of the project
   --dataset TEXT         ID of the dataset
-  --file... TEXT         Name and relative path of the file (optional)
+  --file TEXT            Relative path of the file(s) to download (optional, can be used multiple times)
   --data-directory TEXT  Directory to store the files
   -i, --interactive      Gather arguments interactively
   --help                 Show this message and exit.
 ```
 
+```bash
+$ cirro download --project "Test Project 1" --dataset "test" --data-directory "~/download"
+```
+
 #### Uploading a dataset:
+
 ```bash
 Usage: cirro upload [OPTIONS]
 
   Upload and create a dataset
 
 Options:
-  --name TEXT             Name of the dataset
-  --description TEXT      Description of the dataset (optional)
-  --project TEXT          Name or ID of the project
-  --data-type TEXT        Name or ID of the data type (ingest process)
-  --data-directory TEXT   Directory you wish to upload
-  -i, --interactive       Gather arguments interactively
-  --help                  Show this message and exit.
+  --name TEXT                  Name of the dataset
+  --description TEXT           Description of the dataset (optional)
+  --project TEXT               Name or ID of the project
+  --data-type, --process TEXT  Name or ID of the data type (--process is deprecated)
+  --data-directory TEXT        Directory you wish to upload
+  --file TEXT                  Relative path of the file(s) to upload (optional, can be used multiple times)
+  -i, --interactive            Gather arguments interactively
+  --include-hidden             Include hidden files in the upload (e.g., files starting with .)
+  --help                       Show this message and exit.
+```
+
+```bash
+$ cirro upload --project "Test Project 1" --name "test" --file "sample1.fastq.gz" --file "sample2.fastq.gz" --data-directory "~/data" --data-type "Paired DNAseq (FASTQ)" 
 ```
 
 #### Uploading a reference
+
 ```bash
 Usage: cirro upload-reference [OPTIONS]
 
@@ -69,10 +82,9 @@ Options:
   --name TEXT            Name of the reference
   --reference-type TEXT  Type of the reference (e.g., Reference Genome (FASTA))
   --project TEXT         Name or ID of the project
-  --reference-file TEXT  Location of reference file to upload (can specify multiple files)
+  --reference-file TEXT  Location of reference file(s) to upload (can be used multiple times)
   -i, --interactive      Gather arguments interactively
   --help                 Show this message and exit.
-
 ```
 
 #### Listing datasets:

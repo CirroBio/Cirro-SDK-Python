@@ -38,7 +38,7 @@ def list_datasets(**kwargs):
 @click.option('--dataset',
               help='ID of the dataset')
 @click.option('--file',
-              help='Name and relative path of the file (optional)',
+              help='Relative path of the file(s) to download (optional, can be used multiple times)',
               default=[],
               multiple=True)
 @click.option('--data-directory',
@@ -63,6 +63,10 @@ def download(**kwargs):
               help='Name or ID of the data type (--process is deprecated)')
 @click.option('--data-directory',
               help='Directory you wish to upload')
+@click.option('--file',
+              help='Relative path of the file(s) to upload (optional, can be used multiple times)',
+              default=[],
+              multiple=True)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
@@ -82,7 +86,7 @@ def upload(**kwargs):
 @click.option('--project',
               help='Name or ID of the project')
 @click.option('--reference-file',
-              help='Location of reference file to upload (can specify multiple files)',
+              help='Location of reference file(s) to upload (can be used multiple times)',
               multiple=True)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
