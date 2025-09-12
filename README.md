@@ -188,16 +188,12 @@ The `transfer_max_retries` configuration property specifies the maximum number o
 When uploading files to Cirro, network issues or temporary outages can occasionally cause a transfer to fail.
 It will pause for an increasing amount of time for each retry attempt.
 
-The `enable_additional_checksums` property manages the utilization of SHA-256 hashing for enhanced data integrity. 
-This feature computes the SHA-256 hash of a file during the upload process, and subsequently cross-validates it with the server upon completion.
-When retrieving files, it ensures that the hash received matches the server's stored hash.
 The default hashing algorithm for files is CRC64. In many cases, CRC64 is sufficient to ensure data integrity upon upload.
 
 ```ini
 [General]
 base_url = cirro.bio
 transfer_max_retries = 15
-enable_additional_checksums = true
 ```
 
 ### Clearing saved login
