@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Optional, Union, Dict
 
 from cirro_api_client.v1.api.datasets import get_datasets, get_dataset, import_public_dataset, upload_dataset, \
@@ -298,6 +299,62 @@ class DatasetService(FileEnabledService):
             files=files,
             file_path_map=file_path_map
         )
+
+    def validate_folder(
+        self,
+        project_id: str,
+        dataset_id: str,
+        local_folder: str
+    ):
+        """
+        Validates that the contents of a dataset match that of a local folder.
+        """
+        ds_files = self.get_assets_listing(project_id, dataset_id).files
+
+        local_folder = Path(local_folder)
+        if not local_folder.is_dir():
+            raise ValueError(f"{local_folder} is not a valid local folder")
+
+        # Keep track of files from the dataset which match by checksum, don't match, or are missing
+        ds_files_matching = []
+        ds_files_notmatching = []
+        ds_files_missing = []
+        for ds_file in ds_files:
+            ds_file_path = ds_file.relative_path[len("data/"):]
+            # Get the corresponding local file
+            local_file = local_folder / ds_file_path
+            if not local_file.exists():
+                ds_files_missing.append(ds_file_path)
+            else:
+                if self.file_is_valid(ds_file, local_file):
+                    ds_files_matching.append(ds_file_path)
+                else:
+                    ds_files_notmatching.append(ds_file_path)
+
+        # Find local files that are not in the dataset
+        local_only_files = [
+            str(file.relative_to(local_folder))
+            for file in local_folder.rglob("*")
+            if not file.is_dir()
+            if str(file.relative_to(local_folder)) not in [
+                ds_file.relative_path[len("data/"):]
+                for ds_file in ds_files
+            ]
+        ]
+
+        return dict(
+            ds_files_matching=ds_files_matching,
+            ds_files_notmatching=ds_files_notmatching,
+            ds_files_missing=ds_files_missing,
+            local_only_files=local_only_files
+        )
+
+    def file_is_valid(self, ds_file: File, local_file: Path) -> bool:
+        try:
+            self._file_service.validate_file(ds_file, local_file)
+            return True
+        except ValueError:
+            return False
 
     def download_files(
         self,

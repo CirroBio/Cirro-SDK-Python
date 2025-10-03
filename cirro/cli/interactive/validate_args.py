@@ -117,7 +117,7 @@ def ask_directory(input_value: str) -> str:
         'type': 'path',
         'name': 'directory',
         'only_directories': True,
-        'message': 'Where would you like to download these files?',
+        'message': 'What local folder would you like to compare data contents for?',
         'default': input_value or str(Path.cwd())
     }
 
@@ -125,12 +125,12 @@ def ask_directory(input_value: str) -> str:
     return answers['directory']
 
 
-def gather_download_arguments(input_params: DownloadArguments, projects: List[Project]):
+def gather_validate_arguments(input_params: DownloadArguments, projects: List[Project]):
     input_params['project'] = ask_project(projects, input_params.get('project'))
     return input_params
 
 
-def gather_download_arguments_dataset(input_params: DownloadArguments, datasets: List[Dataset]):
-    input_params['dataset'] = ask_dataset(datasets, input_params.get('dataset'), 'download')
+def gather_validate_arguments_dataset(input_params: DownloadArguments, datasets: List[Dataset]):
+    input_params['dataset'] = ask_dataset(datasets, input_params.get('dataset'), 'validate')
     input_params['data_directory'] = ask_directory(input_params.get('data_directory'))
     return input_params

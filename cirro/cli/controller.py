@@ -13,6 +13,7 @@ from cirro.cli.interactive.download_args import gather_download_arguments, ask_d
 from cirro.cli.interactive.download_args import gather_download_arguments_dataset
 from cirro.cli.interactive.list_dataset_args import gather_list_arguments
 from cirro.cli.interactive.upload_args import gather_upload_arguments
+from cirro.cli.interactive.validate_args import gather_validate_arguments, gather_validate_arguments_dataset
 from cirro.cli.interactive.upload_reference_args import gather_reference_upload_arguments
 from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError, validate_files
 from cirro.cli.models import ListArguments, UploadArguments, DownloadArguments, CreatePipelineConfigArguments, \
@@ -117,6 +118,57 @@ def run_ingest(input_params: UploadArguments, interactive=False):
                                 directory=directory,
                                 files=files)
     logger.info(f"File content validated by {cirro.configuration.checksum_method_display}")
+
+
+def run_validate_folder(input_params: UploadArguments, interactive=False):
+    _check_configure()
+    cirro = CirroApi()
+    logger.info(f"Collecting data from {cirro.configuration.base_url}")
+
+    logger.info("Listing available projects")
+    projects = cirro.projects.list()
+
+    if len(projects) == 0:
+        raise InputError(NO_PROJECTS)
+
+    if interactive:
+        input_params = gather_validate_arguments(input_params, projects)
+
+        input_params['project'] = get_id_from_name(projects, input_params['project'])
+        datasets = list_all_datasets(project_id=input_params['project'], client=cirro)
+        # Filter out datasets that are not complete
+        datasets = [d for d in datasets if d.status == Status.COMPLETED]
+        input_params = gather_validate_arguments_dataset(input_params, datasets)
+        files = cirro.datasets.get_assets_listing(input_params['project'], input_params['dataset']).files
+
+        if len(files) == 0:
+            raise InputError('There are no files in this dataset to validate against')
+
+        project_id = input_params['project']
+        dataset_id = input_params['dataset']
+
+    else:
+        project_id = get_id_from_name(projects, input_params['project'])
+        datasets = cirro.datasets.list(project_id)
+        dataset_id = get_id_from_name(datasets, input_params['dataset'])
+
+    logger.info("Validating files")
+
+    validation_results = cirro.datasets.validate_folder(
+        project_id=project_id,
+        dataset_id=dataset_id,
+        local_folder=input_params['data_directory']
+    )
+
+    for file_list, label in [
+        [validation_results['ds_files_matching'], "Files exactly matching in Cirro and locally"],
+        [validation_results['ds_files_notmatching'], "Files with differing checksums in Cirro and locally"],
+        [validation_results['ds_files_missing'], "Files present in Cirro but not locally"],
+        [validation_results['local_only_files'], "Files present locally but not in Cirro"]
+    ]:
+        logger.info(f"{label}: {len(file_list):,}")
+        for file in file_list:
+            logger.info(f" - {file}")
 
 
 def run_download(input_params: DownloadArguments, interactive=False):
