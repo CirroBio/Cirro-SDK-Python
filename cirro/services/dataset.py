@@ -342,12 +342,12 @@ class DatasetService(FileEnabledService):
             ]
         ]
 
-        return dict(
-            ds_files_matching=ds_files_matching,
-            ds_files_notmatching=ds_files_notmatching,
-            ds_files_missing=ds_files_missing,
-            local_only_files=local_only_files
-        )
+        return {
+            "ds_files_matching": ds_files_matching,
+            "ds_files_notmatching": ds_files_notmatching,
+            "ds_files_missing": ds_files_missing,
+            "local_only_files": local_only_files
+        }
 
     def file_is_valid(self, ds_file: File, local_file: Path) -> bool:
         try:

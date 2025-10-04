@@ -11,13 +11,13 @@ class FormBuilder:
     def __init__(self):
 
         # Contents will be written out as the form
-        self.form = dict(
-            ui=OrderedDict(),
-            form=OrderedDict(
+        self.form = {
+            "ui": OrderedDict(),
+            "form": OrderedDict(
                 type="object",
                 properties=OrderedDict()
             )
-        )
+        }
 
         # Used to make sure that no keys are repeated
         self.used_keys = set()
@@ -28,7 +28,7 @@ class FormBuilder:
         # Store the params which will be populated either by:
         # a) While building the form, the optional `test_value` field will be used
         # b) While running non-interactively, it will use the values read from $PW_NOTEBOOK_DATA
-        self.params = dict()
+        self.params = {}
 
     def add_param(
         self,
@@ -65,7 +65,7 @@ class FormBuilder:
         assert type in self.PARAM_TYPES, msg
 
         # Start building the item in the form
-        item = dict(type=type)
+        item = {"type": type}
 
         # Populate the test value
         if test_value is not None:
@@ -109,11 +109,11 @@ class FormBuilder:
         self.pointer = section_name
 
         # Add the section
-        self.form['form']['properties'][section_name] = dict(
-            title=title,
-            description=description,
-            properties=OrderedDict()
-        )
+        self.form['form']['properties'][section_name] = {
+            "title": title,
+            "description": description,
+            "properties": OrderedDict()
+        }
 
     def _new_section_name(self):
         """Internal method to pick a new section name."""
