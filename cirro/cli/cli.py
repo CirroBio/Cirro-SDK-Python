@@ -4,8 +4,8 @@ import click
 import requests
 from cirro_api_client.v1.errors import CirroException
 
-from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets
 from cirro.cli import run_create_pipeline_config, run_validate_folder
+from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets
 from cirro.cli.controller import handle_error, run_upload_reference
 from cirro.cli.interactive.utils import InputError
 
@@ -92,7 +92,7 @@ def upload(**kwargs):
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
-def validate_folder(**kwargs):
+def validate(**kwargs):
     check_required_args(kwargs)
     run_validate_folder(kwargs, interactive=kwargs.get('interactive'))
 

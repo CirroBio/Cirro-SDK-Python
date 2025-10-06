@@ -84,7 +84,7 @@ $ cirro upload --project "Test Project 1" --name "test" --file "sample1.fastq.gz
 #### Validating that a dataset matches a local folder
 
 ```bash
-Usage: cirro validate-folder [OPTIONS]
+Usage: cirro validate [OPTIONS]
 
   Validate that the contents of a local folder match those of a dataset in Cirro
 
