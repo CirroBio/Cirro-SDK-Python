@@ -134,18 +134,18 @@ def run_validate_folder(input_params: ValidateArguments, interactive=False):
 
     logger.info("Validating files")
 
-    validation_results = cirro.datasets.validate_folder(
+    results = cirro.datasets.validate_folder(
         project_id=project_id,
         dataset_id=dataset_id,
         local_folder=input_params['data_directory']
     )
 
     for file_list, label, log_level in [
-        (validation_results.files_matching, "✅ Matched Files (identical in Cirro and locally)", logging.INFO),
-        (validation_results.files_not_matching, "⚠️ Checksum Mismatches (same file name, different content)", logging.WARNING),
-        (validation_results.files_missing, "⚠️ Missing Locally (present in system but not found locally)", logging.WARNING),
-        (validation_results.local_only_files, "⚠️ Unexpected Local Files (present locally but not in system)", logging.WARNING),
-        (validation_results.validate_errors, "⚠️ Validation Failed (checksums may not be available)", logging.WARNING)
+        (results.files_matching, "✅ Matched Files (identical in Cirro and locally)", logging.INFO),
+        (results.files_not_matching, "⚠️ Checksum Mismatches (same file name, different content)", logging.WARNING),
+        (results.files_missing, "⚠️ Missing Locally (present in system but not found locally)", logging.WARNING),
+        (results.local_only_files, "⚠️ Unexpected Local Files (present locally but not in system)", logging.WARNING),
+        (results.validate_errors, "⚠️ Validation Failed (checksums may not be available)", logging.WARNING)
     ]:
         logger.log(level=log_level, msg=f"{label}: {len(file_list):,}")
         for file in file_list:

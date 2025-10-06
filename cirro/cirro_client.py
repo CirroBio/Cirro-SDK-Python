@@ -12,7 +12,7 @@ class CirroApi:
     """
     Client for interacting directly with the Cirro API
     """
-    def __init__(self, auth_info: AuthInfo = None, base_url: str = None, user_agent = 'Cirro SDK'):
+    def __init__(self, auth_info: AuthInfo = None, base_url: str = None, user_agent: str = 'Cirro SDK'):
         """
         Instantiates the Cirro API object
 
