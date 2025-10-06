@@ -21,7 +21,7 @@ class UploadArguments(TypedDict):
 
 
 class ValidateArguments(TypedDict):
-    name: str
+    dataset: str
     project: str
     data_directory: str
     interactive: bool

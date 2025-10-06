@@ -22,3 +22,11 @@ class DatasetWithShare(Dataset):
             updated_at=dataset.updated_at,
             share=share
         )
+
+
+@_attrs_define
+class DatasetValidationResponse:
+    files_matching: list[str]
+    files_not_matching: list[str]
+    files_missing: list[str]
+    local_only_files: list[str]
