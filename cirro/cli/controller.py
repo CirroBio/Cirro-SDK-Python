@@ -254,12 +254,11 @@ def run_upload_reference(input_params: UploadReferenceArguments, interactive=Fal
 
 
 def run_configure():
-    auth_method, base_url, auth_method_config, enable_additional_checksum = gather_auth_config()
+    auth_method, base_url, auth_method_config = gather_auth_config()
     save_user_config(UserConfig(auth_method=auth_method,
                                 auth_method_config=auth_method_config,
                                 base_url=base_url,
-                                transfer_max_retries=None,
-                                enable_additional_checksum=enable_additional_checksum))
+                                transfer_max_retries=None))
 
 
 def run_create_pipeline_config(input_params: CreatePipelineConfigArguments, interactive=False):
