@@ -131,6 +131,6 @@ def gather_download_arguments(input_params: DownloadArguments, projects: List[Pr
 
 
 def gather_download_arguments_dataset(input_params: DownloadArguments, datasets: List[Dataset]):
-    input_params['dataset'] = ask_dataset(datasets, input_params.get('dataset'), 'download')
+    input_params['dataset'] = ask_dataset(datasets, input_params.get('dataset'), msg_action='download')
     input_params['data_directory'] = ask_directory(input_params.get('data_directory'))
     return input_params

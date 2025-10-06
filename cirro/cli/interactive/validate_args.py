@@ -6,7 +6,7 @@ from cirro_api_client.v1.models import Dataset, Project
 
 from cirro.cli.interactive.common_args import ask_project, ask_dataset
 from cirro.cli.interactive.utils import ask, prompt_wrapper, InputError
-from cirro.cli.models import DownloadArguments
+from cirro.cli.models import ValidateArguments
 from cirro.models.file import File
 
 
@@ -125,12 +125,12 @@ def ask_directory(input_value: str) -> str:
     return answers['directory']
 
 
-def gather_validate_arguments(input_params: DownloadArguments, projects: List[Project]):
+def gather_validate_arguments(input_params: ValidateArguments, projects: list[Project]):
     input_params['project'] = ask_project(projects, input_params.get('project'))
     return input_params
 
 
-def gather_validate_arguments_dataset(input_params: DownloadArguments, datasets: List[Dataset]):
-    input_params['dataset'] = ask_dataset(datasets, input_params.get('dataset'), 'validate')
+def gather_validate_arguments_dataset(input_params: ValidateArguments, datasets: list[Dataset]):
+    input_params['dataset'] = ask_dataset(datasets, input_params.get('dataset'), msg_action='validate')
     input_params['data_directory'] = ask_directory(input_params.get('data_directory'))
     return input_params

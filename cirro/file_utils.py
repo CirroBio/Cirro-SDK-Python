@@ -54,7 +54,10 @@ def generate_flattened_file_map(files: List[PathLike]) -> Dict[PathLike, str]:
 
 
 def is_hidden_file(file_path: Path):
-    # Remove hidden files from listing, desktop.ini .DS_Store, etc.
+    """
+    Check if a file path is hidden
+    Such as desktop.ini, .DS_Store, etc.
+    """
     if os.name == 'nt':
         attributes = win32api.GetFileAttributes(str(file_path))
         return attributes & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)

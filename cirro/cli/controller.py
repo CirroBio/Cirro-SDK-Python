@@ -13,11 +13,11 @@ from cirro.cli.interactive.download_args import gather_download_arguments, ask_d
 from cirro.cli.interactive.download_args import gather_download_arguments_dataset
 from cirro.cli.interactive.list_dataset_args import gather_list_arguments
 from cirro.cli.interactive.upload_args import gather_upload_arguments
-from cirro.cli.interactive.validate_args import gather_validate_arguments, gather_validate_arguments_dataset
 from cirro.cli.interactive.upload_reference_args import gather_reference_upload_arguments
 from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError, validate_files
+from cirro.cli.interactive.validate_args import gather_validate_arguments, gather_validate_arguments_dataset
 from cirro.cli.models import ListArguments, UploadArguments, DownloadArguments, CreatePipelineConfigArguments, \
-    UploadReferenceArguments
+    UploadReferenceArguments, ValidateArguments
 from cirro.config import UserConfig, save_user_config, load_user_config
 from cirro.file_utils import get_files_in_directory
 from cirro.models.process import PipelineDefinition, ConfigAppStatus, CONFIG_APP_URL
@@ -120,7 +120,7 @@ def run_ingest(input_params: UploadArguments, interactive=False):
     logger.info(f"File content validated by {cirro.configuration.checksum_method_display}")
 
 
-def run_validate_folder(input_params: UploadArguments, interactive=False):
+def run_validate_folder(input_params: ValidateArguments, interactive=False):
     _check_configure()
     cirro = CirroApi()
     logger.info(f"Collecting data from {cirro.configuration.base_url}")
@@ -161,10 +161,10 @@ def run_validate_folder(input_params: UploadArguments, interactive=False):
     )
 
     for file_list, label in [
-        [validation_results['ds_files_matching'], "Files exactly matching in Cirro and locally"],
-        [validation_results['ds_files_notmatching'], "Files with differing checksums in Cirro and locally"],
-        [validation_results['ds_files_missing'], "Files present in Cirro but not locally"],
-        [validation_results['local_only_files'], "Files present locally but not in Cirro"]
+        (validation_results.files_matching, "Files exactly matching in Cirro and locally"),
+        (validation_results.files_not_matching, "Files with differing checksums in Cirro and locally"),
+        (validation_results.files_missing, "Files present in Cirro but not locally"),
+        (validation_results.local_only_files, "Files present locally but not in Cirro")
     ]:
         logger.info(f"{label}: {len(file_list):,}")
         for file in file_list:

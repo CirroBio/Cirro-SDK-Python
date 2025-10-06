@@ -306,7 +306,7 @@ class DatasetService(FileEnabledService):
         self,
         project_id: str,
         dataset_id: str,
-        local_folder: str
+        local_folder: PathLike
     ) -> DatasetValidationResponse:
         """
         Validates that the contents of a dataset match that of a local folder.
