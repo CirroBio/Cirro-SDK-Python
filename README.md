@@ -98,7 +98,7 @@ Options:
 ```
 
 ```bash
-$ cirro validate-folder --project "Test Project 1" --dataset "test" --data-directory "~/data"
+$ cirro validate --project "Test Project 1" --dataset "test" --data-directory "~/data"
 ```
 
 #### Uploading a reference
