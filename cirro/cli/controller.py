@@ -108,15 +108,8 @@ def run_ingest(input_params: UploadArguments, interactive=False):
 
 
 def run_validate_folder(input_params: ValidateArguments, interactive=False):
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
-
-    logger.info("Listing available projects")
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
 
     if interactive:
         input_params = gather_validate_arguments(input_params, projects)
