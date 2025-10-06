@@ -23,7 +23,6 @@ from cirro.file_utils import get_files_in_directory
 from cirro.models.process import PipelineDefinition, ConfigAppStatus, CONFIG_APP_URL
 from cirro.services.service_helpers import list_all_datasets
 
-NO_PROJECTS = "No projects available"
 # Log to STDOUT
 log_formatter = logging.Formatter(
     '%(asctime)s %(levelname)-8s [Cirro CLI] %(message)s'
@@ -37,13 +36,8 @@ logger.addHandler(console_handler)
 
 def run_list_datasets(input_params: ListArguments, interactive=False):
     """List the datasets available in a particular project."""
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
 
     if interactive:
         # Prompt the user for the project
@@ -63,16 +57,9 @@ def run_list_datasets(input_params: ListArguments, interactive=False):
 
 
 def run_ingest(input_params: UploadArguments, interactive=False):
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
     processes = cirro.processes.list(process_type=Executor.INGEST)
-
-    logger.info("Listing available projects")
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
 
     if interactive:
         input_params, files = gather_upload_arguments(input_params, projects, processes)
@@ -121,15 +108,8 @@ def run_ingest(input_params: UploadArguments, interactive=False):
 
 
 def run_validate_folder(input_params: ValidateArguments, interactive=False):
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
-
-    logger.info("Listing available projects")
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
 
     if interactive:
         input_params = gather_validate_arguments(input_params, projects)
@@ -154,18 +134,18 @@ def run_validate_folder(input_params: ValidateArguments, interactive=False):
 
     logger.info("Validating files")
 
-    validation_results = cirro.datasets.validate_folder(
+    results = cirro.datasets.validate_folder(
         project_id=project_id,
         dataset_id=dataset_id,
         local_folder=input_params['data_directory']
     )
 
     for file_list, label, log_level in [
-        (validation_results.files_matching, "✅ Matched Files (identical in Cirro and locally)", logging.INFO),
-        (validation_results.files_not_matching, "⚠️ Checksum Mismatches (same file name, different content)", logging.WARNING),
-        (validation_results.files_missing, "⚠️ Missing Locally (present in system but not found locally)", logging.WARNING),
-        (validation_results.local_only_files, "⚠️ Unexpected Local Files (present locally but not in system)", logging.WARNING),
-        (validation_results.validate_errors, "⚠️ Validation Failed (checksums may not be available)", logging.WARNING)
+        (results.files_matching, "✅ Matched Files (identical in Cirro and locally)", logging.INFO),
+        (results.files_not_matching, "⚠️ Checksum Mismatches (same file name, different content)", logging.WARNING),
+        (results.files_missing, "⚠️ Missing Locally (present in system but not found locally)", logging.WARNING),
+        (results.local_only_files, "⚠️ Unexpected Local Files (present locally but not in system)", logging.WARNING),
+        (results.validate_errors, "⚠️ Validation Failed (checksums may not be available)", logging.WARNING)
     ]:
         logger.log(level=log_level, msg=f"{label}: {len(file_list):,}")
         for file in file_list:
@@ -173,15 +153,8 @@ def run_validate_folder(input_params: ValidateArguments, interactive=False):
 
 
 def run_download(input_params: DownloadArguments, interactive=False):
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
-
-    logger.info("Listing available projects")
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
 
     files_to_download = None
     if interactive:
@@ -229,15 +202,9 @@ def run_download(input_params: DownloadArguments, interactive=False):
 
 
 def run_upload_reference(input_params: UploadReferenceArguments, interactive=False):
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
-
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
     reference_types = cirro.references.get_types()
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
 
     if interactive:
         input_params, files = gather_reference_upload_arguments(input_params, projects, reference_types)
@@ -305,6 +272,21 @@ def run_create_pipeline_config(input_params: CreatePipelineConfigArguments, inte
             "It is recommended that you verify your pipeline configuration "
             "using the Cirro Pipeline Configuration App for this pipeline:\n"
             f"{CONFIG_APP_URL}")
+
+
+def _init_cirro_client():
+    _check_configure()
+    cirro = CirroApi(user_agent="Cirro CLI")
+    logger.info(f"Collecting data from {cirro.configuration.base_url}")
+    return cirro
+
+
+def _get_projects(cirro: CirroApi):
+    logger.info("Listing available projects")
+    projects = cirro.projects.list()
+    if len(projects) == 0:
+        raise InputError("No projects available")
+    return projects
 
 
 def _check_configure():
