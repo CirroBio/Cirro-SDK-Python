@@ -30,3 +30,4 @@ class DatasetValidationResponse:
     files_not_matching: list[str]
     files_missing: list[str]
     local_only_files: list[str]
+    validate_errors: list[str]

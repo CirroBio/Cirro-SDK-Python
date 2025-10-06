@@ -160,15 +160,16 @@ def run_validate_folder(input_params: ValidateArguments, interactive=False):
         local_folder=input_params['data_directory']
     )
 
-    for file_list, label in [
-        (validation_results.files_matching, "Files exactly matching in Cirro and locally"),
-        (validation_results.files_not_matching, "Files with differing checksums in Cirro and locally"),
-        (validation_results.files_missing, "Files present in Cirro but not locally"),
-        (validation_results.local_only_files, "Files present locally but not in Cirro")
+    for file_list, label, log_level in [
+        (validation_results.files_matching, "✅ Matched Files (identical in Cirro and locally)", logging.INFO),
+        (validation_results.files_not_matching, "⚠️ Checksum Mismatches (same file name, different content)", logging.WARNING),
+        (validation_results.files_missing, "⚠️ Missing Locally (present in system but not found locally)", logging.WARNING),
+        (validation_results.local_only_files, "⚠️ Unexpected Local Files (present locally but not in system)", logging.WARNING),
+        (validation_results.validate_errors, "⚠️ Validation Failed (checksums may not be available)", logging.WARNING)
     ]:
-        logger.info(f"{label}: {len(file_list):,}")
+        logger.log(level=log_level, msg=f"{label}: {len(file_list):,}")
         for file in file_list:
-            logger.info(f" - {file}")
+            logger.log(level=log_level, msg=f" - {file}")
 
 
 def run_download(input_params: DownloadArguments, interactive=False):

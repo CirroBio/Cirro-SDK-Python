@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import List, Optional, Union, Dict
 
@@ -13,6 +14,8 @@ from cirro.models.dataset import DatasetValidationResponse
 from cirro.models.file import FileAccessContext, File, PathLike
 from cirro.services.base import get_all_records
 from cirro.services.file import FileEnabledService
+
+logger = logging.getLogger()
 
 
 class DatasetService(FileEnabledService):
@@ -321,6 +324,7 @@ class DatasetService(FileEnabledService):
         ds_files_matching = []
         ds_files_not_matching = []
         ds_files_missing = []
+        ds_validate_failed = []
         for ds_file in ds_files:
             ds_file_path = ds_file.normalized_path
             # Get the corresponding local file
@@ -328,27 +332,34 @@ class DatasetService(FileEnabledService):
             if not local_file.exists():
                 ds_files_missing.append(ds_file_path)
             else:
-                if self._file_service.is_valid_file(ds_file, local_file):
-                    ds_files_matching.append(ds_file_path)
-                else:
-                    ds_files_not_matching.append(ds_file_path)
+                try:
+                    if self._file_service.is_valid_file(ds_file, local_file):
+                        ds_files_matching.append(ds_file_path)
+                    else:
+                        ds_files_not_matching.append(ds_file_path)
+                except RuntimeWarning as e:
+                    logger.warning(f"File validation failed: {e}")
+                    ds_validate_failed.append(ds_file_path)
 
         # Find local files that are not in the dataset
-        local_only_files = [
-            str(file.relative_to(local_folder))
+        local_file_paths = [
+            file.relative_to(local_folder).as_posix()
             for file in local_folder.rglob("*")
             if not file.is_dir() and not is_hidden_file(file)
-            if str(file.relative_to(local_folder)) not in [
-                ds_file.normalized_path
-                for ds_file in ds_files
-            ]
+        ]
+        dataset_file_paths = [file.normalized_path for file in ds_files]
+        local_only_files = [
+            file
+            for file in local_file_paths
+            if file not in dataset_file_paths
         ]
 
         return DatasetValidationResponse(
             files_matching=ds_files_matching,
             files_not_matching=ds_files_not_matching,
             files_missing=ds_files_missing,
-            local_only_files=local_only_files
+            local_only_files=local_only_files,
+            validate_errors=ds_validate_failed,
         )
 
     def download_files(
