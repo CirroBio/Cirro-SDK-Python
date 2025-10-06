@@ -89,7 +89,7 @@ Usage: cirro validate-folder [OPTIONS]
   Validate that the contents of a local folder match those of a dataset in Cirro
 
 Options:
-  --name TEXT                  Name or ID of the dataset
+  --dataset TEXT               Name or ID of the dataset
   --project TEXT               Name or ID of the project
   --data-directory TEXT        Local directory you wish to validate
   -i, --interactive            Gather arguments interactively
@@ -98,7 +98,7 @@ Options:
 ```
 
 ```bash
-$ cirro validate-folder --project "Test Project 1" --name "test" --data-directory "~/data"
+$ cirro validate-folder --project "Test Project 1" --dataset "test" --data-directory "~/data"
 ```
 
 #### Uploading a reference
