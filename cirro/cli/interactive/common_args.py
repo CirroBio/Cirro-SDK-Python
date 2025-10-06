@@ -1,9 +1,10 @@
 from typing import List
 
 from cirro_api_client.v1.models import Project, Dataset
+
 from cirro.cli.interactive.utils import ask, prompt_wrapper, InputError
-from cirro.utils import format_date
 from cirro.models.dataset import DatasetWithShare
+from cirro.utils import format_date
 
 
 def _format_share(dataset: Dataset | DatasetWithShare) -> str:
@@ -59,5 +60,5 @@ def ask_dataset(datasets: List[Dataset], input_value: str, msg_action: str) -> s
         'confirm',
         'The selection does match an option available - try again?'
     ):
-        return ask_dataset(datasets, input_value)
+        return ask_dataset(datasets, input_value, msg_action)
     raise InputError("Exiting - no dataset selected")
