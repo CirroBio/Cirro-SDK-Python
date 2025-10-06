@@ -212,11 +212,7 @@ class DataPortalFile(DataPortalAsset):
         if not local_path:
             raise DataPortalInputError("Must provide local path to validate file")
 
-        try:
-            self.validate(local_path)
-            return True
-        except ValueError:
-            return False
+        return self._client.file.is_valid_file(self._file, local_path)
 
 
 class DataPortalFiles(DataPortalAssets[DataPortalFile]):

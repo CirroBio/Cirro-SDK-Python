@@ -140,6 +140,11 @@ class File:
         )
 
     @property
+    def normalized_path(self) -> str:
+        """ Without the data prefix """
+        return self.relative_path[len("data/"):]
+
+    @property
     def absolute_path(self):
         return f'{self.access_context.base_url}/{self.relative_path.strip("/")}'
 

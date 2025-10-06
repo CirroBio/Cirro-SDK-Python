@@ -81,6 +81,26 @@ Options:
 $ cirro upload --project "Test Project 1" --name "test" --file "sample1.fastq.gz" --file "sample2.fastq.gz" --data-directory "~/data" --data-type "Paired DNAseq (FASTQ)" 
 ```
 
+#### Validating that a dataset matches a local folder
+
+```bash
+Usage: cirro validate [OPTIONS]
+
+  Validate that the contents of a local folder match those of a dataset in Cirro
+
+Options:
+  --dataset TEXT               Name or ID of the dataset
+  --project TEXT               Name or ID of the project
+  --data-directory TEXT        Local directory you wish to validate
+  -i, --interactive            Gather arguments interactively
+  --help                       Show this message and exit.
+
+```
+
+```bash
+$ cirro validate --project "Test Project 1" --dataset "test" --data-directory "~/data"
+```
+
 #### Uploading a reference
 
 ```bash

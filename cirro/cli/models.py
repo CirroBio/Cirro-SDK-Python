@@ -20,6 +20,13 @@ class UploadArguments(TypedDict):
     file: Optional[list[str]]
 
 
+class ValidateArguments(TypedDict):
+    dataset: str
+    project: str
+    data_directory: str
+    interactive: bool
+
+
 class ListArguments(TypedDict):
     project: str
     interactive: bool
