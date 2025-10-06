@@ -1,3 +1,5 @@
+import logging
+from pathlib import Path
 from typing import List, Optional, Union, Dict
 
 from cirro_api_client.v1.api.datasets import get_datasets, get_dataset, import_public_dataset, upload_dataset, \
@@ -6,10 +8,14 @@ from cirro_api_client.v1.api.sharing import get_shared_datasets
 from cirro_api_client.v1.models import ImportDataRequest, UploadDatasetRequest, UpdateDatasetRequest, Dataset, \
     DatasetDetail, CreateResponse, UploadDatasetCreateResponse, FileEntry
 
+from cirro.file_utils import is_hidden_file
 from cirro.models.assets import DatasetAssets, Artifact
+from cirro.models.dataset import DatasetValidationResponse
 from cirro.models.file import FileAccessContext, File, PathLike
 from cirro.services.base import get_all_records
 from cirro.services.file import FileEnabledService
+
+logger = logging.getLogger()
 
 
 class DatasetService(FileEnabledService):
@@ -297,6 +303,63 @@ class DatasetService(FileEnabledService):
             directory=directory,
             files=files,
             file_path_map=file_path_map
+        )
+
+    def validate_folder(
+        self,
+        project_id: str,
+        dataset_id: str,
+        local_folder: PathLike
+    ) -> DatasetValidationResponse:
+        """
+        Validates that the contents of a dataset match that of a local folder.
+        """
+        ds_files = self.get_assets_listing(project_id, dataset_id).files
+
+        local_folder = Path(local_folder)
+        if not local_folder.is_dir():
+            raise ValueError(f"{local_folder} is not a valid local folder")
+
+        # Keep track of files from the dataset which match by checksum, don't match, or are missing
+        ds_files_matching = []
+        ds_files_not_matching = []
+        ds_files_missing = []
+        ds_validate_failed = []
+        for ds_file in ds_files:
+            ds_file_path = ds_file.normalized_path
+            # Get the corresponding local file
+            local_file = local_folder / ds_file_path
+            if not local_file.exists():
+                ds_files_missing.append(ds_file_path)
+            else:
+                try:
+                    if self._file_service.is_valid_file(ds_file, local_file):
+                        ds_files_matching.append(ds_file_path)
+                    else:
+                        ds_files_not_matching.append(ds_file_path)
+                except RuntimeWarning as e:
+                    logger.warning(f"File validation failed: {e}")
+                    ds_validate_failed.append(ds_file_path)
+
+        # Find local files that are not in the dataset
+        local_file_paths = [
+            file.relative_to(local_folder).as_posix()
+            for file in local_folder.rglob("*")
+            if not file.is_dir() and not is_hidden_file(file)
+        ]
+        dataset_file_paths = [file.normalized_path for file in ds_files]
+        local_only_files = [
+            file
+            for file in local_file_paths
+            if file not in dataset_file_paths
+        ]
+
+        return DatasetValidationResponse(
+            files_matching=ds_files_matching,
+            files_not_matching=ds_files_not_matching,
+            files_missing=ds_files_missing,
+            local_only_files=local_only_files,
+            validate_errors=ds_validate_failed,
         )
 
     def download_files(

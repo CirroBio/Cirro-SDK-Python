@@ -4,51 +4,10 @@ from typing import List
 
 from cirro_api_client.v1.models import Dataset, Project
 
-from cirro.cli.interactive.common_args import ask_project
+from cirro.cli.interactive.common_args import ask_project, ask_dataset
 from cirro.cli.interactive.utils import ask, prompt_wrapper, InputError
 from cirro.cli.models import DownloadArguments
-from cirro.models.dataset import DatasetWithShare
 from cirro.models.file import File
-from cirro.utils import format_date
-
-
-def _format_share(dataset: Dataset | DatasetWithShare) -> str:
-    if isinstance(dataset, DatasetWithShare) and dataset.share:
-        return f'({dataset.share.name})'
-    return ''
-
-
-def ask_dataset(datasets: List[Dataset], input_value: str) -> str:
-    if len(datasets) == 0:
-        raise InputError("No datasets available")
-    sorted_datasets = sorted(datasets, key=lambda d: d.created_at, reverse=True)
-    dataset_prompt = {
-        'type': 'autocomplete',
-        'name': 'dataset',
-        'message': 'What dataset would you like to download? (Press Tab to see all options)',
-        'choices': [f'{dataset.name} - {dataset.id}' for dataset in sorted_datasets],
-        'meta_information': {
-            f'{dataset.name} - {dataset.id}': f'{format_date(dataset.created_at)} {_format_share(dataset)}'
-            for dataset in datasets
-        },
-        'ignore_case': True
-    }
-    answers = prompt_wrapper(dataset_prompt)
-    choice = answers['dataset']
-    # Map the answer to a dataset
-    for dataset in datasets:
-        if f'{dataset.name} - {dataset.id}' == choice:
-            return dataset.id
-
-    # The user has made a selection which does not match
-    # any of the options available.
-    # This is most likely because there was a typo
-    if ask(
-        'confirm',
-        'The selection does match an option available - try again?'
-    ):
-        return ask_dataset(datasets, input_value)
-    raise InputError("Exiting - no dataset selected")
 
 
 def ask_dataset_files(files: List[File]) -> List[File]:
@@ -172,6 +131,6 @@ def gather_download_arguments(input_params: DownloadArguments, projects: List[Pr
 
 
 def gather_download_arguments_dataset(input_params: DownloadArguments, datasets: List[Dataset]):
-    input_params['dataset'] = ask_dataset(datasets, input_params.get('dataset'))
+    input_params['dataset'] = ask_dataset(datasets, input_params.get('dataset'), msg_action='download')
     input_params['data_directory'] = ask_directory(input_params.get('data_directory'))
     return input_params
