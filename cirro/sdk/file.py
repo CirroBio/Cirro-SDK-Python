@@ -214,6 +214,9 @@ class DataPortalFile(DataPortalAsset):
 
         return self._client.file.is_valid_file(self._file, local_path)
 
+    def get_bytesio(self) -> BytesIO:
+        """Get a generic BytesIO object representing the Data Portal File, to be passed into readers."""
+        return BytesIO(self._get())
 
 class DataPortalFiles(DataPortalAssets[DataPortalFile]):
     """Collection of DataPortalFile objects."""
