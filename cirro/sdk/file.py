@@ -218,6 +218,7 @@ class DataPortalFile(DataPortalAsset):
         """Get a generic BytesIO object representing the Data Portal File, to be passed into readers."""
         return BytesIO(self._get())
 
+
 class DataPortalFiles(DataPortalAssets[DataPortalFile]):
     """Collection of DataPortalFile objects."""
     asset_name = "file"
