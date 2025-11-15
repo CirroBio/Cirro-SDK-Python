@@ -174,17 +174,17 @@ class DataPortalFile(DataPortalAsset):
             ) as handle:
                 return handle.read()
 
-    def download(self, download_location: str = None):
+    def download(self, download_location: str = None) -> str:
         """Download the file to a local directory."""
 
         if download_location is None:
             raise DataPortalInputError("Must provide download location")
 
-        self._client.file.download_files(
+        return self._client.file.download_files(
             self._file.access_context,
             download_location,
             [self.relative_path]
-        )
+        )[0]
 
     def validate(self, local_path: PathLike):
         """
@@ -219,8 +219,10 @@ class DataPortalFiles(DataPortalAssets[DataPortalFile]):
     """Collection of DataPortalFile objects."""
     asset_name = "file"
 
-    def download(self, download_location: str = None) -> None:
+    def download(self, download_location: str = None) -> List[str]:
         """Download the collection of files to a local directory."""
 
+        local_paths = []
         for f in self:
-            f.download(download_location)
+            local_paths += f.download(download_location)
+        return local_paths

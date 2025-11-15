@@ -190,10 +190,11 @@ def upload_directory(directory: PathLike,
                 break
 
 
-def download_directory(directory: str, files: List[str], s3_client: S3Client, bucket: str, prefix: str):
+def download_directory(directory: str, files: List[str], s3_client: S3Client, bucket: str, prefix: str) -> List[str]:
     """
     @private
     """
+    local_paths = []
     for file in files:
         key = f'{prefix}/{file}'.lstrip('/')
         local_path = Path(directory, file).expanduser()
@@ -202,6 +203,8 @@ def download_directory(directory: str, files: List[str], s3_client: S3Client, bu
         s3_client.download_file(local_path=local_path,
                                 bucket=bucket,
                                 key=key)
+        local_paths += str(local_path)
+    return local_paths
 
 
 def get_checksum(file: Path, checksum_name: str, chunk_size=1024 * 1024) -> str:

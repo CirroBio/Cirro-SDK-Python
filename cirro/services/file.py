@@ -162,7 +162,7 @@ class FileService(BaseService):
             max_retries=self.transfer_retries
         )
 
-    def download_files(self, access_context: FileAccessContext, directory: str, files: List[str]) -> None:
+    def download_files(self, access_context: FileAccessContext, directory: str, files: List[str]) -> List[str]:
         """
         Download a list of files to the specified directory
 
@@ -173,7 +173,7 @@ class FileService(BaseService):
         """
         s3_client = self._generate_s3_client(access_context)
 
-        download_directory(
+        return download_directory(
             directory,
             files,
             s3_client,
