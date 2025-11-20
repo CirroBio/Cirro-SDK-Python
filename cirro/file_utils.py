@@ -151,9 +151,9 @@ def upload_directory(directory: PathLike,
 
     for file in files:
         if isinstance(file, str):
-            file_path = Path(directory, file)
+            file_path = Path(directory, file).expanduser()
         else:
-            file_path = file
+            file_path = file.expanduser()
 
         # Check if is present in the file_path_map
         # if it is, use the mapped value as the destination path
@@ -196,7 +196,7 @@ def download_directory(directory: str, files: List[str], s3_client: S3Client, bu
     """
     for file in files:
         key = f'{prefix}/{file}'.lstrip('/')
-        local_path = Path(directory, file)
+        local_path = Path(directory, file).expanduser()
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
         s3_client.download_file(local_path=local_path,
@@ -204,7 +204,7 @@ def download_directory(directory: str, files: List[str], s3_client: S3Client, bu
                                 key=key)
 
 
-def get_checksum(file: PathLike, checksum_name: str, chunk_size=1024 * 1024) -> str:
+def get_checksum(file: Path, checksum_name: str, chunk_size=1024 * 1024) -> str:
     from awscrt import checksums
     checksum_func_map = {
         'CRC32': checksums.crc32,
@@ -217,7 +217,7 @@ def get_checksum(file: PathLike, checksum_name: str, chunk_size=1024 * 1024) -> 
         raise RuntimeWarning(f"Unsupported checksum type: {checksum_name}")
 
     crc = 0
-    with open(file, "rb") as f:
+    with file.open("rb") as f:
         while True:
             chunk = f.read(chunk_size)
             if not chunk:

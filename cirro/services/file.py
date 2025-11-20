@@ -218,6 +218,8 @@ class FileService(BaseService):
             ValueError: If checksums do not match
             RuntimeWarning: If the remote checksum is not available or not supported
         """
+        local_file = Path(local_file).expanduser() if isinstance(local_file, str) else local_file.expanduser()
+
         stats = self.get_file_stats(file)
 
         remote_checksum_key = next((prop for prop in stats.keys()
