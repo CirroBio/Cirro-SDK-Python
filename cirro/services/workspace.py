@@ -9,6 +9,12 @@ class WorkspaceService(BaseService):
     """
     Service for interacting with the Workspace endpoints
     """
+    def list_environments(self) -> list[WorkspaceEnvironment]:
+        """
+        List available workspace environments
+        """
+        return get_workspace_environments.sync(client=self._api_client)
+
     def list(self, project_id: str) -> list[Workspace]:
         """
         Retrieves a list of workspaces that the user has access to
@@ -67,9 +73,3 @@ class WorkspaceService(BaseService):
             workspace_id (str): ID of the Workspace
         """
         stop_workspace.sync_detailed(project_id=project_id, workspace_id=workspace_id, client=self._api_client)
-
-    def list_environments(self) -> list[WorkspaceEnvironment]:
-        """
-        List available workspace environments
-        """
-        return get_workspace_environments.sync(client=self._api_client)
