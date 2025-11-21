@@ -174,6 +174,10 @@ class DataPortalFile(DataPortalAsset):
             ) as handle:
                 return handle.read()
 
+    def read_bytes(self) -> BytesIO:
+        """Get a generic BytesIO object representing the Data Portal File, to be passed into readers."""
+        return BytesIO(self._get())
+
     def download(self, download_location: str = None):
         """Download the file to a local directory."""
 
