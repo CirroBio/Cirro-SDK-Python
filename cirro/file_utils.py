@@ -190,7 +190,7 @@ def upload_directory(directory: PathLike,
                 break
 
 
-def download_directory(directory: str, files: List[str], s3_client: S3Client, bucket: str, prefix: str) -> List[str]:
+def download_directory(directory: str, files: List[str], s3_client: S3Client, bucket: str, prefix: str) -> List[Path]:
     """
     @private
     """
@@ -203,7 +203,7 @@ def download_directory(directory: str, files: List[str], s3_client: S3Client, bu
         s3_client.download_file(local_path=local_path,
                                 bucket=bucket,
                                 key=key)
-        local_paths += str(local_path)
+        local_paths += local_path
     return local_paths
 
 

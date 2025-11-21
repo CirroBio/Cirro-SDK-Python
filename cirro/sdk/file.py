@@ -1,5 +1,6 @@
 import gzip
 from io import BytesIO, StringIO
+from pathlib import Path
 from typing import List
 
 from typing import TYPE_CHECKING
@@ -174,8 +175,13 @@ class DataPortalFile(DataPortalAsset):
             ) as handle:
                 return handle.read()
 
-    def download(self, download_location: str = None) -> str:
-        """Download the file to a local directory."""
+    def download(self, download_location: str = None) -> Path:
+        """
+        Download the file to a local directory.
+
+        Returns:
+            Path to download file
+        """
 
         if download_location is None:
             raise DataPortalInputError("Must provide download location")
@@ -216,10 +222,14 @@ class DataPortalFile(DataPortalAsset):
 
 
 class DataPortalFiles(DataPortalAssets[DataPortalFile]):
-    """Collection of DataPortalFile objects."""
+    """Collection of DataPortalFile objects.
+
+    Returns:
+        List of paths to downloaded files.
+    """
     asset_name = "file"
 
-    def download(self, download_location: str = None) -> List[str]:
+    def download(self, download_location: str = None) -> List[Path]:
         """Download the collection of files to a local directory."""
 
         local_paths = []
