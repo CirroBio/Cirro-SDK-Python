@@ -174,6 +174,10 @@ class DataPortalFile(DataPortalAsset):
             ) as handle:
                 return handle.read()
 
+    def read_bytes(self) -> BytesIO:
+        """Get a generic BytesIO object representing the Data Portal File, to be passed into readers."""
+        return BytesIO(self._get())
+
     def download(self, download_location: str = None):
         """Download the file to a local directory."""
 
@@ -213,10 +217,6 @@ class DataPortalFile(DataPortalAsset):
             raise DataPortalInputError("Must provide local path to validate file")
 
         return self._client.file.is_valid_file(self._file, local_path)
-
-    def get_bytesio(self) -> BytesIO:
-        """Get a generic BytesIO object representing the Data Portal File, to be passed into readers."""
-        return BytesIO(self._get())
 
 
 class DataPortalFiles(DataPortalAssets[DataPortalFile]):
