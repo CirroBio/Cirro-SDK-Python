@@ -226,15 +226,17 @@ class DataPortalFile(DataPortalAsset):
 
 
 class DataPortalFiles(DataPortalAssets[DataPortalFile]):
-    """Collection of DataPortalFile objects.
+    """Collection of DataPortalFile objects."""
 
-    Returns:
-        List of paths to downloaded files.
-    """
     asset_name = "file"
 
     def download(self, download_location: str = None) -> List[Path]:
-        """Download the collection of files to a local directory."""
+        """
+        Download the collection of files to a local directory.
+
+        Returns:
+            List of paths to downloaded files.
+        """
 
         local_paths = []
         for f in self:
