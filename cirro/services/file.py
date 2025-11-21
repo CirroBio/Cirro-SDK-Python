@@ -162,7 +162,7 @@ class FileService(BaseService):
             max_retries=self.transfer_retries
         )
 
-    def download_files(self, access_context: FileAccessContext, directory: str, files: List[str]) -> None:
+    def download_files(self, access_context: FileAccessContext, directory: str, files: List[str]) -> List[Path]:
         """
         Download a list of files to the specified directory
 
@@ -170,10 +170,12 @@ class FileService(BaseService):
             access_context (cirro.models.file.FileAccessContext): File access context, use class methods to generate
             directory (str): download location
             files (List[str]): relative path of files to download
+        Returns:
+            List of paths to downloaded files
         """
         s3_client = self._generate_s3_client(access_context)
 
-        download_directory(
+        return download_directory(
             directory,
             files,
             s3_client,
