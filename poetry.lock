@@ -643,14 +643,14 @@ files = [
 
 [[package]]
 name = "cirro-api-client"
-version = "1.1.0"
+version = "1.2.2"
 description = "A client library for accessing Cirro"
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "cirro_api_client-1.1.0-py3-none-any.whl", hash = "sha256:bd91979bdbf6d3ab129565ac5c0e037bc18283ac3e41b955237aaee721716a7b"},
-    {file = "cirro_api_client-1.1.0.tar.gz", hash = "sha256:a6b64791dff0f0c2bf0a0b87b9bd528eb4072d63eda76cc72f84a158acfd696d"},
+    {file = "cirro_api_client-1.2.2-py3-none-any.whl", hash = "sha256:b230fe47f07b35e9cfb1b9153251c832bc42b8771dafe3e42f2374c9e0a3e84c"},
+    {file = "cirro_api_client-1.2.2.tar.gz", hash = "sha256:d2d9852a35bb918fa7a5a1aeefa430621dab6cfaa5bbf40fede9694fd292c1de"},
 ]
 
 [package.dependencies]
@@ -4405,4 +4405,4 @@ wdl = ["miniwdl"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">3.9.1,<4.0"
-content-hash = "0ba14305844ec9ce8c3c80fb9c0abca55c1f9ea372c2415510d3fc93f39cdc22"
+content-hash = "41ff8f2b584f3599818416dab5de981f965f847a238bdd5951ffe1175ffa8e11"

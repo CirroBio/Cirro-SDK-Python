@@ -5,7 +5,7 @@ from cirro.auth.base import AuthInfo
 from cirro.config import AppConfig
 from cirro.services import FileService, DatasetService, ProjectService, ProcessService, ExecutionService, \
     MetricsService, MetadataService, BillingService, ReferenceService, UserService, ComputeEnvironmentService, \
-    ShareService
+    ShareService, WorkspaceService
 
 
 class CirroApi:
@@ -59,6 +59,7 @@ class CirroApi:
         self._references_service = ReferenceService(self._api_client, file_service=self._file_service)
         self._shares_service = ShareService(self._api_client)
         self._users_service = UserService(self._api_client)
+        self._workspace_service = WorkspaceService(self._api_client)
 
     @property
     def datasets(self) -> DatasetService:
@@ -136,6 +137,13 @@ class CirroApi:
         List and update user information
         """
         return self._users_service
+
+    @property
+    def workspaces(self) -> WorkspaceService:
+        """
+        Manage workspaces
+        """
+        return self._workspace_service
 
     @property
     def file(self) -> FileService:
