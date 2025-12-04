@@ -203,7 +203,7 @@ def download_directory(directory: str, files: List[str], s3_client: S3Client, bu
         s3_client.download_file(local_path=local_path,
                                 bucket=bucket,
                                 key=key)
-        local_paths += local_path
+        local_paths.append(local_path)
     return local_paths
 
 
