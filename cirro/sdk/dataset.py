@@ -4,7 +4,7 @@ from typing import Union, List, Optional
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
-    RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, Executor, ValidateFileRequirementsRequest
+    RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
 
 from cirro.cirro_client import CirroApi
 from cirro.models.assets import DatasetAssets
@@ -327,9 +327,6 @@ class DataPortalDataset(DataPortalAsset):
 
         if contents is None and file_path is None:
             raise DataPortalInputError("Must specify either 'contents' or 'file_path' when updating samplesheet")
-
-        if self.process.executor != Executor.INGEST:
-            raise DataPortalInputError("Cannot update a samplesheet on a non-ingest dataset")
 
         samplesheet_contents = contents
         if file_path is not None:
