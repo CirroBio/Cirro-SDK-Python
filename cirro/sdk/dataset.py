@@ -328,9 +328,6 @@ class DataPortalDataset(DataPortalAsset):
         if contents is None and file_path is None:
             raise DataPortalInputError("Must specify either 'contents' or 'file_path' when updating samplesheet")
 
-        if self.process.executor != Executor.INGEST:
-            raise DataPortalInputError("Cannot update a samplesheet on a non-ingest dataset")
-
         samplesheet_contents = contents
         if file_path is not None:
             samplesheet_contents = Path(file_path).expanduser().read_text()
