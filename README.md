@@ -5,7 +5,7 @@
 ![](https://img.shields.io/pypi/v/cirro.svg)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=CirroBio_Cirro-client&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=CirroBio_Cirro-client)
 
-A Python 3.9+ library for the Cirro platform.
+A Python 3.10+ library for the Cirro platform.
 
 ## Installation
 
