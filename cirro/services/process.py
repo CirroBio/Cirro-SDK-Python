@@ -15,14 +15,15 @@ class ProcessService(BaseService):
     """
     Service for interacting with the Process endpoints
     """
-    def list(self, process_type: Executor = None) -> List[Process]:
+    def list(self, process_type: Executor = None, include_archived=False) -> List[Process]:
         """
         Retrieves a list of available processes
 
         Args:
             process_type (`cirro_api_client.v1.models.Executor`): Optional process type (INGEST, CROMWELL, or NEXTFLOW)
+            include_archived: Whether to include archived processes in the list (default False)
         """
-        processes = get_processes.sync(client=self._api_client)
+        processes = get_processes.sync(client=self._api_client, include_archived=include_archived)
         return [p for p in processes if not process_type or process_type == p.executor]
 
     def get(self, process_id: str) -> ProcessDetail:
