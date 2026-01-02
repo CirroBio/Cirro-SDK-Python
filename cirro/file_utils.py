@@ -151,9 +151,9 @@ def upload_directory(directory: PathLike,
 
     for file in files:
         if isinstance(file, str):
-            file_path = Path(directory, file).expanduser()
+            file_path = Path(directory, file)
         else:
-            file_path = file.expanduser()
+            file_path = file
 
         # Check if is present in the file_path_map
         # if it is, use the mapped value as the destination path
