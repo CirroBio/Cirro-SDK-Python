@@ -40,7 +40,7 @@ class DataPortalReference(DataPortalAsset):
     @property
     def type(self) -> str:
         """Type of reference data (e.g. genome_fasta)"""
-        return self._data.type
+        return self._data.type_
 
     @property
     def absolute_path(self):
