@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cirro"
-version = "1.9.5"
+version = "1.10.0"
 description = "CLI tool and SDK for interacting with the Cirro platform"
 authors = ["Cirro Bio <support@cirro.bio>"]
 license = "MIT"
@@ -11,7 +11,7 @@ packages = [{include = "cirro"}]
 [tool.poetry.dependencies]
 python = ">3.10.0,<4.0"
 attrs = ">=21.3.0"
-cirro_api_client = "1.2.2"
+cirro_api_client = "~1.3.0"
 click = "^8.1.3"
 boto3 = "~=1.41"
 questionary = "^2.0.1"
@@ -33,6 +33,7 @@ pytest = "^7.1.3"
 pytest-cov = "*"
 flake8 = "*"
 pdoc = "15.0.0"
+mypy = "1.19.1"
 
 [tool.poetry.extras]
 pyodide = ["requests-aws4auth"]
@@ -46,3 +47,6 @@ cirro = "cirro.cli.cli:main"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+disable_error_code = ["return", "import-untyped", "var-annotated"]
