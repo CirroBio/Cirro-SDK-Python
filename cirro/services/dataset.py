@@ -227,7 +227,7 @@ class DatasetService(FileEnabledService):
         ]
         artifacts = [
             Artifact(
-                artifact_type=a.type,
+                artifact_type=a.type_,
                 file=File.from_file_entry(
                     FileEntry(a.path),
                     project_id=project_id,

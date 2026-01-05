@@ -134,7 +134,7 @@ class DataPortalProject(DataPortalAsset):
                 for ref in self._client.references.get_for_project(
                     self.id
                 )
-                if reference_type is None or ref.type == reference_type
+                if reference_type is None or ref.type_ == reference_type
             ]
         )
 
