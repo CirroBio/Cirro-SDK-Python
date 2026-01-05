@@ -33,7 +33,6 @@ pytest = "^7.1.3"
 pytest-cov = "*"
 flake8 = "*"
 pdoc = "15.0.0"
-mypy = "1.19.1"
 
 [tool.poetry.extras]
 pyodide = ["requests-aws4auth"]
@@ -47,6 +46,3 @@ cirro = "cirro.cli.cli:main"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.mypy]
-disable_error_code = ["return", "import-untyped", "var-annotated"]
