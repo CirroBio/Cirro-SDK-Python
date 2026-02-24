@@ -48,7 +48,7 @@ def get_auth_info_from_config(app_config: AppConfig, auth_io: Optional[StringIO]
         return ClientCredentialsAuth(
             auth_config.get('client_id'),
             auth_config.get('client_secret'),
-            auth_endpoint=app_config.cognito_endpoint
+            auth_endpoint=app_config.auth_endpoint
         )
 
     return None

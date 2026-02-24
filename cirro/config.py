@@ -108,7 +108,6 @@ class AppConfig:
             info = info_resp.json()
             self.client_id = info['auth']['sdkAppId']
             self.user_pool_id = info['auth']['userPoolId']
-            self.cognito_endpoint = info['auth']['endpoint']
             self.references_bucket = info['referencesBucket']
             self.resources_bucket = info['resourcesBucket']
             self.region = info['region']
