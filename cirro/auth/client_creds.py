@@ -5,7 +5,6 @@ import time
 from typing import Optional
 
 import jwt
-import httpx
 import requests
 from cirro_api_client import RefreshableTokenAuth
 from cirro_api_client.cirro_auth import AuthMethod
@@ -69,7 +68,7 @@ class ClientCredentialsAuth(AuthInfo):
         }
 
         response = requests.post(
-            f"{self._auth_endpoint}/oauth2/token",
+            f"{self._auth_endpoint}/token",
             headers=headers,
             data=data,
         )
@@ -87,4 +86,4 @@ class ClientCredentialsAuth(AuthInfo):
                                           options={"verify_signature": False})
         expires_in = self._token_info.get("expires_in", 3600)
         self._token_expiry = time.time() + expires_in - 30
-        self._username = decoded_access_token["username"]
+        self._username = decoded_access_token["appUsername"]
