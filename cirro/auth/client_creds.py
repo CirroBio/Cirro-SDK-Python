@@ -17,11 +17,26 @@ logger = logging.getLogger()
 
 class ClientCredentialsAuth(AuthInfo):
     """
-    Authenticates to Cirro with the OAuth client credentials
+    Authenticates to Cirro with OAuth client credentials
 
-    :param client_id: Client ID
-    :param client_secret: Client Secret
-    :param auth_endpoint: Auth Endpoint
+    Args:
+        client_id (str): Client ID
+        client_secret (str): Client Secret
+        auth_endpoint (str): Auth Endpoint
+
+    ```python
+    import os
+    from cirro import CirroApi
+    from cirro.auth.client_creds import ClientCredentialsAuth
+    from cirro.config import AppConfig
+
+    client_id = os.getenv('CIRRO_CLIENT_ID')
+    client_secret = os.getenv('CIRRO_CLIENT_SECRET')
+
+    config = AppConfig(base_url="app.cirro.bio")
+    auth_info = ClientCredentialsAuth(client_id, client_secret, auth_endpoint=config.auth_endpoint)
+    cirro = CirroApi(auth_info=auth_info)
+    ```
     """
 
     def __init__(
