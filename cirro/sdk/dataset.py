@@ -244,7 +244,8 @@ class DataPortalDataset(DataPortalAsset):
             params=None,
             notifications_emails: List[str] = None,
             compute_environment: str = None,
-            resume_dataset_id: str = None
+            resume_dataset_id: str = None,
+            source_sample_ids: List[str] = None
     ) -> str:
         """
         Runs an analysis on a dataset, returns the ID of the newly created dataset.
@@ -262,6 +263,7 @@ class DataPortalDataset(DataPortalAsset):
              if blank it will run in AWS
             resume_dataset_id (str): ID of dataset to resume from, used for caching task execution.
              It will attempt to re-use the previous output to minimize duplicate work
+            source_sample_ids (List[str]): List of sample IDs to use as input for the analysis.
 
         Returns:
             dataset_id (str): ID of newly created dataset
@@ -300,6 +302,7 @@ class DataPortalDataset(DataPortalAsset):
                 params=RunAnalysisRequestParams.from_dict(params),
                 notification_emails=notifications_emails,
                 resume_dataset_id=resume_dataset_id,
+                source_sample_ids=source_sample_ids,
                 compute_environment_id=compute_environment.id if compute_environment else None
             )
         )
