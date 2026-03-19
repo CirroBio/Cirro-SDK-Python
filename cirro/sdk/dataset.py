@@ -1,6 +1,7 @@
 import datetime
+import re
 from pathlib import Path
-from typing import Union, List, Optional, Iterator, Tuple, Any
+from typing import Union, List, Optional, Iterator, Tuple, Any, Dict
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
@@ -16,6 +17,39 @@ from cirro.sdk.exceptions import DataPortalInputError
 from cirro.sdk.file import DataPortalFile, DataPortalFiles
 from cirro.sdk.helpers import parse_process_name_or_id
 from cirro.sdk.process import DataPortalProcess
+
+
+def _pattern_to_captures_regex(pattern: str):
+    """
+    Convert a glob pattern that may contain ``{name}`` capture placeholders into
+    a compiled regex and return ``(compiled_regex, capture_names)``.
+
+    Conversion rules:
+      - ``{name}``  → named group matching a single path segment (no ``/``)
+      - ``*``       → matches any characters within a single path segment
+      - ``**``      → matches any characters including ``/`` (multiple segments)
+      - All other characters are regex-escaped.
+
+    The resulting regex is suffix-anchored (like ``pathlib.PurePath.match``):
+    a pattern without a leading ``/`` will match at any depth in the path.
+    """
+    capture_names = re.findall(r'\{(\w+)\}', pattern)
+    tokens = re.split(r'(\*\*|\*|\{\w+\})', pattern)
+    parts = []
+    for token in tokens:
+        if token == '**':
+            parts.append('.*')
+        elif token == '*':
+            parts.append('[^/]*')
+        elif re.match(r'^\{\w+\}$', token):
+            name = token[1:-1]
+            parts.append(f'(?P<{name}>[^/]+)')
+        else:
+            parts.append(re.escape(token))
+    regex_str = ''.join(parts)
+    if not pattern.startswith('/'):
+        regex_str = r'(?:.+/)?' + regex_str
+    return re.compile('^' + regex_str + '$'), capture_names
 
 
 def _infer_file_format(path: str) -> str:
@@ -257,7 +291,7 @@ class DataPortalDataset(DataPortalAsset):
             pattern: str,
             file_format: str = None,
             **kwargs
-    ) -> Iterator[Tuple[DataPortalFile, Any]]:
+    ) -> Iterator[Tuple[DataPortalFile, Any, Dict[str, str]]]:
         """
         Read the contents of files in the dataset matching the given glob pattern.
 
@@ -265,9 +299,18 @@ class DataPortalDataset(DataPortalAsset):
         ``*`` matches any sequence of characters within a single path segment;
         ``**`` matches zero or more path segments.
 
+        **Named captures** — wrap a segment in ``{name}`` to extract that portion
+        of the path automatically.  For example, ``{sample}.csv`` will match
+        ``sampleA.csv`` and ``sampleB.csv`` and return ``{'sample': 'sampleA'}``
+        / ``{'sample': 'sampleB'}`` respectively in the third element of each
+        yielded tuple.  Multiple captures are supported:
+        ``{condition}/{sample}.csv`` extracts both ``condition`` and ``sample``
+        from a two-level path.
+
         Args:
-            pattern (str): Glob pattern used to match file paths within the dataset
-                (e.g., ``'*.csv'``, ``'counts/**/*.tsv.gz'``)
+            pattern (str): Glob pattern used to match file paths within the dataset.
+                May contain ``{name}`` capture placeholders
+                (e.g., ``'{sample}.csv'``, ``'counts/{sample}/*.tsv.gz'``).
             file_format (str): File format used to parse each file. Supported values:
 
                 - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
@@ -293,26 +336,47 @@ class DataPortalDataset(DataPortalAsset):
                 :meth:`~cirro.sdk.file.DataPortalFile.read`.
 
         Yields:
-            Tuple[DataPortalFile, Any]: ``(file, content)`` for each matching file,
-            where *content* type depends on *file_format*.
+            Tuple[DataPortalFile, Any, Dict[str, str]]:
+            ``(file, content, captures)`` for each matching file, where:
+
+            - *content* type depends on *file_format*
+            - *captures* is a ``dict`` of values extracted from ``{name}``
+              placeholders in the pattern (empty ``{}`` when the pattern
+              contains no captures)
 
         Example:
             ```python
             # Read all CSV files in a dataset
-            for file, df in dataset.read_files('*.csv'):
+            for file, df, _ in dataset.read_files('*.csv'):
                 print(file.relative_path, df.shape)
 
+            # Extract sample names automatically from filenames
+            for file, df, captures in dataset.read_files('{sample}.csv'):
+                print(captures['sample'], df.shape)
+
+            # Multi-level capture: condition directory + sample filename
+            for file, df, captures in dataset.read_files('{condition}/{sample}.csv'):
+                print(captures['condition'], captures['sample'], df.shape)
+
             # Read gzip-compressed TSV files using explicit format and separator
-            for file, df in dataset.read_files('**/*.tsv.gz', file_format='csv', sep='\\t'):
+            for file, df, _ in dataset.read_files('**/*.tsv.gz', file_format='csv', sep='\\t'):
                 print(file.relative_path, df.shape)
 
             # Read plain-text log files
-            for file, text in dataset.read_files('logs/*.log', file_format='text'):
+            for file, text, _ in dataset.read_files('logs/*.log', file_format='text'):
                 print(file.relative_path, text[:200])
             ```
         """
-        for file in filter_files_by_pattern(list(self.list_files()), pattern):
-            yield file, _read_file_with_format(file, file_format, **kwargs)
+        has_captures = bool(re.search(r'\{\w+\}', pattern))
+        if has_captures:
+            compiled_regex, _ = _pattern_to_captures_regex(pattern)
+            for file in self.list_files():
+                m = compiled_regex.match(file.relative_path)
+                if m is not None:
+                    yield file, _read_file_with_format(file, file_format, **kwargs), m.groupdict()
+        else:
+            for file in filter_files_by_pattern(list(self.list_files()), pattern):
+                yield file, _read_file_with_format(file, file_format, **kwargs), {}
 
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """

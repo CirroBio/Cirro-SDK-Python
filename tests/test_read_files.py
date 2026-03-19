@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pandas as pd
 
 from cirro.models.file import File, FileAccessContext
-from cirro.sdk.dataset import DataPortalDataset, _infer_file_format, _read_file_with_format
+from cirro.sdk.dataset import DataPortalDataset, _infer_file_format, _read_file_with_format, _pattern_to_captures_regex
 from cirro.sdk.exceptions import DataPortalInputError
 from cirro.sdk.file import DataPortalFile, DataPortalFiles
 
@@ -208,13 +208,14 @@ class TestDatasetReadFiles(unittest.TestCase):
     def test_pattern_matches_csv(self):
         results = list(self.dataset.read_files('*.csv'))
         self.assertEqual(len(results), 1)
-        file, content = results[0]
+        file, content, captures = results[0]
         self.assertEqual(file.relative_path, 'data/results.csv')
+        self.assertEqual(captures, {})
 
     def test_pattern_matches_multiple(self):
         results = list(self.dataset.read_files('data/*'))
         self.assertEqual(len(results), 2)
-        paths = {f.relative_path for f, _ in results}
+        paths = {f.relative_path for f, _, _ in results}
         self.assertIn('data/results.csv', paths)
         self.assertIn('data/counts.tsv', paths)
 
@@ -226,36 +227,122 @@ class TestDatasetReadFiles(unittest.TestCase):
         import pandas as pd
         results = list(self.dataset.read_files('data/*.tsv', file_format='csv', sep='\t'))
         self.assertEqual(len(results), 1)
-        _, df = results[0]
+        _, df, _ = results[0]
         self.assertIsInstance(df, pd.DataFrame)
         self.assertIn('gene', df.columns)
 
     def test_explicit_format_text(self):
         results = list(self.dataset.read_files('logs/*.log', file_format='text'))
         self.assertEqual(len(results), 1)
-        _, content = results[0]
+        _, content, _ = results[0]
         self.assertIsInstance(content, str)
         self.assertIn('started', content)
 
     def test_auto_infer_csv_from_extension(self):
         import pandas as pd
         results = list(self.dataset.read_files('data/results.csv'))
-        _, content = results[0]
+        _, content, _ = results[0]
         self.assertIsInstance(content, pd.DataFrame)
 
     def test_auto_infer_text_from_extension(self):
         results = list(self.dataset.read_files('logs/run.log'))
-        _, content = results[0]
+        _, content, _ = results[0]
         self.assertIsInstance(content, str)
 
     def test_yields_file_and_content_tuples(self):
         results = list(self.dataset.read_files('data/*.csv'))
         self.assertEqual(len(results), 1)
-        file, content = results[0]
+        file, content, captures = results[0]
         self.assertIsInstance(file, DataPortalFile)
+        self.assertEqual(captures, {})
 
     def test_globstar_pattern(self):
         results = list(self.dataset.read_files('**/*.csv'))
         self.assertEqual(len(results), 1)
-        file, _ = results[0]
+        file, _, _ = results[0]
         self.assertEqual(file.relative_path, 'data/results.csv')
+
+    # --- capture pattern tests ---
+
+    def test_capture_simple_filename(self):
+        # {sample}.csv should match data/results.csv and capture sample='results'
+        results = list(self.dataset.read_files('{sample}.csv'))
+        self.assertEqual(len(results), 1)
+        file, _, captures = results[0]
+        self.assertEqual(file.relative_path, 'data/results.csv')
+        self.assertEqual(captures['sample'], 'results')
+
+    def test_capture_with_directory(self):
+        # data/{sample}.csv should match data/results.csv
+        results = list(self.dataset.read_files('data/{sample}.csv'))
+        self.assertEqual(len(results), 1)
+        _, _, captures = results[0]
+        self.assertEqual(captures['sample'], 'results')
+
+    def test_capture_multiple_files(self):
+        # {sample}.csv matches both csv files at depth; capture distinct names
+        dataset = _make_dataset_with_files([
+            _make_mock_file('sampleA.csv', b'a\n1\n'),
+            _make_mock_file('sampleB.csv', b'a\n2\n'),
+            _make_mock_file('notes.txt', b'text'),
+        ])
+        results = list(dataset.read_files('{sample}.csv'))
+        self.assertEqual(len(results), 2)
+        captured = {c['sample'] for _, _, c in results}
+        self.assertSetEqual(captured, {'sampleA', 'sampleB'})
+
+    def test_capture_multi_level(self):
+        # {condition}/{sample}.csv extracts two path segments
+        dataset = _make_dataset_with_files([
+            _make_mock_file('treated/sampleA.csv', b'x\n1\n'),
+            _make_mock_file('control/sampleB.csv', b'x\n2\n'),
+        ])
+        results = list(dataset.read_files('{condition}/{sample}.csv'))
+        self.assertEqual(len(results), 2)
+        by_sample = {c['sample']: c['condition'] for _, _, c in results}
+        self.assertEqual(by_sample['sampleA'], 'treated')
+        self.assertEqual(by_sample['sampleB'], 'control')
+
+    def test_capture_no_match_returns_empty(self):
+        results = list(self.dataset.read_files('{sample}.parquet'))
+        self.assertEqual(len(results), 0)
+
+    def test_capture_returns_empty_dict_when_no_placeholders(self):
+        results = list(self.dataset.read_files('*.csv'))
+        _, _, captures = results[0]
+        self.assertEqual(captures, {})
+
+
+class TestPatternToRegex(unittest.TestCase):
+    def _match(self, pattern, path):
+        compiled, names = _pattern_to_captures_regex(pattern)
+        m = compiled.match(path)
+        return m.groupdict() if m else None
+
+    def test_simple_capture(self):
+        self.assertEqual(self._match('{sample}.csv', 'sampleA.csv'), {'sample': 'sampleA'})
+
+    def test_simple_capture_with_directory(self):
+        self.assertEqual(self._match('{sample}.csv', 'data/sampleA.csv'), {'sample': 'sampleA'})
+
+    def test_directory_capture(self):
+        self.assertEqual(self._match('data/{sample}.csv', 'data/results.csv'), {'sample': 'results'})
+
+    def test_multi_level_capture(self):
+        result = self._match('{condition}/{sample}.csv', 'treated/sampleA.csv')
+        self.assertEqual(result, {'condition': 'treated', 'sample': 'sampleA'})
+
+    def test_multi_level_capture_with_prefix(self):
+        result = self._match('{condition}/{sample}.csv', 'data/treated/sampleA.csv')
+        self.assertEqual(result, {'condition': 'treated', 'sample': 'sampleA'})
+
+    def test_no_match_returns_none(self):
+        self.assertIsNone(self._match('{sample}.csv', 'sampleA.tsv'))
+
+    def test_wildcard_mixed_with_capture(self):
+        result = self._match('data/*/{sample}.csv', 'data/subdir/sampleA.csv')
+        self.assertEqual(result, {'sample': 'sampleA'})
+
+    def test_capture_names_returned(self):
+        _, names = _pattern_to_captures_regex('{condition}/{sample}.csv')
+        self.assertListEqual(names, ['condition', 'sample'])
