@@ -7,7 +7,6 @@ from cirro.cirro_client import CirroApi
 from cirro.models.form_specification import ParameterSpecification
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.exceptions import DataPortalInputError
-from cirro.sdk.dataset import DataPortalDataset
 
 
 class DataPortalProcess(DataPortalAsset):
@@ -102,7 +101,7 @@ class DataPortalProcess(DataPortalAsset):
             self,
             name: str = None,
             project_id: str = None,
-            datasets: List[DataPortalDataset] = None,
+            datasets: list = None,
             description: str = "",
             params=None,
             notifications_emails: List[str] = None,
