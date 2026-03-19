@@ -4,7 +4,8 @@ import click
 import requests
 from cirro_api_client.v1.errors import CirroException
 
-from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets, run_create_pipeline_config
+from cirro.cli import run_create_pipeline_config, run_validate_folder
+from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets
 from cirro.cli.controller import handle_error, run_upload_reference
 from cirro.cli.interactive.utils import InputError
 
@@ -79,6 +80,21 @@ def download(**kwargs):
 def upload(**kwargs):
     check_required_args(kwargs)
     run_ingest(kwargs, interactive=kwargs.get('interactive'))
+
+
+@run.command(help='Validate a dataset exactly matches a local folder', no_args_is_help=True)
+@click.option('--dataset',
+              help='Name or ID of the dataset')
+@click.option('--project',
+              help='Name or ID of the project')
+@click.option('--data-directory',
+              help='Local directory you wish to validate')
+@click.option('-i', '--interactive',
+              help='Gather arguments interactively',
+              is_flag=True, default=False)
+def validate(**kwargs):
+    check_required_args(kwargs)
+    run_validate_folder(kwargs, interactive=kwargs.get('interactive'))
 
 
 @run.command(help='Upload a reference to a project', no_args_is_help=True)

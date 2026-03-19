@@ -10,6 +10,8 @@ from .projects import ProjectService
 from .references import ReferenceService
 from .share import ShareService
 from .user import UserService
+from .workspace import WorkspaceService
+
 
 __all__ = [
     'BillingService',
@@ -23,5 +25,6 @@ __all__ = [
     'ProjectService',
     'ReferenceService',
     'ShareService',
-    'UserService'
+    'UserService',
+    'WorkspaceService',
 ]

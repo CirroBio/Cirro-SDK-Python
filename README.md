@@ -5,7 +5,7 @@
 ![](https://img.shields.io/pypi/v/cirro.svg)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=CirroBio_Cirro-client&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=CirroBio_Cirro-client)
 
-A Python 3.9+ library for the Cirro platform.
+A Python 3.10+ library for the Cirro platform.
 
 ## Installation
 
@@ -79,6 +79,26 @@ Options:
 
 ```bash
 $ cirro upload --project "Test Project 1" --name "test" --file "sample1.fastq.gz" --file "sample2.fastq.gz" --data-directory "~/data" --data-type "Paired DNAseq (FASTQ)" 
+```
+
+#### Validating that a dataset matches a local folder
+
+```bash
+Usage: cirro validate [OPTIONS]
+
+  Validate that the contents of a local folder match those of a dataset in Cirro
+
+Options:
+  --dataset TEXT               Name or ID of the dataset
+  --project TEXT               Name or ID of the project
+  --data-directory TEXT        Local directory you wish to validate
+  -i, --interactive            Gather arguments interactively
+  --help                       Show this message and exit.
+
+```
+
+```bash
+$ cirro validate --project "Test Project 1" --dataset "test" --data-directory "~/data"
 ```
 
 #### Uploading a reference
@@ -188,16 +208,12 @@ The `transfer_max_retries` configuration property specifies the maximum number o
 When uploading files to Cirro, network issues or temporary outages can occasionally cause a transfer to fail.
 It will pause for an increasing amount of time for each retry attempt.
 
-The `enable_additional_checksums` property manages the utilization of SHA-256 hashing for enhanced data integrity. 
-This feature computes the SHA-256 hash of a file during the upload process, and subsequently cross-validates it with the server upon completion.
-When retrieving files, it ensures that the hash received matches the server's stored hash.
 The default hashing algorithm for files is CRC64. In many cases, CRC64 is sufficient to ensure data integrity upon upload.
 
 ```ini
 [General]
 base_url = cirro.bio
 transfer_max_retries = 15
-enable_additional_checksums = true
 ```
 
 ### Clearing saved login

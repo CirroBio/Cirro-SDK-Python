@@ -5,7 +5,7 @@ from typing import Union, List, Optional, Iterator, Tuple, Any, Dict
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
-    RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, Executor, ValidateFileRequirementsRequest
+    RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
 
 from cirro.cirro_client import CirroApi
 from cirro.file_utils import filter_files_by_pattern
@@ -430,7 +430,8 @@ class DataPortalDataset(DataPortalAsset):
             params=None,
             notifications_emails: List[str] = None,
             compute_environment: str = None,
-            resume_dataset_id: str = None
+            resume_dataset_id: str = None,
+            source_sample_ids: List[str] = None
     ) -> str:
         """
         Runs an analysis on a dataset, returns the ID of the newly created dataset.
@@ -448,6 +449,7 @@ class DataPortalDataset(DataPortalAsset):
              if blank it will run in AWS
             resume_dataset_id (str): ID of dataset to resume from, used for caching task execution.
              It will attempt to re-use the previous output to minimize duplicate work
+            source_sample_ids (List[str]): List of sample IDs to use as input for the analysis.
 
         Returns:
             dataset_id (str): ID of newly created dataset
@@ -486,6 +488,7 @@ class DataPortalDataset(DataPortalAsset):
                 params=RunAnalysisRequestParams.from_dict(params),
                 notification_emails=notifications_emails,
                 resume_dataset_id=resume_dataset_id,
+                source_sample_ids=source_sample_ids,
                 compute_environment_id=compute_environment.id if compute_environment else None
             )
         )
@@ -513,9 +516,6 @@ class DataPortalDataset(DataPortalAsset):
 
         if contents is None and file_path is None:
             raise DataPortalInputError("Must specify either 'contents' or 'file_path' when updating samplesheet")
-
-        if self.process.executor != Executor.INGEST:
-            raise DataPortalInputError("Cannot update a samplesheet on a non-ingest dataset")
 
         samplesheet_contents = contents
         if file_path is not None:

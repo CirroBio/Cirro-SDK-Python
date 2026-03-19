@@ -53,8 +53,11 @@ def generate_flattened_file_map(files: List[PathLike]) -> Dict[PathLike, str]:
     }
 
 
-def _is_hidden_file(file_path: Path):
-    # Remove hidden files from listing, desktop.ini .DS_Store, etc.
+def is_hidden_file(file_path: Path):
+    """
+    Check if a file path is hidden
+    Such as desktop.ini, .DS_Store, etc.
+    """
     if os.name == 'nt':
         attributes = win32api.GetFileAttributes(str(file_path))
         return attributes & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
@@ -86,7 +89,7 @@ def get_files_in_directory(
         if file_path.is_dir():
             continue
 
-        if not include_hidden and _is_hidden_file(file_path):
+        if not include_hidden and is_hidden_file(file_path):
             continue
 
         if not file_path.exists():
@@ -187,21 +190,24 @@ def upload_directory(directory: PathLike,
                 break
 
 
-def download_directory(directory: str, files: List[str], s3_client: S3Client, bucket: str, prefix: str):
+def download_directory(directory: str, files: List[str], s3_client: S3Client, bucket: str, prefix: str) -> List[Path]:
     """
     @private
     """
+    local_paths = []
     for file in files:
         key = f'{prefix}/{file}'.lstrip('/')
-        local_path = Path(directory, file)
+        local_path = Path(directory, file).expanduser()
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
         s3_client.download_file(local_path=local_path,
                                 bucket=bucket,
                                 key=key)
+        local_paths.append(local_path)
+    return local_paths
 
 
-def get_checksum(file: PathLike, checksum_name: str, chunk_size=1024 * 1024) -> str:
+def get_checksum(file: Path, checksum_name: str, chunk_size=1024 * 1024) -> str:
     from awscrt import checksums
     checksum_func_map = {
         'CRC32': checksums.crc32,
@@ -214,7 +220,7 @@ def get_checksum(file: PathLike, checksum_name: str, chunk_size=1024 * 1024) -> 
         raise RuntimeWarning(f"Unsupported checksum type: {checksum_name}")
 
     crc = 0
-    with open(file, "rb") as f:
+    with file.open("rb") as f:
         while True:
             chunk = f.read(chunk_size)
             if not chunk:

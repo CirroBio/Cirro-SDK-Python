@@ -99,7 +99,8 @@ def get_id_from_name(items: List[T], name_or_id: str) -> Optional[str]:
     matched = get_item_from_name_or_id(items, name_or_id)
     if not matched:
         item_type = type(items[0]).__name__
-        raise InputError(f"Could not find {item_type} {name_or_id}")
+        item_names = ", ".join([i.id for i in items])
+        raise InputError(f"Could not find {item_type} {name_or_id} - options: {item_names}")
     return matched.id
 
 
