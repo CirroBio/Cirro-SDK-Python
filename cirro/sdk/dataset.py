@@ -398,16 +398,21 @@ class DataPortalDataset(DataPortalAsset):
             ]
         )
 
-    def download_files(self, download_location: str = None) -> None:
+    def download_files(self, download_location: str = None, glob: str = None) -> None:
         """
         Download all the files from the dataset to a local directory.
 
         Args:
             download_location (str): Path to local directory
+            glob (str): Optional wildcard expression to filter which files are downloaded
+                (e.g., ``'*.csv'``, ``'data/**/*.tsv.gz'``).
+                If omitted, all files are downloaded.
         """
 
-        # Alias for internal method
-        self.list_files().download(download_location)
+        files = self.list_files()
+        if glob is not None:
+            files = DataPortalFiles(filter_files_by_pattern(list(files), glob))
+        files.download(download_location)
 
     def run_analysis(
             self,
