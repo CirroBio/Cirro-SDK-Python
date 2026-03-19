@@ -354,6 +354,52 @@ class TestDatasetReadFiles(unittest.TestCase):
             list(self.dataset.read_files())
 
 
+class TestDatasetDownloadFiles(unittest.TestCase):
+    def setUp(self):
+        self.csv_file = _make_mock_file('data/results.csv', b'x,y\n3,4\n')
+        self.tsv_file = _make_mock_file('data/counts.tsv', b'gene\tcount\nTP53\t100\n')
+        self.txt_file = _make_mock_file('logs/run.log', b'started\nfinished\n')
+        self.dataset = _make_dataset_with_files([
+            self.csv_file,
+            self.tsv_file,
+            self.txt_file,
+        ])
+        for f in [self.csv_file, self.tsv_file, self.txt_file]:
+            f.download = Mock(return_value=None)
+
+    def _downloaded_paths(self):
+        return [
+            f.relative_path
+            for f in [self.csv_file, self.tsv_file, self.txt_file]
+            if f.download.called
+        ]
+
+    def test_no_glob_downloads_all(self):
+        self.dataset.download_files(download_location='/tmp')
+        self.assertEqual(len(self._downloaded_paths()), 3)
+
+    def test_glob_filters_to_matching_files(self):
+        self.dataset.download_files(download_location='/tmp', glob='*.csv')
+        downloaded = self._downloaded_paths()
+        self.assertEqual(downloaded, ['data/results.csv'])
+
+    def test_glob_matches_multiple_files(self):
+        self.dataset.download_files(download_location='/tmp', glob='data/*')
+        downloaded = self._downloaded_paths()
+        self.assertIn('data/results.csv', downloaded)
+        self.assertIn('data/counts.tsv', downloaded)
+        self.assertNotIn('logs/run.log', downloaded)
+
+    def test_glob_no_match_downloads_nothing(self):
+        self.dataset.download_files(download_location='/tmp', glob='*.parquet')
+        self.assertEqual(len(self._downloaded_paths()), 0)
+
+    def test_globstar_filters_by_subdirectory(self):
+        self.dataset.download_files(download_location='/tmp', glob='logs/**')
+        downloaded = self._downloaded_paths()
+        self.assertEqual(downloaded, ['logs/run.log'])
+
+
 class TestPatternToRegex(unittest.TestCase):
     def _match(self, pattern, path):
         compiled, _ = _pattern_to_captures_regex(pattern)
