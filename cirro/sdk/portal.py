@@ -100,10 +100,85 @@ class DataPortal:
         except DataPortalAssetNotFound:
             project: DataPortalProject = self.get_project_by_name(project)
 
-        try:
-            return project.get_dataset_by_id(dataset)
-        except DataPortalAssetNotFound:
-            return project.get_dataset_by_name(dataset)
+        return project.get_dataset(dataset)
+
+    def read_files(
+            self,
+            project: str,
+            dataset: str,
+            glob: str = None,
+            pattern: str = None,
+            format: str = None,
+            **kwargs
+    ):
+        """
+        Read the contents of files from a dataset.
+
+        The project and dataset can each be identified by name or ID.
+        See :meth:`~cirro.sdk.dataset.DataPortalDataset.read_files`
+        for full details on ``glob``/``pattern`` matching and format options.
+
+        Args:
+            project (str): ID or name of the project.
+            dataset (str): ID or name of the dataset.
+            glob (str): Wildcard expression to match files.
+                Yields one item per matching file: the parsed content.
+            pattern (str): Wildcard expression with ``{name}`` capture
+                placeholders. Yields ``(content, captures)`` per matching file.
+            format (str): File format used to parse each file
+                (``'csv'``, ``'h5ad'``, ``'json'``, ``'parquet'``,
+                ``'feather'``, ``'pickle'``, ``'excel'``, ``'text'``,
+                or ``None`` to infer from extension).
+            **kwargs: Additional keyword arguments forwarded to the
+                file-parsing function.
+
+        Yields:
+            - When using ``glob``: *content* for each matching file
+            - When using ``pattern``: ``(content, captures)`` for each
+              matching file
+
+        Example:
+            ```python
+            for df in portal.read_files('My Project', 'My Dataset', glob='*.csv'):
+                print(df.shape)
+            ```
+        """
+        ds = self.get_dataset(project=project, dataset=dataset)
+        yield from ds.read_files(glob=glob, pattern=pattern, format=format, **kwargs)
+
+    def read_file(
+            self,
+            project: str,
+            dataset: str,
+            path: str = None,
+            glob: str = None,
+            format: str = None,
+            **kwargs
+    ):
+        """
+        Read the contents of a single file from a dataset.
+
+        The project and dataset can each be identified by name or ID.
+        Provide either ``path`` (exact relative path) or ``glob`` (wildcard
+        expression). If ``glob`` is used it must match exactly one file.
+
+        Args:
+            project (str): ID or name of the project.
+            dataset (str): ID or name of the dataset.
+            path (str): Exact relative path of the file within the dataset.
+            glob (str): Wildcard expression matching exactly one file.
+            format (str): File format used to parse the file
+                (``'csv'``, ``'h5ad'``, ``'json'``, ``'parquet'``,
+                ``'feather'``, ``'pickle'``, ``'excel'``, ``'text'``,
+                or ``None`` to infer from extension).
+            **kwargs: Additional keyword arguments forwarded to the
+                file-parsing function.
+
+        Returns:
+            Parsed file content.
+        """
+        ds = self.get_dataset(project=project, dataset=dataset)
+        return ds.read_file(path=path, glob=glob, format=format, **kwargs)
 
     def list_processes(self, ingest=False) -> DataPortalProcesses:
         """
