@@ -296,79 +296,22 @@ class DataPortalDataset(DataPortalAsset):
         """
         Read the contents of files in the dataset.
 
-        Exactly one of ``glob`` or ``pattern`` must be provided.
-
-        **glob** — standard wildcard matching; yields the file content for each
-        matching file:
-
-        - ``*`` matches any characters within a single path segment
-        - ``**`` matches zero or more path segments
-        - Matching is suffix-anchored (``*.csv`` matches at any depth)
-
-        **pattern** — like ``glob`` but ``{name}`` placeholders capture portions
-        of the path automatically; yields ``(content, captures)`` pairs where
-        *captures* is a ``dict`` of extracted values:
-
-        - ``{name}`` captures one path segment (no ``/``)
-        - ``*`` and ``**`` wildcards work as in ``glob``
+        See :meth:`~cirro.sdk.portal.DataPortal.read_files` for full details
+        on ``glob``/``pattern`` matching and format options.
 
         Args:
-            glob (str): Wildcard expression to match files
-                (e.g., ``'*.csv'``, ``'data/**/*.tsv.gz'``).
+            glob (str): Wildcard expression to match files.
                 Yields one item per matching file: the parsed content.
             pattern (str): Wildcard expression with ``{name}`` capture
-                placeholders (e.g., ``'{sample}.csv'``,
-                ``'{condition}/{sample}.csv'``).
-                Yields ``(content, captures)`` per matching file.
-            format (str): File format used to parse each file. Supported values:
-
-                - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
-                - ``'h5ad'``: parse as AnnData (requires ``anndata`` package)
-                - ``'json'``: parse with :func:`json.loads`, returns a Python object
-                - ``'parquet'``: parse with :func:`pandas.read_parquet`, returns a ``DataFrame``
-                  (requires ``pyarrow`` or ``fastparquet``)
-                - ``'feather'``: parse with :func:`pandas.read_feather`, returns a ``DataFrame``
-                  (requires ``pyarrow``)
-                - ``'pickle'``: deserialize with :mod:`pickle`, returns a Python object
-                - ``'excel'``: parse with :func:`pandas.read_excel`, returns a ``DataFrame``
-                  (requires ``openpyxl`` for ``.xlsx`` or ``xlrd`` for ``.xls``)
-                - ``'text'``: read as plain text, returns a ``str``
-                - ``None`` (default): infer from file extension
-                  (``.csv``/``.tsv`` → ``'csv'``, ``.h5ad`` → ``'h5ad'``,
-                  ``.json`` → ``'json'``, ``.parquet`` → ``'parquet'``,
-                  ``.feather`` → ``'feather'``, ``.pkl``/``.pickle`` → ``'pickle'``,
-                  ``.xlsx``/``.xls`` → ``'excel'``, otherwise ``'text'``)
-            **kwargs: Additional keyword arguments forwarded to the file-parsing
-                function (e.g., ``sep='\\t'`` for CSV/TSV files).
+                placeholders. Yields ``(content, captures)`` per matching file.
+            format (str): File format used to parse each file
+                (or ``None`` to infer from extension).
+            **kwargs: Additional keyword arguments forwarded to the
+                file-parsing function.
 
         Yields:
             - When using ``glob``: *content* for each matching file
-            - When using ``pattern``: ``(content, captures)`` for each matching file,
-              where *captures* is a ``dict`` of values extracted from ``{name}``
-              placeholders
-
-        Raises:
-            DataPortalInputError: if both ``glob`` and ``pattern`` are provided,
-                or if neither is provided.
-
-        Example:
-            ```python
-            # Read all CSV files — just the content
-            for df in dataset.read_files(glob='*.csv'):
-                print(df.shape)
-
-            # Extract sample names from filenames automatically
-            for df, captures in dataset.read_files(pattern='{sample}.csv'):
-                print(captures['sample'], df.shape)
-
-            # Multi-level capture: condition directory + sample filename
-            for df, captures in dataset.read_files(pattern='{condition}/{sample}.csv'):
-                print(captures['condition'], captures['sample'], df.shape)
-
-            # Read gzip-compressed TSV files with explicit separator
-            for df in dataset.read_files(glob='**/*.tsv.gz', format='csv', sep='\\t'):
-                print(df.shape)
-            ```
+            - When using ``pattern``: ``(content, captures)`` for each matching file
         """
         if glob is not None and pattern is not None:
             raise DataPortalInputError("Cannot specify both 'glob' and 'pattern' — use one or the other")
@@ -395,23 +338,18 @@ class DataPortalDataset(DataPortalAsset):
         """
         Read the contents of a single file from the dataset.
 
-        Provide either ``path`` (exact relative path) or ``glob`` (wildcard
-        expression). If ``glob`` is used it must match exactly one file.
+        See :meth:`~cirro.sdk.portal.DataPortal.read_file` for full details.
 
         Args:
             path (str): Exact relative path of the file within the dataset.
-            glob (str): Wildcard expression to match a single file.
+            glob (str): Wildcard expression matching exactly one file.
             format (str): File format used to parse the file. Supported values
-                are the same as :meth:`read_files`.
+                are the same as :meth:`~cirro.sdk.portal.DataPortal.read_files`.
             **kwargs: Additional keyword arguments forwarded to the file-parsing
                 function.
 
         Returns:
             Parsed file content.
-
-        Raises:
-            DataPortalInputError: if both or neither of ``path``/``glob`` are
-                provided, or if ``glob`` matches zero or more than one file.
         """
         if path is not None and glob is not None:
             raise DataPortalInputError("Cannot specify both 'path' and 'glob' — use one or the other")
