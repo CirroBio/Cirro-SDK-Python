@@ -303,7 +303,7 @@ class DataPortalDataset(DataPortalAsset):
             glob (str): Wildcard expression to match files.
                 Yields one item per matching file: the parsed content.
             pattern (str): Wildcard expression with ``{name}`` capture
-                placeholders. Yields ``(content, captures)`` per matching file.
+                placeholders. Yields ``(content, meta)`` per matching file.
             filetype (str): File format used to parse each file
                 (or ``None`` to infer from extension).
             **kwargs: Additional keyword arguments forwarded to the
@@ -311,7 +311,7 @@ class DataPortalDataset(DataPortalAsset):
 
         Yields:
             - When using ``glob``: *content* for each matching file
-            - When using ``pattern``: ``(content, captures)`` for each matching file
+            - When using ``pattern``: ``(content, meta)`` for each matching file
         """
         if glob is not None and pattern is not None:
             raise DataPortalInputError("Cannot specify both 'glob' and 'pattern' — use one or the other")

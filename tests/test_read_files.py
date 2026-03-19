@@ -250,15 +250,15 @@ class TestDatasetReadFiles(unittest.TestCase):
     def test_pattern_simple_filename(self):
         results = list(self.dataset.read_files(pattern='{sample}.csv'))
         self.assertEqual(len(results), 1)
-        content, captures = results[0]
+        content, meta = results[0]
         self.assertIsInstance(content, pd.DataFrame)
-        self.assertEqual(captures['sample'], 'results')
+        self.assertEqual(meta['sample'], 'results')
 
     def test_pattern_with_directory(self):
         results = list(self.dataset.read_files(pattern='data/{sample}.csv'))
         self.assertEqual(len(results), 1)
-        _, captures = results[0]
-        self.assertEqual(captures['sample'], 'results')
+        _, meta = results[0]
+        self.assertEqual(meta['sample'], 'results')
 
     def test_pattern_multiple_files(self):
         dataset = _make_dataset_with_files([
@@ -268,7 +268,7 @@ class TestDatasetReadFiles(unittest.TestCase):
         ])
         results = list(dataset.read_files(pattern='{sample}.csv'))
         self.assertEqual(len(results), 2)
-        captured = {c['sample'] for _, c in results}
+        captured = {m['sample'] for _, m in results}
         self.assertSetEqual(captured, {'sampleA', 'sampleB'})
 
     def test_pattern_multi_level(self):
@@ -278,7 +278,7 @@ class TestDatasetReadFiles(unittest.TestCase):
         ])
         results = list(dataset.read_files(pattern='{condition}/{sample}.csv'))
         self.assertEqual(len(results), 2)
-        by_sample = {c['sample']: c['condition'] for _, c in results}
+        by_sample = {m['sample']: m['condition'] for _, m in results}
         self.assertEqual(by_sample['sampleA'], 'treated')
         self.assertEqual(by_sample['sampleB'], 'control')
 
@@ -286,11 +286,11 @@ class TestDatasetReadFiles(unittest.TestCase):
         results = list(self.dataset.read_files(pattern='{sample}.parquet'))
         self.assertEqual(len(results), 0)
 
-    def test_pattern_yields_content_and_captures_tuple(self):
+    def test_pattern_yields_content_and_meta_tuple(self):
         results = list(self.dataset.read_files(pattern='{sample}.csv'))
-        content, captures = results[0]
-        self.assertIsInstance(captures, dict)
-        self.assertIn('sample', captures)
+        content, meta = results[0]
+        self.assertIsInstance(meta, dict)
+        self.assertIn('sample', meta)
 
     # --- error cases ---
 

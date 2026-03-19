@@ -125,8 +125,8 @@ class DataPortal:
         - Matching is suffix-anchored (``*.csv`` matches at any depth)
 
         **pattern** — like ``glob`` but ``{name}`` placeholders capture portions
-        of the path automatically; yields ``(content, captures)`` pairs where
-        *captures* is a ``dict`` of extracted values:
+        of the path automatically; yields ``(content, meta)`` pairs where
+        *meta* is a ``dict`` of extracted values:
 
         - ``{name}`` captures one path segment (no ``/``)
         - ``*`` and ``**`` wildcards work as in ``glob``
@@ -140,7 +140,7 @@ class DataPortal:
             pattern (str): Wildcard expression with ``{name}`` capture
                 placeholders (e.g., ``'{sample}.csv'``,
                 ``'{condition}/{sample}.csv'``).
-                Yields ``(content, captures)`` per matching file.
+                Yields ``(content, meta)`` per matching file.
             filetype (str): File format used to parse each file. Supported values:
 
                 - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
@@ -164,8 +164,8 @@ class DataPortal:
 
         Yields:
             - When using ``glob``: *content* for each matching file
-            - When using ``pattern``: ``(content, captures)`` for each matching file,
-              where *captures* is a ``dict`` of values extracted from ``{name}``
+            - When using ``pattern``: ``(content, meta)`` for each matching file,
+              where *meta* is a ``dict`` of values extracted from ``{name}``
               placeholders
 
         Raises:
@@ -179,12 +179,12 @@ class DataPortal:
                 print(df.shape)
 
             # Extract sample names from filenames automatically
-            for df, captures in portal.read_files('My Project', 'My Dataset', pattern='{sample}.csv'):
-                print(captures['sample'], df.shape)
+            for df, meta in portal.read_files('My Project', 'My Dataset', pattern='{sample}.csv'):
+                print(meta['sample'], df.shape)
 
             # Multi-level capture: condition directory + sample filename
-            for df, captures in portal.read_files('My Project', 'My Dataset', pattern='{condition}/{sample}.csv'):
-                print(captures['condition'], captures['sample'], df.shape)
+            for df, meta in portal.read_files('My Project', 'My Dataset', pattern='{condition}/{sample}.csv'):
+                print(meta['condition'], meta['sample'], df.shape)
 
             # Read gzip-compressed TSV files with explicit separator
             for df in portal.read_files('My Project', 'My Dataset', glob='**/*.tsv.gz', filetype='csv', sep='\\t'):
