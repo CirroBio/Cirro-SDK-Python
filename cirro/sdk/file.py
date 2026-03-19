@@ -1,4 +1,6 @@
 import gzip
+import json
+import pickle
 from io import BytesIO, StringIO
 from typing import List
 
@@ -140,6 +142,44 @@ class DataPortalFile(DataPortalAsset):
         # Download the file to a temporary file handle and parse the contents
         with BytesIO(self._get()) as handle:
             return ad.read_h5ad(handle)
+
+    def read_json(self, **kwargs):
+        """Read the file contents as a parsed JSON object (dict, list, etc.)."""
+        return json.loads(self._get(), **kwargs)
+
+    def read_parquet(self, **kwargs) -> 'DataFrame':
+        """
+        Read a Parquet file as a Pandas DataFrame.
+
+        Requires ``pyarrow`` or ``fastparquet`` to be installed.
+        All keyword arguments are passed to :func:`pandas.read_parquet`.
+        """
+        import pandas
+        return pandas.read_parquet(BytesIO(self._get()), **kwargs)
+
+    def read_feather(self, **kwargs) -> 'DataFrame':
+        """
+        Read a Feather file as a Pandas DataFrame.
+
+        Requires ``pyarrow`` to be installed.
+        All keyword arguments are passed to :func:`pandas.read_feather`.
+        """
+        import pandas
+        return pandas.read_feather(BytesIO(self._get()), **kwargs)
+
+    def read_pickle(self, **kwargs):
+        """Read the file contents as a Python pickle object."""
+        return pickle.loads(self._get(), **kwargs)
+
+    def read_excel(self, **kwargs) -> 'DataFrame':
+        """
+        Read an Excel file (``.xlsx`` / ``.xls``) as a Pandas DataFrame.
+
+        Requires ``openpyxl`` (for ``.xlsx``) or ``xlrd`` (for ``.xls``).
+        All keyword arguments are passed to :func:`pandas.read_excel`.
+        """
+        import pandas
+        return pandas.read_excel(BytesIO(self._get()), **kwargs)
 
     def readlines(self, encoding='utf-8', compression=None) -> List[str]:
         """Read the file contents as a list of lines."""

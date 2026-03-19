@@ -1,5 +1,10 @@
+import io
+import json
+import pickle
 import unittest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
+
+import pandas as pd
 
 from cirro.models.file import File, FileAccessContext
 from cirro.sdk.dataset import DataPortalDataset, _infer_file_format, _read_file_with_format
@@ -46,6 +51,30 @@ class TestInferFileFormat(unittest.TestCase):
     def test_h5ad_extension(self):
         self.assertEqual(_infer_file_format('data/adata.h5ad'), 'h5ad')
 
+    def test_json_extension(self):
+        self.assertEqual(_infer_file_format('data/results.json'), 'json')
+
+    def test_json_gz_extension(self):
+        self.assertEqual(_infer_file_format('data/results.json.gz'), 'json')
+
+    def test_parquet_extension(self):
+        self.assertEqual(_infer_file_format('data/results.parquet'), 'parquet')
+
+    def test_feather_extension(self):
+        self.assertEqual(_infer_file_format('data/results.feather'), 'feather')
+
+    def test_pickle_pkl_extension(self):
+        self.assertEqual(_infer_file_format('data/results.pkl'), 'pickle')
+
+    def test_pickle_pickle_extension(self):
+        self.assertEqual(_infer_file_format('data/results.pickle'), 'pickle')
+
+    def test_excel_xlsx_extension(self):
+        self.assertEqual(_infer_file_format('data/results.xlsx'), 'excel')
+
+    def test_excel_xls_extension(self):
+        self.assertEqual(_infer_file_format('data/results.xls'), 'excel')
+
     def test_text_fallback(self):
         self.assertEqual(_infer_file_format('data/notes.txt'), 'text')
 
@@ -83,7 +112,79 @@ class TestReadFileWithFormat(unittest.TestCase):
 
     def test_unsupported_format_raises(self):
         with self.assertRaises(DataPortalInputError):
-            _read_file_with_format(self.file, 'parquet')
+            _read_file_with_format(self.file, 'xyz_unknown')
+
+    def test_json_format(self):
+        file = _make_mock_file('data/data.json', b'{"key": "value"}')
+        result = _read_file_with_format(file, 'json')
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result['key'], 'value')
+
+    def test_auto_infer_json(self):
+        file = _make_mock_file('data/data.json', b'[1, 2, 3]')
+        result = _read_file_with_format(file, None)
+        self.assertIsInstance(result, list)
+        self.assertEqual(result, [1, 2, 3])
+
+    def test_pickle_format(self):
+        data = {'hello': 42}
+        file = _make_mock_file('data/data.pkl', pickle.dumps(data))
+        result = _read_file_with_format(file, 'pickle')
+        self.assertEqual(result, data)
+
+    def test_auto_infer_pickle(self):
+        data = [1, 2, 3]
+        file = _make_mock_file('data/data.pkl', pickle.dumps(data))
+        result = _read_file_with_format(file, None)
+        self.assertEqual(result, data)
+
+    def _make_parquet_bytes(self):
+        buf = io.BytesIO()
+        pd.DataFrame({'a': [1, 2], 'b': [3, 4]}).to_parquet(buf)
+        return buf.getvalue()
+
+    def _make_feather_bytes(self):
+        buf = io.BytesIO()
+        pd.DataFrame({'a': [1, 2], 'b': [3, 4]}).to_feather(buf)
+        return buf.getvalue()
+
+    @unittest.skipUnless(
+        __import__('importlib').util.find_spec('pyarrow') is not None,
+        'pyarrow not installed'
+    )
+    def test_parquet_format(self):
+        file = _make_mock_file('data/data.parquet', self._make_parquet_bytes())
+        result = _read_file_with_format(file, 'parquet')
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertListEqual(list(result.columns), ['a', 'b'])
+
+    @unittest.skipUnless(
+        __import__('importlib').util.find_spec('pyarrow') is not None,
+        'pyarrow not installed'
+    )
+    def test_auto_infer_parquet(self):
+        file = _make_mock_file('data/data.parquet', self._make_parquet_bytes())
+        result = _read_file_with_format(file, None)
+        self.assertIsInstance(result, pd.DataFrame)
+
+    @unittest.skipUnless(
+        __import__('importlib').util.find_spec('pyarrow') is not None,
+        'pyarrow not installed'
+    )
+    def test_feather_format(self):
+        file = _make_mock_file('data/data.feather', self._make_feather_bytes())
+        result = _read_file_with_format(file, 'feather')
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertListEqual(list(result.columns), ['a', 'b'])
+
+    @unittest.skipUnless(
+        __import__('importlib').util.find_spec('pyarrow') is not None,
+        'pyarrow not installed'
+    )
+    def test_auto_infer_feather(self):
+        file = _make_mock_file('data/data.feather', self._make_feather_bytes())
+        result = _read_file_with_format(file, None)
+        self.assertIsInstance(result, pd.DataFrame)
 
     def test_csv_kwargs_passed_through(self):
         import pandas as pd

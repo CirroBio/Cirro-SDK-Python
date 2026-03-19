@@ -29,6 +29,16 @@ def _infer_file_format(path: str) -> str:
         return 'csv'
     elif path_lower.endswith('.h5ad'):
         return 'h5ad'
+    elif path_lower.endswith('.json'):
+        return 'json'
+    elif path_lower.endswith('.parquet'):
+        return 'parquet'
+    elif path_lower.endswith('.feather'):
+        return 'feather'
+    elif path_lower.endswith('.pkl') or path_lower.endswith('.pickle'):
+        return 'pickle'
+    elif path_lower.endswith('.xlsx') or path_lower.endswith('.xls'):
+        return 'excel'
     else:
         return 'text'
 
@@ -41,11 +51,22 @@ def _read_file_with_format(file: DataPortalFile, file_format: Optional[str], **k
         return file.read_csv(**kwargs)
     elif file_format == 'h5ad':
         return file.read_h5ad()
+    elif file_format == 'json':
+        return file.read_json(**kwargs)
+    elif file_format == 'parquet':
+        return file.read_parquet(**kwargs)
+    elif file_format == 'feather':
+        return file.read_feather(**kwargs)
+    elif file_format == 'pickle':
+        return file.read_pickle(**kwargs)
+    elif file_format == 'excel':
+        return file.read_excel(**kwargs)
     elif file_format == 'text':
         return file.read(**kwargs)
     else:
         raise DataPortalInputError(
-            f"Unsupported file_format: '{file_format}'. Supported values: 'csv', 'h5ad', 'text'"
+            f"Unsupported file_format: '{file_format}'. "
+            f"Supported values: 'csv', 'h5ad', 'json', 'parquet', 'feather', 'pickle', 'excel', 'text'"
         )
 
 
@@ -251,9 +272,20 @@ class DataPortalDataset(DataPortalAsset):
 
                 - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
                 - ``'h5ad'``: parse as AnnData (requires ``anndata`` package)
+                - ``'json'``: parse with :func:`json.loads`, returns a Python object
+                - ``'parquet'``: parse with :func:`pandas.read_parquet`, returns a ``DataFrame``
+                  (requires ``pyarrow`` or ``fastparquet``)
+                - ``'feather'``: parse with :func:`pandas.read_feather`, returns a ``DataFrame``
+                  (requires ``pyarrow``)
+                - ``'pickle'``: deserialize with :mod:`pickle`, returns a Python object
+                - ``'excel'``: parse with :func:`pandas.read_excel`, returns a ``DataFrame``
+                  (requires ``openpyxl`` for ``.xlsx`` or ``xlrd`` for ``.xls``)
                 - ``'text'``: read as plain text, returns a ``str``
                 - ``None`` (default): infer from file extension
-                  (``.csv``/``.tsv`` → ``'csv'``, ``.h5ad`` → ``'h5ad'``, otherwise ``'text'``)
+                  (``.csv``/``.tsv`` → ``'csv'``, ``.h5ad`` → ``'h5ad'``,
+                  ``.json`` → ``'json'``, ``.parquet`` → ``'parquet'``,
+                  ``.feather`` → ``'feather'``, ``.pkl``/``.pickle`` → ``'pickle'``,
+                  ``.xlsx``/``.xls`` → ``'excel'``, otherwise ``'text'``)
             **kwargs: Additional keyword arguments forwarded to the file-parsing function.
                 For ``'csv'`` format these are passed to :func:`pandas.read_csv`
                 (e.g., ``sep='\\t'`` for TSV files).
