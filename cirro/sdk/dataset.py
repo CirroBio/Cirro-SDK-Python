@@ -377,19 +377,19 @@ class DataPortalDataset(DataPortalAsset):
 
         if glob is not None:
             for file in filter_files_by_pattern(list(self.list_files()), glob):
-                yield _read_file_with_format(file, file_format, **kwargs)
+                yield _read_file_with_format(file, format, **kwargs)
         else:
             compiled_regex, _ = _pattern_to_captures_regex(pattern)
             for file in self.list_files():
                 m = compiled_regex.match(file.relative_path)
                 if m is not None:
-                    yield _read_file_with_format(file, file_format, **kwargs), m.groupdict()
+                    yield _read_file_with_format(file, format, **kwargs), m.groupdict()
 
     def read_file(
             self,
             path: str = None,
             glob: str = None,
-            file_format: str = None,
+            format: str = None,
             **kwargs
     ) -> Any:
         """
@@ -401,7 +401,7 @@ class DataPortalDataset(DataPortalAsset):
         Args:
             path (str): Exact relative path of the file within the dataset.
             glob (str): Wildcard expression to match a single file.
-            file_format (str): File format used to parse the file. Supported values
+            format (str): File format used to parse the file. Supported values
                 are the same as :meth:`read_files`.
             **kwargs: Additional keyword arguments forwarded to the file-parsing
                 function.
@@ -430,7 +430,7 @@ class DataPortalDataset(DataPortalAsset):
                 )
             file = matches[0]
 
-        return _read_file_with_format(file, file_format, **kwargs)
+        return _read_file_with_format(file, format, **kwargs)
 
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """
