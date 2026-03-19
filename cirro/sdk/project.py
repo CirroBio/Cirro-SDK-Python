@@ -89,6 +89,31 @@ class DataPortalProject(DataPortalAsset):
             ]
         )
 
+    def get_dataset(self, name_or_id: str, force_refresh=False) -> DataPortalDataset:
+        """Return the dataset matching the given ID or name.
+
+        Tries to match by ID first, then by name.
+        Raises an error if the name matches multiple datasets.
+        """
+        if force_refresh:
+            self._get_datasets.cache_clear()
+
+        # Try by ID first
+        try:
+            return self.get_dataset_by_id(name_or_id)
+        except (DataPortalAssetNotFound, Exception):
+            pass
+
+        # Fall back to name matching
+        matches = [d for d in self._get_datasets() if d.name == name_or_id]
+        if len(matches) == 0:
+            raise DataPortalAssetNotFound(f'Dataset with name or ID "{name_or_id}" not found')
+        if len(matches) > 1:
+            raise DataPortalInputError(
+                f'Multiple datasets found with the name "{name_or_id}" — use get_dataset_by_id instead'
+            )
+        return self.get_dataset_by_id(matches[0].id)
+
     def get_dataset_by_name(self, name: str, force_refresh=False) -> DataPortalDataset:
         """Return the dataset with the specified name."""
         if force_refresh:
