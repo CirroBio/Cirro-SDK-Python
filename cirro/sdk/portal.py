@@ -154,6 +154,7 @@ class DataPortal:
                 - ``'excel'``: parse with :func:`pandas.read_excel`, returns a ``DataFrame``
                   (requires ``openpyxl`` for ``.xlsx`` or ``xlrd`` for ``.xls``)
                 - ``'text'``: read as plain text, returns a ``str``
+                - ``'bytes'``: read as raw bytes, returns ``bytes``
                 - ``None`` (default): infer from file extension
                   (``.csv``/``.tsv`` → ``'csv'``, ``.h5ad`` → ``'h5ad'``,
                   ``.json`` → ``'json'``, ``.parquet`` → ``'parquet'``,

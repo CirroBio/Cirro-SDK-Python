@@ -97,10 +97,12 @@ def _read_file_with_format(file: DataPortalFile, file_format: Optional[str], **k
         return file.read_excel(**kwargs)
     elif file_format == 'text':
         return file.read(**kwargs)
+    elif file_format == 'bytes':
+        return file._get()
     else:
         raise DataPortalInputError(
             f"Unsupported file_format: '{file_format}'. "
-            f"Supported values: 'csv', 'h5ad', 'json', 'parquet', 'feather', 'pickle', 'excel', 'text'"
+            f"Supported values: 'csv', 'h5ad', 'json', 'parquet', 'feather', 'pickle', 'excel', 'text', 'bytes'"
         )
 
 

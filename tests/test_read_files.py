@@ -110,6 +110,12 @@ class TestReadFileWithFormat(unittest.TestCase):
         result = _read_file_with_format(file, None)
         self.assertIsInstance(result, str)
 
+    def test_bytes_format(self):
+        file = _make_mock_file('data/blob.bin', b'\x00\x01\x02\x03')
+        result = _read_file_with_format(file, 'bytes')
+        self.assertIsInstance(result, bytes)
+        self.assertEqual(result, b'\x00\x01\x02\x03')
+
     def test_unsupported_format_raises(self):
         with self.assertRaises(DataPortalInputError):
             _read_file_with_format(self.file, 'xyz_unknown')
@@ -288,7 +294,7 @@ class TestDatasetReadFiles(unittest.TestCase):
 
     def test_pattern_yields_content_and_meta_tuple(self):
         results = list(self.dataset.read_files(pattern='{sample}.csv'))
-        content, meta = results[0]
+        _, meta = results[0]
         self.assertIsInstance(meta, dict)
         self.assertIn('sample', meta)
 
