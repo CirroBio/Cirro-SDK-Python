@@ -221,13 +221,13 @@ class TestDatasetReadFiles(unittest.TestCase):
         self.assertEqual(len(results), 0)
 
     def test_glob_explicit_format_csv(self):
-        results = list(self.dataset.read_files(glob='data/*.tsv', file_format='csv', sep='\t'))
+        results = list(self.dataset.read_files(glob='data/*.tsv', filetype='csv', sep='\t'))
         self.assertEqual(len(results), 1)
         self.assertIsInstance(results[0], pd.DataFrame)
         self.assertIn('gene', results[0].columns)
 
     def test_glob_explicit_format_text(self):
-        results = list(self.dataset.read_files(glob='logs/*.log', file_format='text'))
+        results = list(self.dataset.read_files(glob='logs/*.log', filetype='text'))
         self.assertEqual(len(results), 1)
         self.assertIsInstance(results[0], str)
         self.assertIn('started', results[0])

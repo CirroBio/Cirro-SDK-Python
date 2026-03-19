@@ -290,21 +290,21 @@ class DataPortalDataset(DataPortalAsset):
             self,
             glob: str = None,
             pattern: str = None,
-            format: str = None,
+            filetype: str = None,
             **kwargs
     ):
         """
         Read the contents of files in the dataset.
 
         See :meth:`~cirro.sdk.portal.DataPortal.read_files` for full details
-        on ``glob``/``pattern`` matching and format options.
+        on ``glob``/``pattern`` matching and filetype options.
 
         Args:
             glob (str): Wildcard expression to match files.
                 Yields one item per matching file: the parsed content.
             pattern (str): Wildcard expression with ``{name}`` capture
                 placeholders. Yields ``(content, captures)`` per matching file.
-            format (str): File format used to parse each file
+            filetype (str): File format used to parse each file
                 (or ``None`` to infer from extension).
             **kwargs: Additional keyword arguments forwarded to the
                 file-parsing function.
@@ -320,19 +320,19 @@ class DataPortalDataset(DataPortalAsset):
 
         if glob is not None:
             for file in filter_files_by_pattern(list(self.list_files()), glob):
-                yield _read_file_with_format(file, format, **kwargs)
+                yield _read_file_with_format(file, filetype, **kwargs)
         else:
             compiled_regex, _ = _pattern_to_captures_regex(pattern)
             for file in self.list_files():
                 m = compiled_regex.match(file.relative_path)
                 if m is not None:
-                    yield _read_file_with_format(file, format, **kwargs), m.groupdict()
+                    yield _read_file_with_format(file, filetype, **kwargs), m.groupdict()
 
     def read_file(
             self,
             path: str = None,
             glob: str = None,
-            format: str = None,
+            filetype: str = None,
             **kwargs
     ) -> Any:
         """
@@ -343,7 +343,7 @@ class DataPortalDataset(DataPortalAsset):
         Args:
             path (str): Exact relative path of the file within the dataset.
             glob (str): Wildcard expression matching exactly one file.
-            format (str): File format used to parse the file. Supported values
+            filetype (str): File format used to parse the file. Supported values
                 are the same as :meth:`~cirro.sdk.portal.DataPortal.read_files`.
             **kwargs: Additional keyword arguments forwarded to the file-parsing
                 function.
@@ -368,7 +368,7 @@ class DataPortalDataset(DataPortalAsset):
                 )
             file = matches[0]
 
-        return _read_file_with_format(file, format, **kwargs)
+        return _read_file_with_format(file, filetype, **kwargs)
 
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """

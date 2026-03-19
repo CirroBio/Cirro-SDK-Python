@@ -108,7 +108,7 @@ class DataPortal:
             dataset: str,
             glob: str = None,
             pattern: str = None,
-            format: str = None,
+            filetype: str = None,
             **kwargs
     ):
         """
@@ -141,7 +141,7 @@ class DataPortal:
                 placeholders (e.g., ``'{sample}.csv'``,
                 ``'{condition}/{sample}.csv'``).
                 Yields ``(content, captures)`` per matching file.
-            format (str): File format used to parse each file. Supported values:
+            filetype (str): File format used to parse each file. Supported values:
 
                 - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
                 - ``'h5ad'``: parse as AnnData (requires ``anndata`` package)
@@ -187,12 +187,12 @@ class DataPortal:
                 print(captures['condition'], captures['sample'], df.shape)
 
             # Read gzip-compressed TSV files with explicit separator
-            for df in portal.read_files('My Project', 'My Dataset', glob='**/*.tsv.gz', format='csv', sep='\\t'):
+            for df in portal.read_files('My Project', 'My Dataset', glob='**/*.tsv.gz', filetype='csv', sep='\\t'):
                 print(df.shape)
             ```
         """
         ds = self.get_dataset(project=project, dataset=dataset)
-        yield from ds.read_files(glob=glob, pattern=pattern, format=format, **kwargs)
+        yield from ds.read_files(glob=glob, pattern=pattern, filetype=filetype, **kwargs)
 
     def read_file(
             self,
@@ -200,7 +200,7 @@ class DataPortal:
             dataset: str,
             path: str = None,
             glob: str = None,
-            format: str = None,
+            filetype: str = None,
             **kwargs
     ):
         """
@@ -215,7 +215,7 @@ class DataPortal:
             dataset (str): ID or name of the dataset.
             path (str): Exact relative path of the file within the dataset.
             glob (str): Wildcard expression matching exactly one file.
-            format (str): File format used to parse the file. Supported values
+            filetype (str): File format used to parse the file. Supported values
                 are the same as :meth:`read_files`.
             **kwargs: Additional keyword arguments forwarded to the
                 file-parsing function.
@@ -228,7 +228,7 @@ class DataPortal:
                 provided, or if ``glob`` matches zero or more than one file.
         """
         ds = self.get_dataset(project=project, dataset=dataset)
-        return ds.read_file(path=path, glob=glob, format=format, **kwargs)
+        return ds.read_file(path=path, glob=glob, filetype=filetype, **kwargs)
 
     def list_processes(self, ingest=False) -> DataPortalProcesses:
         """
