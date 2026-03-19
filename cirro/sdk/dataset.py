@@ -385,6 +385,53 @@ class DataPortalDataset(DataPortalAsset):
                 if m is not None:
                     yield _read_file_with_format(file, file_format, **kwargs), m.groupdict()
 
+    def read_file(
+            self,
+            path: str = None,
+            glob: str = None,
+            file_format: str = None,
+            **kwargs
+    ) -> Any:
+        """
+        Read the contents of a single file from the dataset.
+
+        Provide either ``path`` (exact relative path) or ``glob`` (wildcard
+        expression). If ``glob`` is used it must match exactly one file.
+
+        Args:
+            path (str): Exact relative path of the file within the dataset.
+            glob (str): Wildcard expression to match a single file.
+            file_format (str): File format used to parse the file. Supported values
+                are the same as :meth:`read_files`.
+            **kwargs: Additional keyword arguments forwarded to the file-parsing
+                function.
+
+        Returns:
+            Parsed file content.
+
+        Raises:
+            DataPortalInputError: if both or neither of ``path``/``glob`` are
+                provided, or if ``glob`` matches zero or more than one file.
+        """
+        if path is not None and glob is not None:
+            raise DataPortalInputError("Cannot specify both 'path' and 'glob' — use one or the other")
+        if path is None and glob is None:
+            raise DataPortalInputError("Must specify either 'path' or 'glob'")
+
+        if path is not None:
+            file = self.get_file(path)
+        else:
+            matches = list(filter_files_by_pattern(list(self.list_files()), glob))
+            if len(matches) == 0:
+                raise DataPortalAssetNotFound(f"No files matched glob '{glob}'")
+            if len(matches) > 1:
+                raise DataPortalInputError(
+                    f"glob '{glob}' matched {len(matches)} files — use read_files() to read multiple files"
+                )
+            file = matches[0]
+
+        return _read_file_with_format(file, file_format, **kwargs)
+
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """
         Get the artifact of a particular type from the dataset

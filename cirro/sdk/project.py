@@ -318,6 +318,46 @@ class DataPortalProject(DataPortalAsset):
                 ds = self.get_dataset_by_name(dataset)
         yield from ds.read_files(glob=glob, pattern=pattern, file_format=file_format, **kwargs)
 
+    def read_file(
+            self,
+            dataset: Union[str, DataPortalDataset],
+            path: str = None,
+            glob: str = None,
+            file_format: str = None,
+            **kwargs
+    ):
+        """
+        Read the contents of a single file from a specific dataset in the project.
+
+        The dataset can be identified by name, ID, or a
+        :class:`~cirro.sdk.dataset.DataPortalDataset` object.
+        Provide either ``path`` (exact relative path) or ``glob`` (wildcard
+        expression). If ``glob`` is used it must match exactly one file.
+
+        Args:
+            dataset (str | DataPortalDataset): Dataset to read the file from,
+                identified by name, ID, or object.
+            path (str): Exact relative path of the file within the dataset.
+            glob (str): Wildcard expression matching exactly one file.
+            file_format (str): File format used to parse the file
+                (``'csv'``, ``'h5ad'``, ``'json'``, ``'parquet'``,
+                ``'feather'``, ``'pickle'``, ``'excel'``, ``'text'``,
+                or ``None`` to infer from extension).
+            **kwargs: Additional keyword arguments forwarded to the
+                file-parsing function.
+
+        Returns:
+            Parsed file content.
+        """
+        if isinstance(dataset, DataPortalDataset):
+            ds = dataset
+        else:
+            try:
+                ds = self.get_dataset_by_id(dataset)
+            except (DataPortalAssetNotFound, Exception):
+                ds = self.get_dataset_by_name(dataset)
+        return ds.read_file(path=path, glob=glob, file_format=file_format, **kwargs)
+
 
 class DataPortalProjects(DataPortalAssets[DataPortalProject]):
     """Collection of DataPortalProject objects"""
