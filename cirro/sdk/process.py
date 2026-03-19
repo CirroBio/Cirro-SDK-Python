@@ -122,7 +122,9 @@ class DataPortalProcess(DataPortalAsset):
             compute_environment (str): Name or ID of compute environment to use,
              if blank it will run in AWS
             resume_dataset_id (str): ID of dataset to resume from, used for caching task execution.
-             It will attempt to re-use the previous output to minimize duplicate work
+             It will attempt to re-use the previous output to minimize duplicate work.
+            Note that Nextflow does not require this parameter, as it will automatically resume
+             from any previous attempts using a global cache.
 
         Returns:
             dataset_id (str): ID of newly created dataset
