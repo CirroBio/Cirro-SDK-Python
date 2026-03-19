@@ -290,7 +290,7 @@ class DataPortalDataset(DataPortalAsset):
             self,
             glob: str = None,
             pattern: str = None,
-            file_format: str = None,
+            format: str = None,
             **kwargs
     ):
         """
@@ -320,7 +320,7 @@ class DataPortalDataset(DataPortalAsset):
                 placeholders (e.g., ``'{sample}.csv'``,
                 ``'{condition}/{sample}.csv'``).
                 Yields ``(content, captures)`` per matching file.
-            file_format (str): File format used to parse each file. Supported values:
+            format (str): File format used to parse each file. Supported values:
 
                 - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
                 - ``'h5ad'``: parse as AnnData (requires ``anndata`` package)
@@ -366,7 +366,7 @@ class DataPortalDataset(DataPortalAsset):
                 print(captures['condition'], captures['sample'], df.shape)
 
             # Read gzip-compressed TSV files with explicit separator
-            for df in dataset.read_files(glob='**/*.tsv.gz', file_format='csv', sep='\\t'):
+            for df in dataset.read_files(glob='**/*.tsv.gz', format='csv', sep='\\t'):
                 print(df.shape)
             ```
         """
@@ -514,6 +514,7 @@ class DataPortalDataset(DataPortalAsset):
         process = parse_process_name_or_id(process, self._client)
 
         if compute_environment:
+            compute_environment_name = compute_environment
             compute_environments = self._client.compute_environments.list_environments_for_project(
                 project_id=self.project_id
             )
@@ -523,7 +524,7 @@ class DataPortalDataset(DataPortalAsset):
                 None
             )
             if compute_environment is None:
-                raise DataPortalInputError(f"Compute environment '{compute_environment}' not found")
+                raise DataPortalInputError(f"Compute environment '{compute_environment_name}' not found")
 
         resp = self._client.execution.run_analysis(
             project_id=self.project_id,

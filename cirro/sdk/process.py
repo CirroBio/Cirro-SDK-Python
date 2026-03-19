@@ -147,6 +147,7 @@ class DataPortalProcess(DataPortalAsset):
         ]
 
         if compute_environment:
+            compute_environment_name = compute_environment
             compute_environments = self._client.compute_environments.list_environments_for_project(
                 project_id=project_id
             )
@@ -156,7 +157,7 @@ class DataPortalProcess(DataPortalAsset):
                 None
             )
             if compute_environment is None:
-                raise DataPortalInputError(f"Compute environment '{compute_environment}' not found")
+                raise DataPortalInputError(f"Compute environment '{compute_environment_name}' not found")
 
         resp = self._client.execution.run_analysis(
             project_id=project_id,

@@ -111,7 +111,7 @@ class DataPortalFile(DataPortalAsset):
             elif self.relative_path.endswith('.bz2'):
                 compression = dict(method='bz2')
             elif self.relative_path.endswith('.xz'):
-                compression = dict(method='zstd')
+                compression = dict(method='xz')
             elif self.relative_path.endswith('.zst'):
                 compression = dict(method='zstd')
             else:
@@ -280,5 +280,5 @@ class DataPortalFiles(DataPortalAssets[DataPortalFile]):
 
         local_paths = []
         for f in self:
-            local_paths += f.download(download_location)
+            local_paths.append(f.download(download_location))
         return local_paths
