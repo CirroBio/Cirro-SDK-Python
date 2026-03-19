@@ -1,6 +1,6 @@
 from functools import cache
 from time import sleep
-from typing import List, Union
+from typing import List, Union, Iterator, Tuple, Any
 
 from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag, Status
 
@@ -9,6 +9,7 @@ from cirro.file_utils import get_files_in_directory
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.dataset import DataPortalDataset, DataPortalDatasets
 from cirro.sdk.exceptions import DataPortalAssetNotFound, DataPortalInputError
+from cirro.sdk.file import DataPortalFile
 from cirro.sdk.helpers import parse_process_name_or_id
 from cirro.sdk.process import DataPortalProcess
 from cirro.sdk.reference import DataPortalReference, DataPortalReferences
@@ -234,6 +235,58 @@ class DataPortalProject(DataPortalAsset):
             max_items (int): Maximum number of records to get (default 10,000)
         """
         return self._client.metadata.get_project_samples(self.id, max_items)
+
+    def read_files(
+            self,
+            pattern: str,
+            file_format: str = None,
+            **kwargs
+    ) -> Iterator[Tuple[DataPortalFile, Any]]:
+        """
+        Read the contents of files across all datasets in the project that match
+        the given glob pattern.
+
+        Iterates over every dataset in the project and yields matching files from
+        each one in turn. See :meth:`~cirro.sdk.dataset.DataPortalDataset.read_files`
+        for full details on pattern matching and format options.
+
+        Uses standard glob pattern matching (e.g., ``*.csv``, ``data/**/*.tsv.gz``).
+        ``*`` matches any sequence of characters within a single path segment;
+        ``**`` matches zero or more path segments.
+
+        Args:
+            pattern (str): Glob pattern used to match file paths within each dataset
+                (e.g., ``'*.csv'``, ``'counts/**/*.tsv.gz'``)
+            file_format (str): File format used to parse each file. Supported values:
+
+                - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
+                - ``'h5ad'``: parse as AnnData (requires ``anndata`` package)
+                - ``'text'``: read as plain text, returns a ``str``
+                - ``None`` (default): infer from file extension
+                  (``.csv``/``.tsv`` → ``'csv'``, ``.h5ad`` → ``'h5ad'``, otherwise ``'text'``)
+            **kwargs: Additional keyword arguments forwarded to the file-parsing function.
+                For ``'csv'`` format these are passed to :func:`pandas.read_csv`
+                (e.g., ``sep='\\t'`` for TSV files).
+                For ``'text'`` format these are passed to
+                :meth:`~cirro.sdk.file.DataPortalFile.read`.
+
+        Yields:
+            Tuple[DataPortalFile, Any]: ``(file, content)`` for each matching file
+            across all datasets, where *content* type depends on *file_format*.
+
+        Example:
+            ```python
+            # Read all CSV files across every dataset in a project
+            for file, df in project.read_files('*.csv'):
+                print(file.relative_path, df.shape)
+
+            # Read gzip-compressed TSV files with explicit separator
+            for file, df in project.read_files('**/*.tsv.gz', file_format='csv', sep='\\t'):
+                print(file.relative_path, df.shape)
+            ```
+        """
+        for dataset in self.list_datasets():
+            yield from dataset.read_files(pattern, file_format=file_format, **kwargs)
 
 
 class DataPortalProjects(DataPortalAssets[DataPortalProject]):

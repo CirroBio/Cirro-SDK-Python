@@ -1,12 +1,13 @@
 import datetime
 from pathlib import Path
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Iterator, Tuple, Any
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
     RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, Executor, ValidateFileRequirementsRequest
 
 from cirro.cirro_client import CirroApi
+from cirro.file_utils import filter_files_by_pattern
 from cirro.models.assets import DatasetAssets
 from cirro.models.file import PathLike
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
@@ -15,6 +16,37 @@ from cirro.sdk.exceptions import DataPortalInputError
 from cirro.sdk.file import DataPortalFile, DataPortalFiles
 from cirro.sdk.helpers import parse_process_name_or_id
 from cirro.sdk.process import DataPortalProcess
+
+
+def _infer_file_format(path: str) -> str:
+    """Infer the file format from the file extension."""
+    path_lower = path.lower()
+    for ext in ('.gz', '.bz2', '.xz', '.zst'):
+        if path_lower.endswith(ext):
+            path_lower = path_lower[:-len(ext)]
+            break
+    if path_lower.endswith('.csv') or path_lower.endswith('.tsv'):
+        return 'csv'
+    elif path_lower.endswith('.h5ad'):
+        return 'h5ad'
+    else:
+        return 'text'
+
+
+def _read_file_with_format(file: DataPortalFile, file_format: Optional[str], **kwargs) -> Any:
+    """Read a file using the specified format, or auto-detect from extension."""
+    if file_format is None:
+        file_format = _infer_file_format(file.relative_path)
+    if file_format == 'csv':
+        return file.read_csv(**kwargs)
+    elif file_format == 'h5ad':
+        return file.read_h5ad()
+    elif file_format == 'text':
+        return file.read(**kwargs)
+    else:
+        raise DataPortalInputError(
+            f"Unsupported file_format: '{file_format}'. Supported values: 'csv', 'h5ad', 'text'"
+        )
 
 
 class DataPortalDataset(DataPortalAsset):
@@ -198,6 +230,57 @@ class DataPortalDataset(DataPortalAsset):
                 for file in files
             ]
         )
+
+    def read_files(
+            self,
+            pattern: str,
+            file_format: str = None,
+            **kwargs
+    ) -> Iterator[Tuple[DataPortalFile, Any]]:
+        """
+        Read the contents of files in the dataset matching the given glob pattern.
+
+        Uses standard glob pattern matching (e.g., ``*.csv``, ``data/**/*.tsv.gz``).
+        ``*`` matches any sequence of characters within a single path segment;
+        ``**`` matches zero or more path segments.
+
+        Args:
+            pattern (str): Glob pattern used to match file paths within the dataset
+                (e.g., ``'*.csv'``, ``'counts/**/*.tsv.gz'``)
+            file_format (str): File format used to parse each file. Supported values:
+
+                - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
+                - ``'h5ad'``: parse as AnnData (requires ``anndata`` package)
+                - ``'text'``: read as plain text, returns a ``str``
+                - ``None`` (default): infer from file extension
+                  (``.csv``/``.tsv`` → ``'csv'``, ``.h5ad`` → ``'h5ad'``, otherwise ``'text'``)
+            **kwargs: Additional keyword arguments forwarded to the file-parsing function.
+                For ``'csv'`` format these are passed to :func:`pandas.read_csv`
+                (e.g., ``sep='\\t'`` for TSV files).
+                For ``'text'`` format these are passed to
+                :meth:`~cirro.sdk.file.DataPortalFile.read`.
+
+        Yields:
+            Tuple[DataPortalFile, Any]: ``(file, content)`` for each matching file,
+            where *content* type depends on *file_format*.
+
+        Example:
+            ```python
+            # Read all CSV files in a dataset
+            for file, df in dataset.read_files('*.csv'):
+                print(file.relative_path, df.shape)
+
+            # Read gzip-compressed TSV files using explicit format and separator
+            for file, df in dataset.read_files('**/*.tsv.gz', file_format='csv', sep='\\t'):
+                print(file.relative_path, df.shape)
+
+            # Read plain-text log files
+            for file, text in dataset.read_files('logs/*.log', file_format='text'):
+                print(file.relative_path, text[:200])
+            ```
+        """
+        for file in filter_files_by_pattern(list(self.list_files()), pattern):
+            yield file, _read_file_with_format(file, file_format, **kwargs)
 
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """
