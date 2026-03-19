@@ -288,29 +288,38 @@ class DataPortalDataset(DataPortalAsset):
 
     def read_files(
             self,
-            pattern: str,
+            glob: str = None,
+            pattern: str = None,
             file_format: str = None,
             **kwargs
-    ) -> Iterator[Tuple[DataPortalFile, Any, Dict[str, str]]]:
+    ):
         """
-        Read the contents of files in the dataset matching the given glob pattern.
+        Read the contents of files in the dataset.
 
-        Uses standard glob pattern matching (e.g., ``*.csv``, ``data/**/*.tsv.gz``).
-        ``*`` matches any sequence of characters within a single path segment;
-        ``**`` matches zero or more path segments.
+        Exactly one of ``glob`` or ``pattern`` must be provided.
 
-        **Named captures** — wrap a segment in ``{name}`` to extract that portion
-        of the path automatically.  For example, ``{sample}.csv`` will match
-        ``sampleA.csv`` and ``sampleB.csv`` and return ``{'sample': 'sampleA'}``
-        / ``{'sample': 'sampleB'}`` respectively in the third element of each
-        yielded tuple.  Multiple captures are supported:
-        ``{condition}/{sample}.csv`` extracts both ``condition`` and ``sample``
-        from a two-level path.
+        **glob** — standard wildcard matching; yields the file content for each
+        matching file:
+
+        - ``*`` matches any characters within a single path segment
+        - ``**`` matches zero or more path segments
+        - Matching is suffix-anchored (``*.csv`` matches at any depth)
+
+        **pattern** — like ``glob`` but ``{name}`` placeholders capture portions
+        of the path automatically; yields ``(content, captures)`` pairs where
+        *captures* is a ``dict`` of extracted values:
+
+        - ``{name}`` captures one path segment (no ``/``)
+        - ``*`` and ``**`` wildcards work as in ``glob``
 
         Args:
-            pattern (str): Glob pattern used to match file paths within the dataset.
-                May contain ``{name}`` capture placeholders
-                (e.g., ``'{sample}.csv'``, ``'counts/{sample}/*.tsv.gz'``).
+            glob (str): Wildcard expression to match files
+                (e.g., ``'*.csv'``, ``'data/**/*.tsv.gz'``).
+                Yields one item per matching file: the parsed content.
+            pattern (str): Wildcard expression with ``{name}`` capture
+                placeholders (e.g., ``'{sample}.csv'``,
+                ``'{condition}/{sample}.csv'``).
+                Yields ``(content, captures)`` per matching file.
             file_format (str): File format used to parse each file. Supported values:
 
                 - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
@@ -329,54 +338,52 @@ class DataPortalDataset(DataPortalAsset):
                   ``.json`` → ``'json'``, ``.parquet`` → ``'parquet'``,
                   ``.feather`` → ``'feather'``, ``.pkl``/``.pickle`` → ``'pickle'``,
                   ``.xlsx``/``.xls`` → ``'excel'``, otherwise ``'text'``)
-            **kwargs: Additional keyword arguments forwarded to the file-parsing function.
-                For ``'csv'`` format these are passed to :func:`pandas.read_csv`
-                (e.g., ``sep='\\t'`` for TSV files).
-                For ``'text'`` format these are passed to
-                :meth:`~cirro.sdk.file.DataPortalFile.read`.
+            **kwargs: Additional keyword arguments forwarded to the file-parsing
+                function (e.g., ``sep='\\t'`` for CSV/TSV files).
 
         Yields:
-            Tuple[DataPortalFile, Any, Dict[str, str]]:
-            ``(file, content, captures)`` for each matching file, where:
+            - When using ``glob``: *content* for each matching file
+            - When using ``pattern``: ``(content, captures)`` for each matching file,
+              where *captures* is a ``dict`` of values extracted from ``{name}``
+              placeholders
 
-            - *content* type depends on *file_format*
-            - *captures* is a ``dict`` of values extracted from ``{name}``
-              placeholders in the pattern (empty ``{}`` when the pattern
-              contains no captures)
+        Raises:
+            DataPortalInputError: if both ``glob`` and ``pattern`` are provided,
+                or if neither is provided.
 
         Example:
             ```python
-            # Read all CSV files in a dataset
-            for file, df, _ in dataset.read_files('*.csv'):
-                print(file.relative_path, df.shape)
+            # Read all CSV files — just the content
+            for df in dataset.read_files(glob='*.csv'):
+                print(df.shape)
 
-            # Extract sample names automatically from filenames
-            for file, df, captures in dataset.read_files('{sample}.csv'):
+            # Extract sample names from filenames automatically
+            for df, captures in dataset.read_files(pattern='{sample}.csv'):
                 print(captures['sample'], df.shape)
 
             # Multi-level capture: condition directory + sample filename
-            for file, df, captures in dataset.read_files('{condition}/{sample}.csv'):
+            for df, captures in dataset.read_files(pattern='{condition}/{sample}.csv'):
                 print(captures['condition'], captures['sample'], df.shape)
 
-            # Read gzip-compressed TSV files using explicit format and separator
-            for file, df, _ in dataset.read_files('**/*.tsv.gz', file_format='csv', sep='\\t'):
-                print(file.relative_path, df.shape)
-
-            # Read plain-text log files
-            for file, text, _ in dataset.read_files('logs/*.log', file_format='text'):
-                print(file.relative_path, text[:200])
+            # Read gzip-compressed TSV files with explicit separator
+            for df in dataset.read_files(glob='**/*.tsv.gz', file_format='csv', sep='\\t'):
+                print(df.shape)
             ```
         """
-        has_captures = bool(re.search(r'\{\w+\}', pattern))
-        if has_captures:
+        if glob is not None and pattern is not None:
+            raise DataPortalInputError("Cannot specify both 'glob' and 'pattern' — use one or the other")
+        if glob is None and pattern is None:
+            raise DataPortalInputError("Must specify either 'glob' or 'pattern'")
+
+        if glob is not None:
+            for file in filter_files_by_pattern(list(self.list_files()), glob):
+                yield _read_file_with_format(file, file_format, **kwargs)
+        else:
             compiled_regex, _ = _pattern_to_captures_regex(pattern)
             for file in self.list_files():
                 m = compiled_regex.match(file.relative_path)
                 if m is not None:
-                    yield file, _read_file_with_format(file, file_format, **kwargs), m.groupdict()
-        else:
-            for file in filter_files_by_pattern(list(self.list_files()), pattern):
-                yield file, _read_file_with_format(file, file_format, **kwargs), {}
+                    yield _read_file_with_format(file, file_format, **kwargs), m.groupdict()
 
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """
