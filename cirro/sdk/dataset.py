@@ -118,7 +118,7 @@ class DataPortalDataset(DataPortalAsset):
         Should be invoked from a top-level constructor, for example:
 
         ```python
-        from cirro import DataPortal()
+        from cirro import DataPortal
         portal = DataPortal()
         dataset = portal.get_dataset(
             project="id-or-name-of-project",

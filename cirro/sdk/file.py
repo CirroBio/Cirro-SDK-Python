@@ -27,7 +27,7 @@ class DataPortalFile(DataPortalAsset):
         Instantiate by listing files from a dataset.
 
         ```python
-        from cirro import DataPortal()
+        from cirro import DataPortal
         portal = DataPortal()
         dataset = portal.get_dataset(
             project="id-or-name-of-project",

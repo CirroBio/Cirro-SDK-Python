@@ -101,7 +101,7 @@ class DataPortalProject(DataPortalAsset):
         # Try by ID first
         try:
             return self.get_dataset_by_id(name_or_id)
-        except (DataPortalAssetNotFound, Exception):
+        except Exception:
             pass
 
         # Fall back to name matching

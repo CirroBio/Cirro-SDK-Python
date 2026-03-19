@@ -28,7 +28,7 @@ class DataPortal:
         ```python
         from cirro import DataPortal
 
-        Portal = DataPortal(base_url="app.cirro.bio")
+        portal = DataPortal(base_url="app.cirro.bio")
         portal.list_projects()
         ```
         """
