@@ -292,6 +292,51 @@ class TestDatasetReadFiles(unittest.TestCase):
         self.assertIsInstance(meta, dict)
         self.assertIn('sample', meta)
 
+    # --- special characters in filenames ---
+
+    def test_glob_matches_filename_with_spaces(self):
+        dataset = _make_dataset_with_files([
+            _make_mock_file('data/my sample.csv', b'a\n1\n'),
+        ])
+        results = list(dataset.read_files(glob='*.csv'))
+        self.assertEqual(len(results), 1)
+
+    def test_glob_matches_filename_with_hyphens_and_parens(self):
+        dataset = _make_dataset_with_files([
+            _make_mock_file('data/sample-A (1).csv', b'a\n1\n'),
+        ])
+        results = list(dataset.read_files(glob='*.csv'))
+        self.assertEqual(len(results), 1)
+
+    def test_pattern_captures_filename_with_spaces(self):
+        dataset = _make_dataset_with_files([
+            _make_mock_file('my sample.csv', b'a\n1\n'),
+        ])
+        results = list(dataset.read_files(pattern='{sample}.csv'))
+        self.assertEqual(len(results), 1)
+        _, meta = results[0]
+        self.assertEqual(meta['sample'], 'my sample')
+
+    def test_pattern_captures_directory_with_spaces(self):
+        dataset = _make_dataset_with_files([
+            _make_mock_file('treated group/sampleA.csv', b'a\n1\n'),
+            _make_mock_file('control group/sampleB.csv', b'a\n2\n'),
+        ])
+        results = list(dataset.read_files(pattern='{condition}/{sample}.csv'))
+        self.assertEqual(len(results), 2)
+        by_sample = {m['sample']: m['condition'] for _, m in results}
+        self.assertEqual(by_sample['sampleA'], 'treated group')
+        self.assertEqual(by_sample['sampleB'], 'control group')
+
+    def test_pattern_captures_special_chars(self):
+        dataset = _make_dataset_with_files([
+            _make_mock_file('sample-A_v2 (1).csv', b'a\n1\n'),
+        ])
+        results = list(dataset.read_files(pattern='{sample}.csv'))
+        self.assertEqual(len(results), 1)
+        _, meta = results[0]
+        self.assertEqual(meta['sample'], 'sample-A_v2 (1)')
+
     # --- error cases ---
 
     def test_both_glob_and_pattern_raises(self):
@@ -305,7 +350,7 @@ class TestDatasetReadFiles(unittest.TestCase):
 
 class TestPatternToRegex(unittest.TestCase):
     def _match(self, pattern, path):
-        compiled, names = _pattern_to_captures_regex(pattern)
+        compiled, _ = _pattern_to_captures_regex(pattern)
         m = compiled.match(path)
         return m.groupdict() if m else None
 
@@ -336,3 +381,31 @@ class TestPatternToRegex(unittest.TestCase):
     def test_capture_names_returned(self):
         _, names = _pattern_to_captures_regex('{condition}/{sample}.csv')
         self.assertListEqual(names, ['condition', 'sample'])
+
+    def test_capture_with_spaces(self):
+        result = self._match('{sample}.csv', 'my sample.csv')
+        self.assertEqual(result, {'sample': 'my sample'})
+
+    def test_capture_with_spaces_in_directory(self):
+        result = self._match('{condition}/{sample}.csv', 'treated group/my sample.csv')
+        self.assertEqual(result, {'condition': 'treated group', 'sample': 'my sample'})
+
+    def test_capture_with_hyphens_and_underscores(self):
+        result = self._match('{sample}.csv', 'sample-A_v2.csv')
+        self.assertEqual(result, {'sample': 'sample-A_v2'})
+
+    def test_capture_with_parentheses(self):
+        result = self._match('{sample}.csv', 'sample (1).csv')
+        self.assertEqual(result, {'sample': 'sample (1)'})
+
+    def test_capture_with_dots_in_name(self):
+        result = self._match('{sample}.csv', 'sample.v2.csv')
+        self.assertEqual(result, {'sample': 'sample.v2'})
+
+    def test_wildcard_matches_spaces(self):
+        compiled, _ = _pattern_to_captures_regex('data/*.csv')
+        self.assertIsNotNone(compiled.match('data/my file.csv'))
+
+    def test_globstar_matches_spaces_across_segments(self):
+        compiled, _ = _pattern_to_captures_regex('**/*.csv')
+        self.assertIsNotNone(compiled.match('some dir/sub dir/my file.csv'))
