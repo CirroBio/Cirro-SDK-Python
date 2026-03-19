@@ -372,6 +372,24 @@ class DataPortalDataset(DataPortalAsset):
 
         return _read_file_with_format(file, filetype, **kwargs)
 
+    def get_trace(self) -> Any:
+        """
+        Read the Nextflow workflow trace file for this dataset as a DataFrame.
+
+        Returns:
+            `pandas.DataFrame`
+        """
+        return self.get_artifact(ArtifactType.WORKFLOW_TRACE).read_csv(sep='\t')
+
+    def get_logs(self) -> str:
+        """
+        Read the Nextflow workflow logs for this dataset as a string.
+
+        Returns:
+            str
+        """
+        return self.get_artifact(ArtifactType.WORKFLOW_LOGS).read()
+
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """
         Get the artifact of a particular type from the dataset
