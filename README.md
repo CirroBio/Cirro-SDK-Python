@@ -181,6 +181,49 @@ See the following set of Jupyter notebooks that contain examples on the followin
 | [Using references](samples/Using_references.ipynb)                 | Managing reference data              |
 | [Advanced usage](samples/Advanced_usage.ipynb)                     | Advanced operations                  |
 
+### Reading files
+
+The `read_file` and `read_files` methods provide a convenient way to read dataset files directly into Python objects. The file format is inferred from the extension (`.csv`, `.tsv`, `.json`, `.parquet`, `.feather`, `.pkl`, `.xlsx`, `.h5ad`), or can be specified explicitly.
+
+```python
+from cirro import DataPortal
+
+# If not logged in, this will prompt with a login URL
+portal = DataPortal()
+
+# Read a single file from the indicated dataset
+df = portal.read_file(project="My Project", dataset="My Dataset", glob="**/results.csv")
+
+# Iterate over each of the files ending in .csv within a dataset
+for df in portal.read_files(project="My Project", dataset="My Dataset", glob="*.csv"):
+    print(df.shape)
+
+```
+
+You can also call these methods on the `DataPortalDataset` object:
+
+```python
+# Get an object representing a single dataset
+dataset = portal.get_dataset(project="My Project", dataset="My Dataset")
+
+# Read a single file by exact path or glob pattern
+df = dataset.read_file(path="data/results.csv")
+df = dataset.read_file(glob="**/results.csv")
+
+# Read multiple files matching a pattern — yields one result per file
+for df in dataset.read_files(glob="**/*.csv"):
+    print(df.shape)
+
+# Extract values from the path using {name} capture placeholders
+for df, meta in dataset.read_files(pattern="{sample}/results.csv"):
+    print(meta["sample"], df.shape)
+
+# Extra keyword arguments are forwarded to the file-parsing function
+for df in dataset.read_files(glob="**/*.tsv.gz", filetype="csv", sep="\t"):
+    print(df.shape)
+```
+
+
 ## R Usage
 
 | Jupyter Notebook                                    | Topic               |
