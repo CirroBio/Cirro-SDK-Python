@@ -106,7 +106,8 @@ class DataPortalProcess(DataPortalAsset):
             params=None,
             notifications_emails: List[str] = None,
             compute_environment: str = None,
-            resume_dataset_id: str = None
+            resume_dataset_id: str = None,
+            source_sample_ids: List[str] = None
     ) -> str:
         """
         Runs this process on one or more input datasets, returns the ID of the newly created dataset.
@@ -125,6 +126,7 @@ class DataPortalProcess(DataPortalAsset):
              It will attempt to re-use the previous output to minimize duplicate work.
             Note that Nextflow does not require this parameter, as it will automatically resume
              from any previous attempts using a global cache.
+            source_sample_ids (List[str]): List of sample IDs to use as input for the analysis.
 
         Returns:
             dataset_id (str): ID of newly created dataset
@@ -169,6 +171,7 @@ class DataPortalProcess(DataPortalAsset):
                 params=RunAnalysisRequestParams.from_dict(params),
                 notification_emails=notifications_emails,
                 resume_dataset_id=resume_dataset_id,
+                source_sample_ids=source_sample_ids,
                 compute_environment_id=compute_environment.id if compute_environment else None
             )
         )
