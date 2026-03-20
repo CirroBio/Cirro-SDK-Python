@@ -1,12 +1,14 @@
 import datetime
+import re
 from pathlib import Path
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Any
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
     RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
 
 from cirro.cirro_client import CirroApi
+from cirro.file_utils import filter_files_by_pattern
 from cirro.models.assets import DatasetAssets
 from cirro.models.file import PathLike
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
@@ -15,6 +17,93 @@ from cirro.sdk.exceptions import DataPortalInputError
 from cirro.sdk.file import DataPortalFile, DataPortalFiles
 from cirro.sdk.helpers import parse_process_name_or_id
 from cirro.sdk.process import DataPortalProcess
+
+
+def _pattern_to_captures_regex(pattern: str):
+    """
+    Convert a glob pattern that may contain ``{name}`` capture placeholders into
+    a compiled regex and return ``(compiled_regex, capture_names)``.
+
+    Conversion rules:
+      - ``{name}``  → named group matching a single path segment (no ``/``)
+      - ``*``       → matches any characters within a single path segment
+      - ``**``      → matches any characters including ``/`` (multiple segments)
+      - All other characters are regex-escaped.
+
+    The resulting regex is suffix-anchored (like ``pathlib.PurePath.match``):
+    a pattern without a leading ``/`` will match at any depth in the path.
+    """
+    capture_names = re.findall(r'\{(\w+)\}', pattern)
+    tokens = re.split(r'(\*\*|\*|\{\w+\})', pattern)
+    parts = []
+    for token in tokens:
+        if token == '**':
+            parts.append('.*')
+        elif token == '*':
+            parts.append('[^/]*')
+        elif re.match(r'^\{\w+\}$', token):
+            name = token[1:-1]
+            parts.append(f'(?P<{name}>[^/]+)')
+        else:
+            parts.append(re.escape(token))
+    regex_str = ''.join(parts)
+    if not pattern.startswith('/'):
+        regex_str = r'(?:.+/)?' + regex_str
+    return re.compile('^' + regex_str + '$'), capture_names
+
+
+def _infer_file_format(path: str) -> str:
+    """Infer the file format from the file extension."""
+    path_lower = path.lower()
+    for ext in ('.gz', '.bz2', '.xz', '.zst'):
+        if path_lower.endswith(ext):
+            path_lower = path_lower[:-len(ext)]
+            break
+    if path_lower.endswith('.csv') or path_lower.endswith('.tsv'):
+        return 'csv'
+    elif path_lower.endswith('.h5ad'):
+        return 'h5ad'
+    elif path_lower.endswith('.json'):
+        return 'json'
+    elif path_lower.endswith('.parquet'):
+        return 'parquet'
+    elif path_lower.endswith('.feather'):
+        return 'feather'
+    elif path_lower.endswith('.pkl') or path_lower.endswith('.pickle'):
+        return 'pickle'
+    elif path_lower.endswith('.xlsx') or path_lower.endswith('.xls'):
+        return 'excel'
+    else:
+        return 'text'
+
+
+def _read_file_with_format(file: DataPortalFile, file_format: Optional[str], **kwargs) -> Any:
+    """Read a file using the specified format, or auto-detect from extension."""
+    if file_format is None:
+        file_format = _infer_file_format(file.relative_path)
+    if file_format == 'csv':
+        return file.read_csv(**kwargs)
+    elif file_format == 'h5ad':
+        return file.read_h5ad()
+    elif file_format == 'json':
+        return file.read_json(**kwargs)
+    elif file_format == 'parquet':
+        return file.read_parquet(**kwargs)
+    elif file_format == 'feather':
+        return file.read_feather(**kwargs)
+    elif file_format == 'pickle':
+        return file.read_pickle(**kwargs)
+    elif file_format == 'excel':
+        return file.read_excel(**kwargs)
+    elif file_format == 'text':
+        return file.read(**kwargs)
+    elif file_format == 'bytes':
+        return file._get()
+    else:
+        raise DataPortalInputError(
+            f"Unsupported file_format: '{file_format}'. "
+            f"Supported values: 'csv', 'h5ad', 'json', 'parquet', 'feather', 'pickle', 'excel', 'text', 'bytes'"
+        )
 
 
 class DataPortalDataset(DataPortalAsset):
@@ -31,7 +120,7 @@ class DataPortalDataset(DataPortalAsset):
         Should be invoked from a top-level constructor, for example:
 
         ```python
-        from cirro import DataPortal()
+        from cirro import DataPortal
         portal = DataPortal()
         dataset = portal.get_dataset(
             project="id-or-name-of-project",
@@ -199,6 +288,108 @@ class DataPortalDataset(DataPortalAsset):
             ]
         )
 
+    def read_files(
+            self,
+            glob: str = None,
+            pattern: str = None,
+            filetype: str = None,
+            **kwargs
+    ):
+        """
+        Read the contents of files in the dataset.
+
+        See :meth:`~cirro.sdk.portal.DataPortal.read_files` for full details
+        on ``glob``/``pattern`` matching and filetype options.
+
+        Args:
+            glob (str): Wildcard expression to match files.
+                Yields one item per matching file: the parsed content.
+            pattern (str): Wildcard expression with ``{name}`` capture
+                placeholders. Yields ``(content, meta)`` per matching file.
+            filetype (str): File format used to parse each file
+                (or ``None`` to infer from extension).
+            **kwargs: Additional keyword arguments forwarded to the
+                file-parsing function.
+
+        Yields:
+            - When using ``glob``: *content* for each matching file
+            - When using ``pattern``: ``(content, meta)`` for each matching file
+        """
+        if glob is not None and pattern is not None:
+            raise DataPortalInputError("Cannot specify both 'glob' and 'pattern' — use one or the other")
+        if glob is None and pattern is None:
+            raise DataPortalInputError("Must specify either 'glob' or 'pattern'")
+
+        if glob is not None:
+            for file in filter_files_by_pattern(list(self.list_files()), glob):
+                yield _read_file_with_format(file, filetype, **kwargs)
+        else:
+            compiled_regex, _ = _pattern_to_captures_regex(pattern)
+            for file in self.list_files():
+                m = compiled_regex.match(file.relative_path)
+                if m is not None:
+                    yield _read_file_with_format(file, filetype, **kwargs), m.groupdict()
+
+    def read_file(
+            self,
+            path: str = None,
+            glob: str = None,
+            filetype: str = None,
+            **kwargs
+    ) -> Any:
+        """
+        Read the contents of a single file from the dataset.
+
+        See :meth:`~cirro.sdk.portal.DataPortal.read_file` for full details.
+
+        Args:
+            path (str): Exact relative path of the file within the dataset.
+            glob (str): Wildcard expression matching exactly one file.
+            filetype (str): File format used to parse the file. Supported values
+                are the same as :meth:`~cirro.sdk.portal.DataPortal.read_files`.
+            **kwargs: Additional keyword arguments forwarded to the file-parsing
+                function.
+
+        Returns:
+            Parsed file content.
+        """
+        if path is not None and glob is not None:
+            raise DataPortalInputError("Cannot specify both 'path' and 'glob' — use one or the other")
+        if path is None and glob is None:
+            raise DataPortalInputError("Must specify either 'path' or 'glob'")
+
+        if path is not None:
+            file = self.get_file(path)
+        else:
+            matches = list(filter_files_by_pattern(list(self.list_files()), glob))
+            if len(matches) == 0:
+                raise DataPortalAssetNotFound(f"No files matched glob '{glob}'")
+            if len(matches) > 1:
+                raise DataPortalInputError(
+                    f"glob '{glob}' matched {len(matches)} files — use read_files() to read multiple files"
+                )
+            file = matches[0]
+
+        return _read_file_with_format(file, filetype, **kwargs)
+
+    def get_trace(self) -> Any:
+        """
+        Read the Nextflow workflow trace file for this dataset as a DataFrame.
+
+        Returns:
+            `pandas.DataFrame`
+        """
+        return self.get_artifact(ArtifactType.WORKFLOW_TRACE).read_csv(sep='\t')
+
+    def get_logs(self) -> str:
+        """
+        Read the Nextflow workflow logs for this dataset as a string.
+
+        Returns:
+            str
+        """
+        return self.get_artifact(ArtifactType.WORKFLOW_LOGS).read()
+
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """
         Get the artifact of a particular type from the dataset
@@ -225,16 +416,21 @@ class DataPortalDataset(DataPortalAsset):
             ]
         )
 
-    def download_files(self, download_location: str = None) -> None:
+    def download_files(self, download_location: str = None, glob: str = None) -> None:
         """
         Download all the files from the dataset to a local directory.
 
         Args:
             download_location (str): Path to local directory
+            glob (str): Optional wildcard expression to filter which files are downloaded
+                (e.g., ``'*.csv'``, ``'data/**/*.tsv.gz'``).
+                If omitted, all files are downloaded.
         """
 
-        # Alias for internal method
-        self.list_files().download(download_location)
+        files = self.list_files()
+        if glob is not None:
+            files = DataPortalFiles(filter_files_by_pattern(list(files), glob))
+        files.download(download_location)
 
     def run_analysis(
             self,
@@ -281,6 +477,7 @@ class DataPortalDataset(DataPortalAsset):
         process = parse_process_name_or_id(process, self._client)
 
         if compute_environment:
+            compute_environment_name = compute_environment
             compute_environments = self._client.compute_environments.list_environments_for_project(
                 project_id=self.project_id
             )
@@ -290,7 +487,7 @@ class DataPortalDataset(DataPortalAsset):
                 None
             )
             if compute_environment is None:
-                raise DataPortalInputError(f"Compute environment '{compute_environment}' not found")
+                raise DataPortalInputError(f"Compute environment '{compute_environment_name}' not found")
 
         resp = self._client.execution.run_analysis(
             project_id=self.project_id,

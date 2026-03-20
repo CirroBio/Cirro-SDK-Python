@@ -60,7 +60,7 @@ class DataPortalAssets(List[T]):
         # Error if multiple projects are found
         msg = f"Multiple {self.asset_name} items found with name '{name}', use ID instead.\n{self.description()}"
         if len(matching_queries) > 1:
-            raise DataPortalAssetNotFound(msg)
+            raise DataPortalInputError(msg)
 
         return matching_queries[0]
 
