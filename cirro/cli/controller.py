@@ -119,7 +119,10 @@ def run_validate_folder(input_params: ValidateArguments, interactive=False):
         # Filter out datasets that are not complete
         datasets = [d for d in datasets if d.status == Status.COMPLETED]
         input_params = gather_validate_arguments_dataset(input_params, datasets)
-        files = cirro.datasets.get_assets_listing(input_params['project'], input_params['dataset']).files
+        files = cirro.datasets.get_assets_listing(
+            input_params['project'], input_params['dataset'],
+            file_limit=input_params['file_limit']
+        ).files
 
         if len(files) == 0:
             raise InputError('There are no files in this dataset to validate against')
@@ -137,7 +140,8 @@ def run_validate_folder(input_params: ValidateArguments, interactive=False):
     results = cirro.datasets.validate_folder(
         project_id=project_id,
         dataset_id=dataset_id,
-        local_folder=input_params['data_directory']
+        local_folder=input_params['data_directory'],
+        file_limit=input_params['file_limit']
     )
 
     for file_list, label, log_level in [
@@ -165,7 +169,10 @@ def run_download(input_params: DownloadArguments, interactive=False):
         # Filter out datasets that are not complete
         datasets = [d for d in datasets if d.status == Status.COMPLETED]
         input_params = gather_download_arguments_dataset(input_params, datasets)
-        files = cirro.datasets.get_assets_listing(input_params['project'], input_params['dataset']).files
+        files = cirro.datasets.get_assets_listing(
+            input_params['project'], input_params['dataset'],
+            file_limit=input_params['file_limit']
+        ).files
 
         if len(files) == 0:
             raise InputError('There are no files in this dataset to download')
@@ -180,7 +187,9 @@ def run_download(input_params: DownloadArguments, interactive=False):
         dataset_id = get_id_from_name(datasets, input_params['dataset'])
 
         if input_params['file']:
-            all_files = cirro.datasets.get_assets_listing(project_id, dataset_id).files
+            all_files = cirro.datasets.get_assets_listing(
+                project_id, dataset_id, file_limit=input_params['file_limit']
+            ).files
             files_to_download = []
 
             for filepath in input_params['file']:
@@ -198,7 +207,8 @@ def run_download(input_params: DownloadArguments, interactive=False):
     cirro.datasets.download_files(project_id=project_id,
                                   dataset_id=dataset_id,
                                   download_location=input_params['data_directory'],
-                                  files=files_to_download)
+                                  files=files_to_download,
+                                  file_limit=input_params['file_limit'])
 
 
 def run_list_projects():
@@ -228,7 +238,9 @@ def run_list_files(input_params: ListFilesArguments, interactive=False):
         datasets = cirro.datasets.list(project_id)
         dataset_id = get_id_from_name(datasets, input_params['dataset'])
 
-    files = cirro.datasets.get_assets_listing(project_id, dataset_id).files
+    files = cirro.datasets.get_assets_listing(
+        project_id, dataset_id, file_limit=input_params['file_limit']
+    ).files
 
     if len(files) == 0:
         logger.info("No files found in this dataset")

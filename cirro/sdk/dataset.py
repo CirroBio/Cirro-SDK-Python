@@ -276,11 +276,22 @@ class DataPortalDataset(DataPortalAsset):
                 msg = '\n'.join([f"No file found with path '{relative_path}'."])
                 raise DataPortalAssetNotFound(msg)
 
-    def list_files(self) -> DataPortalFiles:
+    def list_files(self, file_limit: int = 100000) -> DataPortalFiles:
         """
         Return the list of files which make up the dataset.
+
+        Args:
+            file_limit (int): Maximum number of files to return (default 100,000)
         """
-        files = self._get_assets().files
+        if file_limit != 100000:
+            assets = self._client.datasets.get_assets_listing(
+                project_id=self.project_id,
+                dataset_id=self.id,
+                file_limit=file_limit
+            )
+            files = assets.files
+        else:
+            files = self._get_assets().files
         return DataPortalFiles(
             [
                 DataPortalFile(file=file, client=self._client)

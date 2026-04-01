@@ -35,6 +35,9 @@ def list_projects():
               help='Name or ID of the project')
 @click.option('--dataset',
               help='Name or ID of the dataset')
+@click.option('--file-limit',
+              help='Maximum number of files to list',
+              default=100000, show_default=True)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
@@ -65,6 +68,9 @@ def list_datasets(**kwargs):
               multiple=True)
 @click.option('--data-directory',
               help='Directory to store the files')
+@click.option('--file-limit',
+              help='Maximum number of files to enumerate from the dataset',
+              default=100000, show_default=True)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
@@ -107,6 +113,9 @@ def upload(**kwargs):
               help='Name or ID of the project')
 @click.option('--data-directory',
               help='Local directory you wish to validate')
+@click.option('--file-limit',
+              help='Maximum number of files to enumerate from the dataset',
+              default=100000, show_default=True)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)

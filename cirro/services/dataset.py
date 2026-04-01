@@ -324,12 +324,13 @@ class DatasetService(FileEnabledService):
         self,
         project_id: str,
         dataset_id: str,
-        local_folder: PathLike
+        local_folder: PathLike,
+        file_limit: int = 100000
     ) -> DatasetValidationResponse:
         """
         Validates that the contents of a dataset match that of a local folder.
         """
-        ds_files = self.get_assets_listing(project_id, dataset_id).files
+        ds_files = self.get_assets_listing(project_id, dataset_id, file_limit=file_limit).files
 
         local_folder = Path(local_folder)
         if not local_folder.is_dir():
@@ -382,7 +383,8 @@ class DatasetService(FileEnabledService):
         project_id: str,
         dataset_id: str,
         download_location: str,
-        files: Union[List[File], List[str]] = None
+        files: Union[List[File], List[str]] = None,
+        file_limit: int = 100000
     ) -> None:
         """
         Downloads files from a dataset
@@ -395,9 +397,10 @@ class DatasetService(FileEnabledService):
             dataset_id (str): ID of the Dataset
             download_location (str): Local destination for downloaded files
             files (typing.List[str]): Optional list of files to download
+            file_limit (int): Maximum number of files to get (default 100,000)
         """
         if files is None:
-            files = self.get_assets_listing(project_id, dataset_id).files
+            files = self.get_assets_listing(project_id, dataset_id, file_limit=file_limit).files
 
         if len(files) == 0:
             return
