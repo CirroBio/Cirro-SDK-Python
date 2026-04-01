@@ -43,7 +43,6 @@ def list_files(**kwargs):
     run_list_files(kwargs, interactive=kwargs.get('interactive'))
 
 
-
 @run.command(help='List datasets', no_args_is_help=True)
 @click.option('--project',
               help='Name or ID of the project')

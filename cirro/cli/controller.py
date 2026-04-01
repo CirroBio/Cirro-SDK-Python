@@ -239,7 +239,6 @@ def run_list_files(input_params: ListFilesArguments, interactive=False):
     print(df.to_string(index=False))
 
 
-
 def run_upload_reference(input_params: UploadReferenceArguments, interactive=False):
     cirro = _init_cirro_client()
     projects = _get_projects(cirro)
