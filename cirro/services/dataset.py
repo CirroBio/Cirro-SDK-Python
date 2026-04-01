@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Mapping as _Mapping
 from pathlib import Path
 from typing import List, Optional, Union, Dict
 
@@ -8,8 +7,6 @@ from cirro_api_client.v1.api.datasets import get_datasets, get_dataset, import_p
 from cirro_api_client.v1.api.sharing import get_shared_datasets
 from cirro_api_client.v1.models import ImportDataRequest, UploadDatasetRequest, UpdateDatasetRequest, Dataset, \
     DatasetDetail, CreateResponse, UploadDatasetCreateResponse, FileEntry
-from cirro_api_client.v1.models.dataset_viz_config import DatasetVizConfig as _DatasetVizConfig
-
 from cirro.file_utils import is_hidden_file
 from cirro.models.assets import DatasetAssets, Artifact
 from cirro.models.dataset import DatasetValidationResponse
