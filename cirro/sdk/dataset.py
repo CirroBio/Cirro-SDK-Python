@@ -283,15 +283,13 @@ class DataPortalDataset(DataPortalAsset):
         Args:
             file_limit (int): Maximum number of files to return (default 100,000)
         """
-        if file_limit != 100000:
-            assets = self._client.datasets.get_assets_listing(
-                project_id=self.project_id,
-                dataset_id=self.id,
-                file_limit=file_limit
-            )
-            files = assets.files
-        else:
-            files = self._get_assets().files
+        assets = self._client.datasets.get_assets_listing(
+            project_id=self.project_id,
+            dataset_id=self.id,
+            file_limit=file_limit
+        )
+        files = assets.files
+
         return DataPortalFiles(
             [
                 DataPortalFile(file=file, client=self._client)
