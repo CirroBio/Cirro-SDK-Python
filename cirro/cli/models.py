@@ -45,3 +45,9 @@ class UploadReferenceArguments(TypedDict):
     project: str
     reference_file: list[str]
     interactive: bool
+
+
+class ListFilesArguments(TypedDict):
+    project: str
+    dataset: str
+    interactive: bool

@@ -17,7 +17,7 @@ from cirro.cli.interactive.upload_reference_args import gather_reference_upload_
 from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError, validate_files
 from cirro.cli.interactive.validate_args import gather_validate_arguments, gather_validate_arguments_dataset
 from cirro.cli.models import ListArguments, UploadArguments, DownloadArguments, CreatePipelineConfigArguments, \
-    UploadReferenceArguments, ValidateArguments
+    UploadReferenceArguments, ValidateArguments, ListFilesArguments
 from cirro.config import UserConfig, save_user_config, load_user_config
 from cirro.file_utils import get_files_in_directory
 from cirro.models.process import PipelineDefinition, ConfigAppStatus, CONFIG_APP_URL
@@ -199,6 +199,45 @@ def run_download(input_params: DownloadArguments, interactive=False):
                                   dataset_id=dataset_id,
                                   download_location=input_params['data_directory'],
                                   files=files_to_download)
+
+
+def run_list_projects():
+    """List all available projects."""
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
+
+    import pandas as pd
+    df = pd.DataFrame([{'id': p.id, 'name': p.name} for p in projects])
+    print(df.to_string(index=False))
+
+
+def run_list_files(input_params: ListFilesArguments, interactive=False):
+    """List files available in a dataset."""
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
+
+    if interactive:
+        from cirro.cli.interactive.common_args import ask_project, ask_dataset
+        from cirro.services.service_helpers import list_all_datasets
+        project_name = ask_project(projects, input_params.get('project'))
+        project_id = get_id_from_name(projects, project_name)
+        datasets = list_all_datasets(project_id=project_id, client=cirro)
+        dataset_id = ask_dataset(datasets, input_params.get('dataset'), msg_action='list files for')
+    else:
+        project_id = get_id_from_name(projects, input_params['project'])
+        datasets = cirro.datasets.list(project_id)
+        dataset_id = get_id_from_name(datasets, input_params['dataset'])
+
+    files = cirro.datasets.get_assets_listing(project_id, dataset_id).files
+
+    if len(files) == 0:
+        logger.info("No files found in this dataset")
+        return
+
+    import pandas as pd
+    df = pd.DataFrame([{'path': f.normalized_path, 'size': f.size} for f in files])
+    print(df.to_string(index=False))
+
 
 
 def run_upload_reference(input_params: UploadReferenceArguments, interactive=False):

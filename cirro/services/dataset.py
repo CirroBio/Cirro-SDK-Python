@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping as _Mapping
 from pathlib import Path
 from typing import List, Optional, Union, Dict
 
@@ -7,6 +8,20 @@ from cirro_api_client.v1.api.datasets import get_datasets, get_dataset, import_p
 from cirro_api_client.v1.api.sharing import get_shared_datasets
 from cirro_api_client.v1.models import ImportDataRequest, UploadDatasetRequest, UpdateDatasetRequest, Dataset, \
     DatasetDetail, CreateResponse, UploadDatasetCreateResponse, FileEntry
+from cirro_api_client.v1.models.dataset_viz_config import DatasetVizConfig as _DatasetVizConfig
+
+# Patch DatasetVizConfig.from_dict to handle the case where the API returns a string
+# (a path to the config file) instead of a config dict.
+_original_dviz_from_dict = _DatasetVizConfig.from_dict.__func__
+
+
+def _safe_dviz_from_dict(cls, src_dict):
+    if not isinstance(src_dict, _Mapping):
+        return cls()
+    return _original_dviz_from_dict(cls, src_dict)
+
+
+_DatasetVizConfig.from_dict = classmethod(_safe_dviz_from_dict)
 
 from cirro.file_utils import is_hidden_file
 from cirro.models.assets import DatasetAssets, Artifact
