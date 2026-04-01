@@ -10,6 +10,13 @@ from cirro_api_client.v1.models import ImportDataRequest, UploadDatasetRequest, 
     DatasetDetail, CreateResponse, UploadDatasetCreateResponse, FileEntry
 from cirro_api_client.v1.models.dataset_viz_config import DatasetVizConfig as _DatasetVizConfig
 
+from cirro.file_utils import is_hidden_file
+from cirro.models.assets import DatasetAssets, Artifact
+from cirro.models.dataset import DatasetValidationResponse
+from cirro.models.file import FileAccessContext, File, PathLike
+from cirro.services.base import get_all_records
+from cirro.services.file import FileEnabledService
+
 # Patch DatasetVizConfig.from_dict to handle the case where the API returns a string
 # (a path to the config file) instead of a config dict.
 _original_dviz_from_dict = _DatasetVizConfig.from_dict.__func__
@@ -22,13 +29,6 @@ def _safe_dviz_from_dict(cls, src_dict):
 
 
 _DatasetVizConfig.from_dict = classmethod(_safe_dviz_from_dict)
-
-from cirro.file_utils import is_hidden_file
-from cirro.models.assets import DatasetAssets, Artifact
-from cirro.models.dataset import DatasetValidationResponse
-from cirro.models.file import FileAccessContext, File, PathLike
-from cirro.services.base import get_all_records
-from cirro.services.file import FileEnabledService
 
 logger = logging.getLogger()
 
