@@ -7,6 +7,7 @@ class DownloadArguments(TypedDict):
     data_directory: str
     interactive: bool
     file: Optional[list[str]]
+    file_limit: int
 
 
 class UploadArguments(TypedDict):
@@ -25,6 +26,7 @@ class ValidateArguments(TypedDict):
     project: str
     data_directory: str
     interactive: bool
+    file_limit: int
 
 
 class ListArguments(TypedDict):
@@ -45,3 +47,10 @@ class UploadReferenceArguments(TypedDict):
     project: str
     reference_file: list[str]
     interactive: bool
+
+
+class ListFilesArguments(TypedDict):
+    project: str
+    dataset: str
+    interactive: bool
+    file_limit: int

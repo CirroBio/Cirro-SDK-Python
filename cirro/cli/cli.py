@@ -6,7 +6,7 @@ from cirro_api_client.v1.errors import CirroException
 
 from cirro.cli import run_create_pipeline_config, run_validate_folder
 from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets
-from cirro.cli.controller import handle_error, run_upload_reference
+from cirro.cli.controller import handle_error, run_upload_reference, run_list_projects, run_list_files
 from cirro.cli.interactive.utils import InputError
 
 
@@ -23,6 +23,27 @@ def check_required_args(args):
 @click.version_option()
 def run():
     pass  # Print out help text, nothing to do
+
+
+@run.command(help='List projects')
+def list_projects():
+    run_list_projects()
+
+
+@run.command(help='List files in a dataset', no_args_is_help=True)
+@click.option('--project',
+              help='Name or ID of the project')
+@click.option('--dataset',
+              help='Name or ID of the dataset')
+@click.option('--file-limit',
+              help='Maximum number of files to list',
+              default=100000, show_default=True)
+@click.option('-i', '--interactive',
+              help='Gather arguments interactively',
+              is_flag=True, default=False)
+def list_files(**kwargs):
+    check_required_args(kwargs)
+    run_list_files(kwargs, interactive=kwargs.get('interactive'))
 
 
 @run.command(help='List datasets', no_args_is_help=True)
@@ -47,6 +68,9 @@ def list_datasets(**kwargs):
               multiple=True)
 @click.option('--data-directory',
               help='Directory to store the files')
+@click.option('--file-limit',
+              help='Maximum number of files to enumerate from the dataset',
+              default=100000, show_default=True)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
@@ -89,6 +113,9 @@ def upload(**kwargs):
               help='Name or ID of the project')
 @click.option('--data-directory',
               help='Local directory you wish to validate')
+@click.option('--file-limit',
+              help='Maximum number of files to enumerate from the dataset',
+              default=100000, show_default=True)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
