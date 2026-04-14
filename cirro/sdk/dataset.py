@@ -2,7 +2,10 @@ import csv
 import datetime
 from io import StringIO
 from pathlib import Path
-from typing import Union, List, Optional
+from typing import Union, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cirro.sdk.task import DataPortalTask
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
