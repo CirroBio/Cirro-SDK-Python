@@ -46,3 +46,6 @@ class DebugArguments(TypedDict):
     interactive: bool
     max_depth: Optional[int]
     max_tasks: Optional[int]
+    show_script: bool
+    show_log: bool
+    show_files: bool

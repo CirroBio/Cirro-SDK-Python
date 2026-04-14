@@ -115,6 +115,15 @@ def upload_reference(**kwargs):
               help='Maximum total number of tasks to print across all depth levels '
                    '(default: unlimited)',
               type=int, default=None)
+@click.option('--show-script/--no-show-script',
+              help='Print the task script (.command.sh)',
+              default=True)
+@click.option('--show-log/--no-show-log',
+              help='Print the task log (.command.log)',
+              default=True)
+@click.option('--show-files/--no-show-files',
+              help='Print input and output file lists with sizes',
+              default=True)
 @click.option('-i', '--interactive',
               help='Walk through debug information interactively',
               is_flag=True, default=False)

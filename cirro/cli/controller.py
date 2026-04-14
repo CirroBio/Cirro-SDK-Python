@@ -323,6 +323,9 @@ def run_debug(input_params: DebugArguments, interactive=False):
             failed_task,
             max_depth=input_params.get('max_depth'),
             max_tasks=input_params.get('max_tasks'),
+            show_script=input_params.get('show_script', True),
+            show_log=input_params.get('show_log', True),
+            show_files=input_params.get('show_files', True),
         )
 
 
@@ -331,7 +334,10 @@ def _format_size(size_bytes: int) -> str:
     return convert_size(size_bytes)
 
 
-def _print_task_debug(task, depth: int = 0):
+def _print_task_debug(task, depth: int = 0,
+                      show_script: bool = True,
+                      show_log: bool = True,
+                      show_files: bool = True):
     """Print all debug info for one task, indented according to its depth in the input chain."""
     indent = "  " * depth
     sep = "=" * 60
@@ -345,38 +351,47 @@ def _print_task_debug(task, depth: int = 0):
     print(f"{indent}Hash:      {task.hash}")
     print(f"{indent}Work Dir:  {task.work_dir}")
 
-    task_script = task.script()
-    print(f"\n{indent}--- Task Script ---")
-    print('\n'.join(indent + line for line in (task_script or "(empty)").splitlines()))
+    if show_script:
+        task_script = task.script()
+        print(f"\n{indent}--- Task Script ---")
+        print('\n'.join(indent + line for line in (task_script or "(empty)").splitlines()))
 
-    task_log = task.logs()
-    print(f"\n{indent}--- Task Log ---")
-    print('\n'.join(indent + line for line in (task_log or "(empty)").splitlines()))
+    if show_log:
+        task_log = task.logs()
+        print(f"\n{indent}--- Task Log ---")
+        print('\n'.join(indent + line for line in (task_log or "(empty)").splitlines()))
 
-    inputs = task.inputs
-    print(f"\n{indent}--- Inputs ({len(inputs)}) ---")
-    for f in inputs:
-        source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
-        try:
-            size_str = _format_size(f.size)
-        except Exception:
-            size_str = "unknown size"
-        print(f"{indent}  {f.name}  ({size_str})  [{source}]")
+    if show_files:
+        inputs = task.inputs
+        print(f"\n{indent}--- Inputs ({len(inputs)}) ---")
+        for f in inputs:
+            source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
+            try:
+                size_str = _format_size(f.size)
+            except Exception:
+                size_str = "unknown size"
+            print(f"{indent}  {f.name}  ({size_str})  [{source}]")
 
-    outputs = task.outputs
-    print(f"\n{indent}--- Outputs ({len(outputs)}) ---")
-    for f in outputs:
-        try:
-            size_str = _format_size(f.size)
-        except Exception:
-            size_str = "unknown size"
-        print(f"{indent}  {f.name}  ({size_str})")
+        outputs = task.outputs
+        print(f"\n{indent}--- Outputs ({len(outputs)}) ---")
+        for f in outputs:
+            try:
+                size_str = _format_size(f.size)
+            except Exception:
+                size_str = "unknown size"
+            print(f"{indent}  {f.name}  ({size_str})")
+    else:
+        # Still need inputs loaded so recursion can follow source_task links
+        _ = task.inputs
 
 
 def _print_task_debug_recursive(
     task,
     max_depth: Optional[int],
     max_tasks: Optional[int],
+    show_script: bool = True,
+    show_log: bool = True,
+    show_files: bool = True,
     _depth: int = 0,
     _seen: set = None,
     _counter: list = None
@@ -405,10 +420,12 @@ def _print_task_debug_recursive(
     _seen.add(task.name)
     _counter[0] += 1
 
-    _print_task_debug(task, depth=_depth)
+    _print_task_debug(task, depth=_depth,
+                      show_script=show_script,
+                      show_log=show_log,
+                      show_files=show_files)
 
     if max_depth is not None and _depth >= max_depth:
-        # Show which source tasks exist but are not being expanded
         source_tasks = [
             f.source_task for f in task.inputs
             if f.source_task and f.source_task.name not in _seen
@@ -421,6 +438,13 @@ def _print_task_debug_recursive(
 
     for f in task.inputs:
         if f.source_task and f.source_task.name not in _seen:
+            _print_task_debug_recursive(
+                f.source_task, max_depth, max_tasks,
+                show_script=show_script,
+                show_log=show_log,
+                show_files=show_files,
+                _depth=_depth + 1, _seen=_seen, _counter=_counter
+            )
             _print_task_debug_recursive(
                 f.source_task, max_depth, max_tasks,
                 _depth=_depth + 1, _seen=_seen, _counter=_counter
