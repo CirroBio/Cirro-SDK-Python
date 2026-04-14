@@ -107,11 +107,24 @@ def upload_reference(**kwargs):
 @click.option('--dataset',
               help='Name or ID of the dataset',
               default=None)
+@click.option('--max-depth',
+              help='Maximum number of source-task levels to recurse through input files '
+                   '(default: unlimited)',
+              type=int, default=None)
+@click.option('--max-tasks',
+              help='Maximum total number of tasks to print across all depth levels '
+                   '(default: unlimited)',
+              type=int, default=None)
 @click.option('-i', '--interactive',
               help='Walk through debug information interactively',
               is_flag=True, default=False)
 def debug(**kwargs):
-    check_required_args(kwargs)
+    if not kwargs.get('interactive') and (
+        kwargs.get('project') is None or kwargs.get('dataset') is None
+    ):
+        ctx = click.get_current_context()
+        click.echo(ctx.get_help())
+        ctx.exit()
     run_debug(kwargs, interactive=kwargs.get('interactive'))
 
 

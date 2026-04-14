@@ -319,7 +319,11 @@ def run_debug(input_params: DebugArguments, interactive=False):
     if interactive:
         _task_menu(failed_task, depth=0)
     else:
-        _print_task_debug(failed_task)
+        _print_task_debug_recursive(
+            failed_task,
+            max_depth=input_params.get('max_depth'),
+            max_tasks=input_params.get('max_tasks'),
+        )
 
 
 def _format_size(size_bytes: int) -> str:
@@ -327,41 +331,100 @@ def _format_size(size_bytes: int) -> str:
     return convert_size(size_bytes)
 
 
-def _print_task_debug(task):
-    """Print debug info for the primary failed task (non-interactive)."""
-    print("\n=== Primary Failed Task ===")
-    print(f"Name:      {task.name}")
-    print(f"Status:    {task.status}")
-    print(f"Exit Code: {task.exit_code}")
-    print(f"Hash:      {task.hash}")
-    print(f"Work Dir:  {task.work_dir}")
+def _print_task_debug(task, depth: int = 0):
+    """Print all debug info for one task, indented according to its depth in the input chain."""
+    indent = "  " * depth
+    sep = "=" * 60
+    label = "Primary Failed Task" if depth == 0 else f"Source Task [depth {depth}]"
+
+    print(f"\n{indent}{sep}")
+    print(f"{indent}{label}: {task.name}")
+    print(f"{indent}{sep}")
+    print(f"{indent}Status:    {task.status}")
+    print(f"{indent}Exit Code: {task.exit_code}")
+    print(f"{indent}Hash:      {task.hash}")
+    print(f"{indent}Work Dir:  {task.work_dir}")
 
     task_script = task.script()
-    print("\n=== Task Script ===")
-    print(task_script if task_script else "(empty)")
+    print(f"\n{indent}--- Task Script ---")
+    print('\n'.join(indent + line for line in (task_script or "(empty)").splitlines()))
 
     task_log = task.logs()
-    print("\n=== Task Log ===")
-    print(task_log if task_log else "(empty)")
+    print(f"\n{indent}--- Task Log ---")
+    print('\n'.join(indent + line for line in (task_log or "(empty)").splitlines()))
 
     inputs = task.inputs
-    print(f"\n=== Inputs ({len(inputs)}) ===")
+    print(f"\n{indent}--- Inputs ({len(inputs)}) ---")
     for f in inputs:
         source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
         try:
             size_str = _format_size(f.size)
         except Exception:
             size_str = "unknown size"
-        print(f"  {f.name}  ({size_str})  [{source}]")
+        print(f"{indent}  {f.name}  ({size_str})  [{source}]")
 
     outputs = task.outputs
-    print(f"\n=== Outputs ({len(outputs)}) ===")
+    print(f"\n{indent}--- Outputs ({len(outputs)}) ---")
     for f in outputs:
         try:
             size_str = _format_size(f.size)
         except Exception:
             size_str = "unknown size"
-        print(f"  {f.name}  ({size_str})")
+        print(f"{indent}  {f.name}  ({size_str})")
+
+
+def _print_task_debug_recursive(
+    task,
+    max_depth: Optional[int],
+    max_tasks: Optional[int],
+    _depth: int = 0,
+    _seen: set = None,
+    _counter: list = None
+):
+    """
+    Print debug info for a task and then recurse into the tasks that created
+    each of its input files.
+
+    Deduplicates tasks (a task that produced multiple inputs is only printed
+    once).  Stops early when ``max_depth`` or ``max_tasks`` is reached and
+    prints a notice so the user knows output was capped.
+    """
+    if _seen is None:
+        _seen = set()
+    if _counter is None:
+        _counter = [0]
+
+    if task.name in _seen:
+        return
+
+    if max_tasks is not None and _counter[0] >= max_tasks:
+        indent = "  " * _depth
+        print(f"\n{indent}[max-tasks limit reached — stopping recursion]")
+        return
+
+    _seen.add(task.name)
+    _counter[0] += 1
+
+    _print_task_debug(task, depth=_depth)
+
+    if max_depth is not None and _depth >= max_depth:
+        # Show which source tasks exist but are not being expanded
+        source_tasks = [
+            f.source_task for f in task.inputs
+            if f.source_task and f.source_task.name not in _seen
+        ]
+        if source_tasks:
+            indent = "  " * (_depth + 1)
+            names = ', '.join(t.name for t in source_tasks)
+            print(f"\n{indent}[max-depth limit reached — not expanding: {names}]")
+        return
+
+    for f in task.inputs:
+        if f.source_task and f.source_task.name not in _seen:
+            _print_task_debug_recursive(
+                f.source_task, max_depth, max_tasks,
+                _depth=_depth + 1, _seen=_seen, _counter=_counter
+            )
 
 
 _BACK = "Back"

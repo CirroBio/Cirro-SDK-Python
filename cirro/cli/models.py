@@ -44,3 +44,5 @@ class DebugArguments(TypedDict):
     project: str
     dataset: str
     interactive: bool
+    max_depth: Optional[int]
+    max_tasks: Optional[int]
