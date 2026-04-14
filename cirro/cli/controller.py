@@ -317,7 +317,7 @@ def run_debug(input_params: DebugArguments, interactive=False):
         return
 
     if interactive:
-        _print_task_debug_interactive(failed_task, depth=0)
+        _task_menu(failed_task, depth=0)
     else:
         _print_task_debug(failed_task)
 
@@ -364,11 +364,13 @@ def _print_task_debug(task):
         print(f"  {f.name}  ({size_str})")
 
 
-def _print_task_debug_interactive(task, depth=0):
-    """Interactively walk through debug info for a task, optionally tracing inputs."""
-    indent = "  " * depth
-    label = "Primary Failed Task" if depth == 0 else "Source Task"
+_BACK = "Back"
+_DONE = "Done"
+# Binary formats that cannot be meaningfully displayed as text
+_BINARY_EXTENSIONS = {'.bam', '.cram', '.bai', '.crai', '.bcf', '.idx'}
 
+
+def _print_task_header(task, indent: str, label: str):
     print(f"\n{indent}=== {label} ===")
     print(f"{indent}Name:      {task.name}")
     print(f"{indent}Status:    {task.status}")
@@ -376,40 +378,178 @@ def _print_task_debug_interactive(task, depth=0):
     print(f"{indent}Hash:      {task.hash}")
     print(f"{indent}Work Dir:  {task.work_dir}")
 
-    if ask_yes_no(f'Show task script for {task.name!r}?'):
-        task_script = task.script()
-        print(f"\n{indent}--- Task Script ---")
-        print(task_script if task_script else "(empty)")
 
-    if ask_yes_no(f'Show task log for {task.name!r}?'):
-        task_log = task.logs()
-        print(f"\n{indent}--- Task Log ---")
-        print(task_log if task_log else "(empty)")
+def _task_menu(task, depth: int = 0):
+    """
+    Menu-driven exploration of a single task.
+
+    The user can show the script/log, browse inputs and outputs, and drill
+    into any source task that produced an input file.  The menu loops until
+    the user selects Back / Done.
+    """
+    indent = "  " * depth
+    label = "Primary Failed Task" if depth == 0 else "Source Task"
+    _print_task_header(task, indent, label)
 
     inputs = task.inputs
-    if inputs and ask_yes_no(f'Inspect inputs for {task.name!r}? ({len(inputs)} input(s))'):
-        print(f"\n{indent}--- Inputs ({len(inputs)}) ---")
-        for f in inputs:
+    outputs = task.outputs
+
+    while True:
+        choices = [
+            "Show task script",
+            "Show task log",
+            f"Browse inputs ({len(inputs)})",
+            f"Browse outputs ({len(outputs)})",
+            _DONE if depth == 0 else _BACK,
+        ]
+        choice = ask('select', 'What would you like to do?', choices=choices)
+
+        if choice == "Show task script":
+            content = task.script()
+            print(f"\n{indent}--- Task Script ---")
+            print(content if content else "(empty)")
+
+        elif choice == "Show task log":
+            content = task.logs()
+            print(f"\n{indent}--- Task Log ---")
+            print(content if content else "(empty)")
+
+        elif choice.startswith("Browse inputs"):
+            _browse_files_menu(inputs, "input", depth)
+
+        elif choice.startswith("Browse outputs"):
+            _browse_files_menu(outputs, "output", depth)
+
+        else:  # Done / Back
+            break
+
+
+def _browse_files_menu(files, kind: str, depth: int):
+    """
+    Let the user pick a file from a list, then enter its file menu.
+
+    ``kind`` is ``'input'`` or ``'output'``, used only for the prompt label.
+    """
+    indent = "  " * depth
+    if not files:
+        print(f"\n{indent}No {kind} files available.")
+        return
+
+    while True:
+        # Build display labels — disambiguate duplicates by appending a counter
+        seen: dict = {}
+        labels = []
+        for f in files:
+            seen[f.name] = seen.get(f.name, 0) + 1
+        counts: dict = {}
+        for f in files:
+            if seen[f.name] > 1:
+                counts[f.name] = counts.get(f.name, 0) + 1
+                label = f"{f.name} [{counts[f.name]}]"
+            else:
+                label = f.name
             source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
             try:
                 size_str = _format_size(f.size)
             except Exception:
                 size_str = "unknown size"
-            print(f"{indent}  {f.name}  ({size_str})  [{source}]")
+            labels.append(f"{label}  ({size_str})  [{source}]")
 
-            if f.source_task and ask_yes_no(
-                f'Drill into source task {f.source_task.name!r}?'
-            ):
-                _print_task_debug_interactive(f.source_task, depth=depth + 1)
+        choices = labels + [_BACK]
+        choice = ask('select', f'Select a {kind} file to inspect', choices=choices)
+        if choice == _BACK:
+            break
 
-    outputs = task.outputs
-    print(f"\n{indent}--- Outputs ({len(outputs)}) ---")
-    for f in outputs:
-        try:
-            size_str = _format_size(f.size)
-        except Exception:
-            size_str = "unknown size"
-        print(f"{indent}  {f.name}  ({size_str})")
+        idx = labels.index(choice)
+        _file_menu(files[idx], depth)
+
+
+def _file_read_options(name: str):
+    """Return the list of read-action strings appropriate for a given filename."""
+    lower = name.lower()
+    # Strip compression suffix to check underlying type
+    for ext in ('.gz', '.bz2', '.zst'):
+        if lower.endswith(ext):
+            lower = lower[:-len(ext)]
+            break
+
+    from pathlib import PurePath
+    suffix = PurePath(lower).suffix
+
+    if suffix in _BINARY_EXTENSIONS:
+        return []  # no readable options for binary formats
+
+    options = []
+    if suffix in ('.csv', '.tsv'):
+        options.append("Read as CSV (first 10 rows)")
+    if suffix == '.json':
+        options.append("Read as JSON")
+    options.append("Read as text (first 100 lines)")
+    return options
+
+
+def _file_menu(wf, depth: int):
+    """Menu for inspecting a single WorkDirFile: read contents or drill into source task."""
+    indent = "  " * depth
+    source = f"from task: {wf.source_task.name}" if wf.source_task else "staged input"
+    try:
+        size_str = _format_size(wf.size)
+    except Exception:
+        size_str = "unknown size"
+    print(f"\n{indent}File: {wf.name}  ({size_str})  [{source}]")
+
+    read_options = _file_read_options(wf.name)
+    if not read_options and not wf.source_task:
+        print(f"{indent}(binary file — no readable options)")
+        return
+
+    choices = list(read_options)
+    if wf.source_task:
+        choices.append(f"Drill into source task: {wf.source_task.name}")
+    choices.append(_BACK)
+
+    while True:
+        choice = ask('select', f'What would you like to do with {wf.name!r}?',
+                     choices=choices)
+
+        if choice == _BACK:
+            break
+
+        elif choice.startswith("Read as CSV"):
+            try:
+                df = wf.read_csv()
+                print(df.head(10).to_string())
+            except Exception as e:
+                print(f"Could not read as CSV: {e}")
+
+        elif choice.startswith("Read as JSON"):
+            try:
+                import json as _json
+                data = wf.read_json()
+                output = _json.dumps(data, indent=2)
+                # Cap output at ~200 lines so the terminal isn't flooded
+                lines = output.splitlines()
+                if len(lines) > 200:
+                    print('\n'.join(lines[:200]))
+                    print(f"... ({len(lines) - 200} more lines)")
+                else:
+                    print(output)
+            except Exception as e:
+                print(f"Could not read as JSON: {e}")
+
+        elif choice.startswith("Read as text"):
+            try:
+                lines = wf.readlines()
+                if len(lines) > 100:
+                    print('\n'.join(lines[:100]))
+                    print(f"... ({len(lines) - 100} more lines)")
+                else:
+                    print('\n'.join(lines))
+            except Exception as e:
+                print(f"Could not read as text: {e}")
+
+        elif choice.startswith("Drill into source task"):
+            _task_menu(wf.source_task, depth=depth + 1)
 
 
 def _check_configure():
