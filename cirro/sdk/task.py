@@ -2,7 +2,7 @@ import gzip
 import json
 from io import BytesIO, StringIO
 from pathlib import PurePath
-from typing import List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING
 
 from cirro.models.file import FileAccessContext
 from cirro.models.s3_path import S3Path
@@ -35,8 +35,13 @@ class WorkDirFile:
         self._client = client
         self._project_id = project_id
         self._size = size
-        self.source_task = source_task
+        self._source_task = source_task
         self._s3_path = S3Path(s3_uri)
+
+    @property
+    def source_task(self) -> Optional['DataPortalTask']:
+        """The task that produced this file, or ``None`` for staged/primary inputs."""
+        return self._source_task
 
     @property
     def name(self) -> str:
@@ -72,13 +77,13 @@ class WorkDirFile:
                 f"the work directory may have been cleaned up: {e}"
             ) from e
 
-    def read(self, encoding: str = 'utf-8', compression: str = None) -> str:
+    def read(self, encoding: str = 'utf-8', compression: Optional[str] = None) -> str:
         """
         Read the file contents as text.
 
         Args:
-            encoding: Character encoding (default ``utf-8``).
-            compression: ``'gzip'`` to decompress on the fly, or ``None``
+            encoding (str): Character encoding (default 'utf-8').
+            compression (str): ``'gzip'`` to decompress on the fly, or ``None``
                 (default) to read as-is.
         """
         raw = self._get()
@@ -89,11 +94,11 @@ class WorkDirFile:
                 return fh.read()
         raise ValueError(f"Unsupported compression: {compression!r} (use 'gzip' or None)")
 
-    def readlines(self, encoding: str = 'utf-8', compression: str = None) -> List[str]:
+    def readlines(self, encoding: str = 'utf-8', compression: Optional[str] = None) -> List[str]:
         """Read the file contents as a list of lines."""
         return self.read(encoding=encoding, compression=compression).splitlines()
 
-    def read_json(self, encoding: str = 'utf-8') -> object:
+    def read_json(self, encoding: str = 'utf-8') -> Any:
         """
         Parse the file as JSON.
 

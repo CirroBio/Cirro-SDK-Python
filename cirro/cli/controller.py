@@ -3,14 +3,16 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import List, Optional, Set
 
 from cirro_api_client.v1.models import UploadDatasetRequest, Status, Executor
 
 from cirro.cirro_client import CirroApi
 from cirro.cli.interactive.auth_args import gather_auth_config
+from cirro.cli.interactive.common_args import ask_project
 from cirro.cli.interactive.create_pipeline_config import gather_create_pipeline_config_arguments
-from cirro.cli.interactive.download_args import gather_download_arguments, ask_dataset_files
-from cirro.cli.interactive.download_args import gather_download_arguments_dataset
+from cirro.cli.interactive.download_args import gather_download_arguments, ask_dataset_files, \
+    ask_dataset, gather_download_arguments_dataset
 from cirro.cli.interactive.list_dataset_args import gather_list_arguments
 from cirro.cli.interactive.upload_args import gather_upload_arguments
 from cirro.cli.interactive.upload_reference_args import gather_reference_upload_arguments
@@ -21,7 +23,10 @@ from cirro.cli.models import ListArguments, UploadArguments, DownloadArguments, 
 from cirro.config import UserConfig, save_user_config, load_user_config
 from cirro.file_utils import get_files_in_directory
 from cirro.models.process import PipelineDefinition, ConfigAppStatus, CONFIG_APP_URL
+from cirro.sdk.dataset import DataPortalDataset
+from cirro.sdk.nextflow_utils import find_primary_failed_task
 from cirro.services.service_helpers import list_all_datasets
+from cirro.utils import convert_size
 
 NO_PROJECTS = "No projects available"
 # Log to STDOUT
@@ -273,19 +278,14 @@ def run_debug(input_params: DebugArguments, interactive=False):
         raise InputError(NO_PROJECTS)
 
     if interactive:
-        from cirro.cli.interactive.common_args import ask_project as _ask_project
-        from cirro.cli.interactive.download_args import ask_dataset as _ask_dataset
-        project_name = _ask_project(projects, input_params.get('project'))
+        project_name = ask_project(projects, input_params.get('project'))
         input_params['project'] = get_id_from_name(projects, project_name)
         datasets = list_all_datasets(project_id=input_params['project'], client=cirro)
-        input_params['dataset'] = _ask_dataset(datasets, input_params.get('dataset'))
+        input_params['dataset'] = ask_dataset(datasets, input_params.get('dataset'))
     else:
         input_params['project'] = get_id_from_name(projects, input_params['project'])
         datasets = cirro.datasets.list(input_params['project'])
         input_params['dataset'] = get_id_from_name(datasets, input_params['dataset'])
-
-    from cirro.sdk.dataset import DataPortalDataset
-    from cirro.sdk.nextflow_utils import find_primary_failed_task
 
     project_id = input_params['project']
     dataset_id = input_params['dataset']
@@ -329,11 +329,6 @@ def run_debug(input_params: DebugArguments, interactive=False):
         )
 
 
-def _format_size(size_bytes: int) -> str:
-    from cirro.utils import convert_size
-    return convert_size(size_bytes)
-
-
 def _print_task_debug(task, depth: int = 0,
                       show_script: bool = True,
                       show_log: bool = True,
@@ -367,7 +362,7 @@ def _print_task_debug(task, depth: int = 0,
         for f in inputs:
             source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
             try:
-                size_str = _format_size(f.size)
+                size_str = convert_size(f.size)
             except Exception:
                 size_str = "unknown size"
             print(f"{indent}  {f.name}  ({size_str})  [{source}]")
@@ -376,13 +371,10 @@ def _print_task_debug(task, depth: int = 0,
         print(f"\n{indent}--- Outputs ({len(outputs)}) ---")
         for f in outputs:
             try:
-                size_str = _format_size(f.size)
+                size_str = convert_size(f.size)
             except Exception:
                 size_str = "unknown size"
             print(f"{indent}  {f.name}  ({size_str})")
-    else:
-        # Still need inputs loaded so recursion can follow source_task links
-        _ = task.inputs
 
 
 def _print_task_debug_recursive(
@@ -393,8 +385,8 @@ def _print_task_debug_recursive(
     show_log: bool = True,
     show_files: bool = True,
     _depth: int = 0,
-    _seen: set = None,
-    _counter: list = None
+    _seen: Optional[Set[str]] = None,
+    _counter: Optional[List[int]] = None
 ):
     """
     Print debug info for a task and then recurse into the tasks that created
@@ -533,7 +525,7 @@ def _browse_files_menu(files, kind: str, depth: int):
                 label = f.name
             source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
             try:
-                size_str = _format_size(f.size)
+                size_str = convert_size(f.size)
             except Exception:
                 size_str = "unknown size"
             labels.append(f"{label}  ({size_str})  [{source}]")
@@ -575,7 +567,7 @@ def _file_menu(wf, depth: int):
     indent = "  " * depth
     source = f"from task: {wf.source_task.name}" if wf.source_task else "staged input"
     try:
-        size_str = _format_size(wf.size)
+        size_str = convert_size(wf.size)
     except Exception:
         size_str = "unknown size"
     print(f"\n{indent}File: {wf.name}  ({size_str})  [{source}]")
