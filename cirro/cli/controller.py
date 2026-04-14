@@ -15,7 +15,7 @@ from cirro.cli.interactive.list_dataset_args import gather_list_arguments
 from cirro.cli.interactive.upload_args import gather_upload_arguments
 from cirro.cli.interactive.upload_reference_args import gather_reference_upload_arguments
 from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError, \
-    validate_files, ask_yes_no
+    validate_files, ask_yes_no, ask
 from cirro.cli.models import ListArguments, UploadArguments, DownloadArguments, CreatePipelineConfigArguments, \
     UploadReferenceArguments, DebugArguments
 from cirro.config import UserConfig, save_user_config, load_user_config
@@ -445,10 +445,6 @@ def _print_task_debug_recursive(
                 show_files=show_files,
                 _depth=_depth + 1, _seen=_seen, _counter=_counter
             )
-            _print_task_debug_recursive(
-                f.source_task, max_depth, max_tasks,
-                _depth=_depth + 1, _seen=_seen, _counter=_counter
-            )
 
 
 _BACK = "Back"
@@ -560,8 +556,7 @@ def _file_read_options(name: str):
             lower = lower[:-len(ext)]
             break
 
-    from pathlib import PurePath
-    suffix = PurePath(lower).suffix
+    suffix = Path(lower).suffix
 
     if suffix in _BINARY_EXTENSIONS:
         return []  # no readable options for binary formats
@@ -611,9 +606,8 @@ def _file_menu(wf, depth: int):
 
         elif choice.startswith("Read as JSON"):
             try:
-                import json as _json
                 data = wf.read_json()
-                output = _json.dumps(data, indent=2)
+                output = json.dumps(data, indent=2)
                 # Cap output at ~200 lines so the terminal isn't flooded
                 lines = output.splitlines()
                 if len(lines) > 200:
