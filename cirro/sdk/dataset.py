@@ -1,4 +1,6 @@
+import csv
 import datetime
+from io import StringIO
 from pathlib import Path
 from typing import Union, List, Optional
 
@@ -44,6 +46,7 @@ class DataPortalDataset(DataPortalAsset):
         self._data = dataset
         self._assets: Optional[DatasetAssets] = None
         self._client = client
+        self._tasks: Optional[List] = None
 
     @property
     def id(self) -> str:
@@ -139,6 +142,66 @@ class DataPortalDataset(DataPortalAsset):
     def created_at(self) -> datetime.datetime:
         """Timestamp of dataset creation"""
         return self._data.created_at
+
+    def logs(self) -> str:
+        """
+        Return the top-level Nextflow execution log for this dataset.
+
+        Fetches the log from CloudWatch via the Cirro API.
+        """
+        return self._client.execution.get_execution_logs(
+            project_id=self.project_id,
+            dataset_id=self.id
+        )
+
+    @property
+    def tasks(self) -> List['DataPortalTask']:
+        """
+        List of tasks from the Nextflow workflow execution.
+
+        Task metadata is read from the ``WORKFLOW_TRACE`` artifact (a TSV file
+        produced by Nextflow).  Input and output files for each task are fetched
+        from S3 on demand.
+
+        Only available for Nextflow workflow datasets.
+
+        Raises:
+            DataPortalInputError: If no trace artifact is found.
+        """
+        if self._tasks is None:
+            self._tasks = self._load_tasks()
+        return self._tasks
+
+    def _load_tasks(self) -> List['DataPortalTask']:
+        from cirro.sdk.task import DataPortalTask
+
+        try:
+            trace_file = self.get_artifact(ArtifactType.WORKFLOW_TRACE)
+        except DataPortalAssetNotFound:
+            raise DataPortalInputError(
+                "tasks is only available for Nextflow workflow datasets"
+            )
+
+        content = trace_file.read()
+        reader = csv.DictReader(StringIO(content), delimiter='\t')
+
+        # Build all tasks with a shared reference list so each task can look up
+        # sibling tasks when resolving input source_task links.
+        all_tasks_ref: List = []
+        tasks = []
+        for row in reader:
+            task = DataPortalTask(
+                trace_row=row,
+                client=self._client,
+                project_id=self.project_id,
+                all_tasks_ref=all_tasks_ref
+            )
+            tasks.append(task)
+
+        # Populate the shared list after all tasks are constructed so that
+        # lazy input resolution can see the complete set.
+        all_tasks_ref.extend(tasks)
+        return tasks
 
     def _get_detail(self):
         if not isinstance(self._data, DatasetDetail):
