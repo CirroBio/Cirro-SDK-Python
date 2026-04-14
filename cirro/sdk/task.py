@@ -6,6 +6,7 @@ from typing import List, Optional, TYPE_CHECKING
 
 from cirro.models.file import FileAccessContext
 from cirro.models.s3_path import S3Path
+from cirro.sdk.exceptions import DataPortalAssetNotFound
 from cirro.sdk.nextflow_utils import parse_inputs_from_command_run
 
 if TYPE_CHECKING:
@@ -46,18 +47,30 @@ class WorkDirFile:
     def size(self) -> int:
         """File size in bytes (fetched lazily via head_object if not pre-populated)."""
         if self._size is None:
-            s3 = self._get_s3_client()
-            resp = s3.head_object(Bucket=self._s3_path.bucket, Key=self._s3_path.key)
-            self._size = resp['ContentLength']
+            try:
+                s3 = self._get_s3_client()
+                resp = s3.head_object(Bucket=self._s3_path.bucket, Key=self._s3_path.key)
+                self._size = resp['ContentLength']
+            except Exception as e:
+                raise DataPortalAssetNotFound(
+                    f"Could not determine size of {self.name!r} — "
+                    f"the work directory may have been cleaned up: {e}"
+                ) from e
         return self._size
 
     def _get(self) -> bytes:
         """Return the raw bytes of the file."""
-        access_context = FileAccessContext.download(
-            project_id=self._project_id,
-            base_url=self._s3_path.base
-        )
-        return self._client.file.get_file_from_path(access_context, self._s3_path.key)
+        try:
+            access_context = FileAccessContext.download(
+                project_id=self._project_id,
+                base_url=self._s3_path.base
+            )
+            return self._client.file.get_file_from_path(access_context, self._s3_path.key)
+        except Exception as e:
+            raise DataPortalAssetNotFound(
+                f"Could not read {self.name!r} — "
+                f"the work directory may have been cleaned up: {e}"
+            ) from e
 
     def read(self, encoding: str = 'utf-8', compression: str = None) -> str:
         """
@@ -86,7 +99,10 @@ class WorkDirFile:
 
         Returns whatever the top-level JSON value is (dict, list, etc.).
         """
-        return json.loads(self.read(encoding=encoding))
+        try:
+            return json.loads(self.read(encoding=encoding))
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Could not parse {self.name!r} as JSON: {e}") from e
 
     def read_csv(self, compression: str = 'infer', encoding: str = 'utf-8',
                  **kwargs) -> 'DataFrame':
@@ -100,7 +116,13 @@ class WorkDirFile:
         All additional keyword arguments are forwarded to
         ``pandas.read_csv``.
         """
-        import pandas
+        try:
+            import pandas
+        except ImportError:
+            raise ImportError(
+                "pandas is required to read CSV files. "
+                "Install it with: pip install pandas"
+            )
 
         if compression == 'infer':
             name = self.name
@@ -213,6 +235,10 @@ class DataPortalTask:
     # ------------------------------------------------------------------ #
 
     def _get_access_context(self) -> FileAccessContext:
+        if not self.work_dir:
+            raise DataPortalAssetNotFound(
+                f"Task {self.name!r} has no work directory recorded in the trace"
+            )
         s3_path = S3Path(self.work_dir)
         return FileAccessContext.download(
             project_id=self._project_id,

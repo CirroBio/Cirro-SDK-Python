@@ -147,12 +147,17 @@ class DataPortalDataset(DataPortalAsset):
         """
         Return the top-level Nextflow execution log for this dataset.
 
-        Fetches the log from CloudWatch via the Cirro API.
+        Fetches the log from CloudWatch via the Cirro API.  Returns an empty
+        string if no log events are available (e.g. the job has not started
+        yet, or the dataset was not created by a Nextflow workflow).
         """
-        return self._client.execution.get_execution_logs(
-            project_id=self.project_id,
-            dataset_id=self.id
-        )
+        try:
+            return self._client.execution.get_execution_logs(
+                project_id=self.project_id,
+                dataset_id=self.id
+            )
+        except Exception:
+            return ''
 
     @property
     def tasks(self) -> List['DataPortalTask']:
@@ -182,7 +187,16 @@ class DataPortalDataset(DataPortalAsset):
                 "tasks is only available for Nextflow workflow datasets"
             )
 
-        content = trace_file.read()
+        try:
+            content = trace_file.read()
+        except Exception as e:
+            raise DataPortalInputError(
+                f"Could not read the workflow trace artifact: {e}"
+            ) from e
+
+        if not content.strip():
+            return []
+
         reader = csv.DictReader(StringIO(content), delimiter='\t')
 
         # Build all tasks with a shared reference list so each task can look up
@@ -202,6 +216,39 @@ class DataPortalDataset(DataPortalAsset):
         # lazy input resolution can see the complete set.
         all_tasks_ref.extend(tasks)
         return tasks
+
+    @property
+    def primary_failed_task(self) -> Optional['DataPortalTask']:
+        """
+        Find the root-cause failed task in this Nextflow workflow execution.
+
+        Returns ``None`` gracefully in all non-error situations:
+
+        - The dataset is not a Nextflow workflow (no trace artifact).
+        - The dataset has no task trace yet (still queued or just started).
+        - The trace is empty (no tasks ran).
+        - No tasks have a ``FAILED`` status (the workflow succeeded or was
+          stopped before any task actually failed).
+        - The execution log is unavailable (``logs()`` always returns ``""``
+          on failure rather than raising, so this is handled automatically).
+
+        Uses the execution log to cross-reference the trace for more accurate
+        identification of the root-cause task when multiple tasks failed.
+        """
+        from cirro.sdk.nextflow_utils import find_primary_failed_task
+
+        try:
+            tasks = self.tasks
+        except DataPortalInputError:
+            # Not a Nextflow dataset or trace not available
+            return None
+
+        if not tasks:
+            return None
+
+        # logs() already returns '' on any error, so no try/except needed here
+        execution_log = self.logs()
+        return find_primary_failed_task(tasks, execution_log)
 
     def _get_detail(self):
         if not isinstance(self._data, DatasetDetail):
