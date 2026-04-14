@@ -1,3 +1,6 @@
+import gzip
+import json
+from io import BytesIO, StringIO
 from pathlib import PurePath
 from typing import List, Optional, TYPE_CHECKING
 
@@ -7,6 +10,7 @@ from cirro.sdk.nextflow_utils import parse_inputs_from_command_run
 
 if TYPE_CHECKING:
     from cirro.cirro_client import CirroApi
+    from pandas import DataFrame
 
 
 class WorkDirFile:
@@ -47,15 +51,74 @@ class WorkDirFile:
             self._size = resp['ContentLength']
         return self._size
 
-    def read(self) -> str:
-        """Read the file contents as a UTF-8 string."""
+    def _get(self) -> bytes:
+        """Return the raw bytes of the file."""
         access_context = FileAccessContext.download(
             project_id=self._project_id,
             base_url=self._s3_path.base
         )
-        return self._client.file.get_file_from_path(
-            access_context, self._s3_path.key
-        ).decode('utf-8', errors='replace')
+        return self._client.file.get_file_from_path(access_context, self._s3_path.key)
+
+    def read(self, encoding: str = 'utf-8', compression: str = None) -> str:
+        """
+        Read the file contents as text.
+
+        Args:
+            encoding: Character encoding (default ``utf-8``).
+            compression: ``'gzip'`` to decompress on the fly, or ``None``
+                (default) to read as-is.
+        """
+        raw = self._get()
+        if compression is None:
+            return raw.decode(encoding, errors='replace')
+        if compression == 'gzip':
+            with gzip.open(BytesIO(raw), 'rt', encoding=encoding) as fh:
+                return fh.read()
+        raise ValueError(f"Unsupported compression: {compression!r} (use 'gzip' or None)")
+
+    def readlines(self, encoding: str = 'utf-8', compression: str = None) -> List[str]:
+        """Read the file contents as a list of lines."""
+        return self.read(encoding=encoding, compression=compression).splitlines()
+
+    def read_json(self, encoding: str = 'utf-8') -> object:
+        """
+        Parse the file as JSON.
+
+        Returns whatever the top-level JSON value is (dict, list, etc.).
+        """
+        return json.loads(self.read(encoding=encoding))
+
+    def read_csv(self, compression: str = 'infer', encoding: str = 'utf-8',
+                 **kwargs) -> 'DataFrame':
+        """
+        Parse the file as a Pandas DataFrame.
+
+        The default separator is a comma; pass ``sep='\\t'`` for TSV files.
+        Compression is inferred from the file extension by default, but can be
+        overridden with ``compression='gzip'`` or ``compression=None``.
+
+        All additional keyword arguments are forwarded to
+        ``pandas.read_csv``.
+        """
+        import pandas
+
+        if compression == 'infer':
+            name = self.name
+            if name.endswith('.gz'):
+                compression = dict(method='gzip')
+            elif name.endswith('.bz2'):
+                compression = dict(method='bz2')
+            elif name.endswith('.zst'):
+                compression = dict(method='zstd')
+            else:
+                compression = None
+
+        raw = self._get()
+        handle = BytesIO(raw) if compression is not None else StringIO(raw.decode(encoding))
+        try:
+            return pandas.read_csv(handle, compression=compression, encoding=encoding, **kwargs)
+        finally:
+            handle.close()
 
     def _get_s3_client(self):
         access_context = FileAccessContext.download(
