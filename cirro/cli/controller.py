@@ -336,6 +336,10 @@ def _print_task_debug(task):
     print(f"Hash:      {task.hash}")
     print(f"Work Dir:  {task.work_dir}")
 
+    task_script = task.script()
+    print("\n=== Task Script ===")
+    print(task_script if task_script else "(empty)")
+
     task_log = task.logs()
     print("\n=== Task Log ===")
     print(task_log if task_log else "(empty)")
@@ -371,6 +375,11 @@ def _print_task_debug_interactive(task, depth=0):
     print(f"{indent}Exit Code: {task.exit_code}")
     print(f"{indent}Hash:      {task.hash}")
     print(f"{indent}Work Dir:  {task.work_dir}")
+
+    if ask_yes_no(f'Show task script for {task.name!r}?'):
+        task_script = task.script()
+        print(f"\n{indent}--- Task Script ---")
+        print(task_script if task_script else "(empty)")
 
     if ask_yes_no(f'Show task log for {task.name!r}?'):
         task_log = task.logs()

@@ -184,6 +184,16 @@ class DataPortalTask:
         """
         return self._read_work_file('.command.log')
 
+    def script(self) -> str:
+        """
+        Return the contents of ``.command.sh`` from the task's work directory.
+
+        This is the actual shell script that Nextflow executed — the user's
+        pipeline code for this task.
+        Returns an empty string if the file cannot be read.
+        """
+        return self._read_work_file('.command.sh')
+
     # ------------------------------------------------------------------ #
     # Inputs                                                               #
     # ------------------------------------------------------------------ #
