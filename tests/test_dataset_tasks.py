@@ -37,7 +37,7 @@ def _make_dataset(execution_log='', trace_content=None):
         trace_file.absolute_path = 's3://bucket/proj/artifacts/trace.tsv'
         trace_artifact = Artifact(artifact_type=ArtifactType.WORKFLOW_TRACE, file=trace_file)
         assets = DatasetAssets(files=[], artifacts=[trace_artifact])
-        client.file.get_file_from_path.return_value = trace_content.encode()
+        client.file.get_file.return_value = trace_content.encode()
     else:
         assets = DatasetAssets(files=[], artifacts=[])
 
