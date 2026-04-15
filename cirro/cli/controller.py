@@ -18,8 +18,9 @@ from cirro.cli.interactive.upload_args import gather_upload_arguments
 from cirro.cli.interactive.upload_reference_args import gather_reference_upload_arguments
 from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError, \
     validate_files, ask_yes_no, ask
+from cirro.cli.interactive.validate_args import gather_validate_arguments, gather_validate_arguments_dataset
 from cirro.cli.models import ListArguments, UploadArguments, DownloadArguments, CreatePipelineConfigArguments, \
-    UploadReferenceArguments, DebugArguments
+    UploadReferenceArguments, ValidateArguments, ListFilesArguments, DebugArguments
 from cirro.config import UserConfig, save_user_config, load_user_config
 from cirro.file_utils import get_files_in_directory
 from cirro.models.process import PipelineDefinition, ConfigAppStatus, CONFIG_APP_URL
@@ -28,7 +29,6 @@ from cirro.sdk.nextflow_utils import find_primary_failed_task
 from cirro.services.service_helpers import list_all_datasets
 from cirro.utils import convert_size
 
-NO_PROJECTS = "No projects available"
 # Log to STDOUT
 log_formatter = logging.Formatter(
     '%(asctime)s %(levelname)-8s [Cirro CLI] %(message)s'
@@ -42,13 +42,8 @@ logger.addHandler(console_handler)
 
 def run_list_datasets(input_params: ListArguments, interactive=False):
     """List the datasets available in a particular project."""
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
 
     if interactive:
         # Prompt the user for the project
@@ -68,16 +63,9 @@ def run_list_datasets(input_params: ListArguments, interactive=False):
 
 
 def run_ingest(input_params: UploadArguments, interactive=False):
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
     processes = cirro.processes.list(process_type=Executor.INGEST)
-
-    logger.info("Listing available projects")
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
 
     if interactive:
         input_params, files = gather_upload_arguments(input_params, projects, processes)
@@ -125,16 +113,58 @@ def run_ingest(input_params: UploadArguments, interactive=False):
     logger.info(f"File content validated by {cirro.configuration.checksum_method_display}")
 
 
+def run_validate_folder(input_params: ValidateArguments, interactive=False):
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
+
+    if interactive:
+        input_params = gather_validate_arguments(input_params, projects)
+
+        input_params['project'] = get_id_from_name(projects, input_params['project'])
+        datasets = list_all_datasets(project_id=input_params['project'], client=cirro)
+        # Filter out datasets that are not complete
+        datasets = [d for d in datasets if d.status == Status.COMPLETED]
+        input_params = gather_validate_arguments_dataset(input_params, datasets)
+        files = cirro.datasets.get_assets_listing(
+            input_params['project'], input_params['dataset'],
+            file_limit=input_params['file_limit']
+        ).files
+
+        if len(files) == 0:
+            raise InputError('There are no files in this dataset to validate against')
+
+        project_id = input_params['project']
+        dataset_id = input_params['dataset']
+
+    else:
+        project_id = get_id_from_name(projects, input_params['project'])
+        datasets = cirro.datasets.list(project_id)
+        dataset_id = get_id_from_name(datasets, input_params['dataset'])
+
+    logger.info("Validating files")
+
+    results = cirro.datasets.validate_folder(
+        project_id=project_id,
+        dataset_id=dataset_id,
+        local_folder=input_params['data_directory'],
+        file_limit=input_params['file_limit']
+    )
+
+    for file_list, label, log_level in [
+        (results.files_matching, "✅ Matched Files (identical in Cirro and locally)", logging.INFO),
+        (results.files_not_matching, "⚠️ Checksum Mismatches (same file name, different content)", logging.WARNING),
+        (results.files_missing, "⚠️ Missing Locally (present in system but not found locally)", logging.WARNING),
+        (results.local_only_files, "⚠️ Unexpected Local Files (present locally but not in system)", logging.WARNING),
+        (results.validate_errors, "⚠️ Validation Failed (checksums may not be available)", logging.WARNING)
+    ]:
+        logger.log(level=log_level, msg=f"{label}: {len(file_list):,}")
+        for file in file_list:
+            logger.log(level=log_level, msg=f" - {file}")
+
+
 def run_download(input_params: DownloadArguments, interactive=False):
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
-
-    logger.info("Listing available projects")
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
 
     files_to_download = None
     if interactive:
@@ -145,7 +175,10 @@ def run_download(input_params: DownloadArguments, interactive=False):
         # Filter out datasets that are not complete
         datasets = [d for d in datasets if d.status == Status.COMPLETED]
         input_params = gather_download_arguments_dataset(input_params, datasets)
-        files = cirro.datasets.get_assets_listing(input_params['project'], input_params['dataset']).files
+        files = cirro.datasets.get_assets_listing(
+            input_params['project'], input_params['dataset'],
+            file_limit=input_params['file_limit']
+        ).files
 
         if len(files) == 0:
             raise InputError('There are no files in this dataset to download')
@@ -160,7 +193,9 @@ def run_download(input_params: DownloadArguments, interactive=False):
         dataset_id = get_id_from_name(datasets, input_params['dataset'])
 
         if input_params['file']:
-            all_files = cirro.datasets.get_assets_listing(project_id, dataset_id).files
+            all_files = cirro.datasets.get_assets_listing(
+                project_id, dataset_id, file_limit=input_params['file_limit']
+            ).files
             files_to_download = []
 
             for filepath in input_params['file']:
@@ -178,19 +213,54 @@ def run_download(input_params: DownloadArguments, interactive=False):
     cirro.datasets.download_files(project_id=project_id,
                                   dataset_id=dataset_id,
                                   download_location=input_params['data_directory'],
-                                  files=files_to_download)
+                                  files=files_to_download,
+                                  file_limit=input_params['file_limit'])
+
+
+def run_list_projects():
+    """List all available projects."""
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
+
+    import pandas as pd
+    df = pd.DataFrame([{'id': p.id, 'name': p.name} for p in projects])
+    print(df.to_string(index=False))
+
+
+def run_list_files(input_params: ListFilesArguments, interactive=False):
+    """List files available in a dataset."""
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
+
+    if interactive:
+        from cirro.cli.interactive.common_args import ask_project, ask_dataset
+        from cirro.services.service_helpers import list_all_datasets
+        project_name = ask_project(projects, input_params.get('project'))
+        project_id = get_id_from_name(projects, project_name)
+        datasets = list_all_datasets(project_id=project_id, client=cirro)
+        dataset_id = ask_dataset(datasets, input_params.get('dataset'), msg_action='list files for')
+    else:
+        project_id = get_id_from_name(projects, input_params['project'])
+        datasets = cirro.datasets.list(project_id)
+        dataset_id = get_id_from_name(datasets, input_params['dataset'])
+
+    files = cirro.datasets.get_assets_listing(
+        project_id, dataset_id, file_limit=input_params['file_limit']
+    ).files
+
+    if len(files) == 0:
+        logger.info("No files found in this dataset")
+        return
+
+    import pandas as pd
+    df = pd.DataFrame([{'path': f.normalized_path, 'size': f.size} for f in files])
+    print(df.to_string(index=False))
 
 
 def run_upload_reference(input_params: UploadReferenceArguments, interactive=False):
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
-
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
     reference_types = cirro.references.get_types()
-    projects = cirro.projects.list()
-
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
 
     if interactive:
         input_params, files = gather_reference_upload_arguments(input_params, projects, reference_types)
@@ -207,12 +277,11 @@ def run_upload_reference(input_params: UploadReferenceArguments, interactive=Fal
 
 
 def run_configure():
-    auth_method, base_url, auth_method_config, enable_additional_checksum = gather_auth_config()
+    auth_method, base_url, auth_method_config = gather_auth_config()
     save_user_config(UserConfig(auth_method=auth_method,
                                 auth_method_config=auth_method_config,
                                 base_url=base_url,
-                                transfer_max_retries=None,
-                                enable_additional_checksum=enable_additional_checksum))
+                                transfer_max_retries=None))
 
 
 def run_create_pipeline_config(input_params: CreatePipelineConfigArguments, interactive=False):
@@ -269,13 +338,8 @@ def run_debug(input_params: DebugArguments, interactive=False):
     shows its logs, inputs, and outputs.  In interactive mode the user can
     drill into the input chain to trace back the root cause.
     """
-    _check_configure()
-    cirro = CirroApi()
-    logger.info(f"Collecting data from {cirro.configuration.base_url}")
-
-    projects = cirro.projects.list()
-    if len(projects) == 0:
-        raise InputError(NO_PROJECTS)
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
 
     if interactive:
         project_name = ask_project(projects, input_params.get('project'))
@@ -623,6 +687,21 @@ def _file_menu(wf, depth: int) -> None:
 
         elif choice.startswith("Drill into source task"):
             _task_menu(wf.source_task, depth=depth + 1)
+
+
+def _init_cirro_client():
+    _check_configure()
+    cirro = CirroApi(user_agent="Cirro CLI")
+    logger.info(f"Collecting data from {cirro.configuration.base_url}")
+    return cirro
+
+
+def _get_projects(cirro: CirroApi):
+    logger.info("Listing available projects")
+    projects = cirro.projects.list()
+    if len(projects) == 0:
+        raise InputError("No projects available")
+    return projects
 
 
 def _check_configure():

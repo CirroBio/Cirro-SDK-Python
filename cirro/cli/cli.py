@@ -4,9 +4,9 @@ import click
 import requests
 from cirro_api_client.v1.errors import CirroException
 
-from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets, run_create_pipeline_config, \
-    run_debug
-from cirro.cli.controller import handle_error, run_upload_reference
+from cirro.cli import run_create_pipeline_config, run_validate_folder
+from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets
+from cirro.cli.controller import handle_error, run_upload_reference, run_list_projects, run_list_files, run_debug
 from cirro.cli.interactive.utils import InputError
 
 
@@ -23,6 +23,27 @@ def check_required_args(args):
 @click.version_option()
 def run():
     pass  # Print out help text, nothing to do
+
+
+@run.command(help='List projects')
+def list_projects():
+    run_list_projects()
+
+
+@run.command(help='List files in a dataset', no_args_is_help=True)
+@click.option('--project',
+              help='Name or ID of the project')
+@click.option('--dataset',
+              help='Name or ID of the dataset')
+@click.option('--file-limit',
+              help='Maximum number of files to list',
+              default=100000, show_default=True)
+@click.option('-i', '--interactive',
+              help='Gather arguments interactively',
+              is_flag=True, default=False)
+def list_files(**kwargs):
+    check_required_args(kwargs)
+    run_list_files(kwargs, interactive=kwargs.get('interactive'))
 
 
 @run.command(help='List datasets', no_args_is_help=True)
@@ -47,6 +68,9 @@ def list_datasets(**kwargs):
               multiple=True)
 @click.option('--data-directory',
               help='Directory to store the files')
+@click.option('--file-limit',
+              help='Maximum number of files to enumerate from the dataset',
+              default=100000, show_default=True)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
@@ -82,6 +106,24 @@ def upload(**kwargs):
     run_ingest(kwargs, interactive=kwargs.get('interactive'))
 
 
+@run.command(help='Validate a dataset exactly matches a local folder', no_args_is_help=True)
+@click.option('--dataset',
+              help='Name or ID of the dataset')
+@click.option('--project',
+              help='Name or ID of the project')
+@click.option('--data-directory',
+              help='Local directory you wish to validate')
+@click.option('--file-limit',
+              help='Maximum number of files to enumerate from the dataset',
+              default=100000, show_default=True)
+@click.option('-i', '--interactive',
+              help='Gather arguments interactively',
+              is_flag=True, default=False)
+def validate(**kwargs):
+    check_required_args(kwargs)
+    run_validate_folder(kwargs, interactive=kwargs.get('interactive'))
+
+
 @run.command(help='Upload a reference to a project', no_args_is_help=True)
 @click.option('--name',
               help='Name of the reference')
@@ -100,40 +142,18 @@ def upload_reference(**kwargs):
     run_upload_reference(kwargs, interactive=kwargs.get('interactive'))
 
 
-@run.command(help='Debug a failed workflow execution', no_args_is_help=True)
+@run.command(help='Debug a failed workflow execution', no_args_is_help=False)
 @click.option('--project',
               help='Name or ID of the project',
               default=None)
 @click.option('--dataset',
               help='Name or ID of the dataset',
               default=None)
-@click.option('--max-depth',
-              help='Maximum number of source-task levels to recurse through input files '
-                   '(default: unlimited)',
-              type=int, default=None)
-@click.option('--max-tasks',
-              help='Maximum total number of tasks to print across all depth levels '
-                   '(default: unlimited)',
-              type=int, default=None)
-@click.option('--show-script/--no-show-script',
-              help='Print the task script (.command.sh)',
-              default=True)
-@click.option('--show-log/--no-show-log',
-              help='Print the task log (.command.log)',
-              default=True)
-@click.option('--show-files/--no-show-files',
-              help='Print input and output file lists with sizes',
-              default=True)
 @click.option('-i', '--interactive',
-              help='Walk through debug information interactively',
+              help='Gather arguments interactively',
               is_flag=True, default=False)
 def debug(**kwargs):
-    if not kwargs.get('interactive') and (
-        kwargs.get('project') is None or kwargs.get('dataset') is None
-    ):
-        ctx = click.get_current_context()
-        click.echo(ctx.get_help())
-        ctx.exit()
+    check_required_args(kwargs)
     run_debug(kwargs, interactive=kwargs.get('interactive'))
 
 

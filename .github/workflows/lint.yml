@@ -15,30 +15,30 @@ jobs:
       contents: read
     strategy:
       matrix:
-        python-version: [ "3.9", "3.10", "3.11", "3.12" ]
+        python-version: [ "3.10", "3.11", "3.12", "3.13", "3.14" ]
 
     steps:
       # For SonarCloud scan
       - uses: actions/checkout@v4
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.14'
         with:
           fetch-depth: 0
 
       - uses: actions/checkout@v4
-        if: matrix.python-version != '3.12'
+        if: matrix.python-version != '3.14'
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      
+
       # for nextflow
       - name: Set up Java Runtime Environment
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
-      
+
       - name: Install Nextflow 25.04.2 (standalone)
         run: |
           curl -sL https://github.com/nextflow-io/nextflow/releases/download/v25.04.2/nextflow-25.04.2-dist -o nextflow
@@ -62,7 +62,7 @@ jobs:
 
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
-        if: matrix.python-version == '3.12'  # Only run once
+        if: matrix.python-version == '3.14'  # Only run once
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

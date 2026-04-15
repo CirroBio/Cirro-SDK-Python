@@ -28,7 +28,7 @@ class DataPortal:
         ```python
         from cirro import DataPortal
 
-        Portal = DataPortal(base_url="app.cirro.bio")
+        portal = DataPortal(base_url="app.cirro.bio")
         portal.list_projects()
         ```
         """
@@ -100,10 +100,136 @@ class DataPortal:
         except DataPortalAssetNotFound:
             project: DataPortalProject = self.get_project_by_name(project)
 
-        try:
-            return project.get_dataset_by_id(dataset)
-        except DataPortalAssetNotFound:
-            return project.get_dataset_by_name(dataset)
+        return project.get_dataset(dataset)
+
+    def read_files(
+            self,
+            project: str,
+            dataset: str,
+            glob: str = None,
+            pattern: str = None,
+            filetype: str = None,
+            **kwargs
+    ):
+        """
+        Read the contents of files from a dataset.
+
+        The project and dataset can each be identified by name or ID.
+        Exactly one of ``glob`` or ``pattern`` must be provided.
+
+        **glob** — standard wildcard matching; yields the file content for each
+        matching file:
+
+        - ``*`` matches any characters within a single path segment
+        - ``**`` matches zero or more path segments
+        - Matching is suffix-anchored (``*.csv`` matches at any depth)
+
+        **pattern** — like ``glob`` but ``{name}`` placeholders capture portions
+        of the path automatically; yields ``(content, meta)`` pairs where
+        *meta* is a ``dict`` of extracted values:
+
+        - ``{name}`` captures one path segment (no ``/``)
+        - ``*`` and ``**`` wildcards work as in ``glob``
+
+        Args:
+            project (str): ID or name of the project.
+            dataset (str): ID or name of the dataset.
+            glob (str): Wildcard expression to match files
+                (e.g., ``'*.csv'``, ``'data/**/*.tsv.gz'``).
+                Yields one item per matching file: the parsed content.
+            pattern (str): Wildcard expression with ``{name}`` capture
+                placeholders (e.g., ``'{sample}.csv'``,
+                ``'{condition}/{sample}.csv'``).
+                Yields ``(content, meta)`` per matching file.
+            filetype (str): File format used to parse each file. Supported values:
+
+                - ``'csv'``: parse with :func:`pandas.read_csv`, returns a ``DataFrame``
+                - ``'h5ad'``: parse as AnnData (requires ``anndata`` package)
+                - ``'json'``: parse with :func:`json.loads`, returns a Python object
+                - ``'parquet'``: parse with :func:`pandas.read_parquet`, returns a ``DataFrame``
+                  (requires ``pyarrow`` or ``fastparquet``)
+                - ``'feather'``: parse with :func:`pandas.read_feather`, returns a ``DataFrame``
+                  (requires ``pyarrow``)
+                - ``'pickle'``: deserialize with :mod:`pickle`, returns a Python object
+                - ``'excel'``: parse with :func:`pandas.read_excel`, returns a ``DataFrame``
+                  (requires ``openpyxl`` for ``.xlsx`` or ``xlrd`` for ``.xls``)
+                - ``'text'``: read as plain text, returns a ``str``
+                - ``'bytes'``: read as raw bytes, returns ``bytes``
+                - ``None`` (default): infer from file extension
+                  (``.csv``/``.tsv`` → ``'csv'``, ``.h5ad`` → ``'h5ad'``,
+                  ``.json`` → ``'json'``, ``.parquet`` → ``'parquet'``,
+                  ``.feather`` → ``'feather'``, ``.pkl``/``.pickle`` → ``'pickle'``,
+                  ``.xlsx``/``.xls`` → ``'excel'``, otherwise ``'text'``)
+            **kwargs: Additional keyword arguments forwarded to the file-parsing
+                function (e.g., ``sep='\\t'`` for CSV/TSV files).
+
+        Yields:
+            - When using ``glob``: *content* for each matching file
+            - When using ``pattern``: ``(content, meta)`` for each matching file,
+              where *meta* is a ``dict`` of values extracted from ``{name}``
+              placeholders
+
+        Raises:
+            DataPortalInputError: if both ``glob`` and ``pattern`` are provided,
+                or if neither is provided.
+
+        Example:
+            ```python
+            # Read all CSV files — just the content
+            for df in portal.read_files('My Project', 'My Dataset', glob='*.csv'):
+                print(df.shape)
+
+            # Extract sample names from filenames automatically
+            for df, meta in portal.read_files('My Project', 'My Dataset', pattern='{sample}.csv'):
+                print(meta['sample'], df.shape)
+
+            # Multi-level capture: condition directory + sample filename
+            for df, meta in portal.read_files('My Project', 'My Dataset', pattern='{condition}/{sample}.csv'):
+                print(meta['condition'], meta['sample'], df.shape)
+
+            # Read gzip-compressed TSV files with explicit separator
+            for df in portal.read_files('My Project', 'My Dataset', glob='**/*.tsv.gz', filetype='csv', sep='\\t'):
+                print(df.shape)
+            ```
+        """
+        ds = self.get_dataset(project=project, dataset=dataset)
+        yield from ds.read_files(glob=glob, pattern=pattern, filetype=filetype, **kwargs)
+
+    def read_file(
+            self,
+            project: str,
+            dataset: str,
+            path: str = None,
+            glob: str = None,
+            filetype: str = None,
+            **kwargs
+    ):
+        """
+        Read the contents of a single file from a dataset.
+
+        The project and dataset can each be identified by name or ID.
+        Provide either ``path`` (exact relative path) or ``glob`` (wildcard
+        expression). If ``glob`` is used it must match exactly one file.
+
+        Args:
+            project (str): ID or name of the project.
+            dataset (str): ID or name of the dataset.
+            path (str): Exact relative path of the file within the dataset.
+            glob (str): Wildcard expression matching exactly one file.
+            filetype (str): File format used to parse the file. Supported values
+                are the same as :meth:`read_files`.
+            **kwargs: Additional keyword arguments forwarded to the
+                file-parsing function.
+
+        Returns:
+            Parsed file content.
+
+        Raises:
+            DataPortalInputError: if both or neither of ``path``/``glob`` are
+                provided, or if ``glob`` matches zero or more than one file.
+        """
+        ds = self.get_dataset(project=project, dataset=dataset)
+        return ds.read_file(path=path, glob=glob, filetype=filetype, **kwargs)
 
     def list_processes(self, ingest=False) -> DataPortalProcesses:
         """

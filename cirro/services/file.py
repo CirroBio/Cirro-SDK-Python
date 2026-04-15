@@ -2,6 +2,7 @@ import logging
 import threading
 from datetime import datetime, timezone
 from functools import partial
+from pathlib import Path
 from typing import List, Dict
 
 from botocore.client import BaseClient
@@ -161,7 +162,7 @@ class FileService(BaseService):
             max_retries=self.transfer_retries
         )
 
-    def download_files(self, access_context: FileAccessContext, directory: str, files: List[str]) -> None:
+    def download_files(self, access_context: FileAccessContext, directory: str, files: List[str]) -> List[Path]:
         """
         Download a list of files to the specified directory
 
@@ -169,16 +170,39 @@ class FileService(BaseService):
             access_context (cirro.models.file.FileAccessContext): File access context, use class methods to generate
             directory (str): download location
             files (List[str]): relative path of files to download
+        Returns:
+            List of paths to downloaded files
         """
         s3_client = self._generate_s3_client(access_context)
 
-        download_directory(
+        return download_directory(
             directory,
             files,
             s3_client,
             access_context.bucket,
             access_context.prefix
         )
+
+    def is_valid_file(self, file: File, local_file: Path) -> bool:
+        """
+        Validates the checksum of a file against a local file
+        See ``validate_file`` method for details.
+
+        Args:
+            file (File): Cirro file to validate
+            local_file (PathLike): Local file path to compare against
+
+        Returns:
+            bool: True if file integrity matches, False otherwise
+
+        Raises:
+            RuntimeWarning: If the remote checksum is not available or not supported
+        """
+        try:
+            self.validate_file(file, local_file)
+            return True
+        except ValueError:
+            return False
 
     def validate_file(self, file: File, local_file: PathLike):
         """
@@ -196,6 +220,8 @@ class FileService(BaseService):
             ValueError: If checksums do not match
             RuntimeWarning: If the remote checksum is not available or not supported
         """
+        local_file = Path(local_file).expanduser() if isinstance(local_file, str) else local_file.expanduser()
+
         stats = self.get_file_stats(file)
 
         remote_checksum_key = next((prop for prop in stats.keys()

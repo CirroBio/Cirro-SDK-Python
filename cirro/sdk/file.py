@@ -1,5 +1,8 @@
 import gzip
+import json
+import pickle
 from io import BytesIO, StringIO
+from pathlib import Path
 from typing import List
 
 from typing import TYPE_CHECKING
@@ -24,7 +27,7 @@ class DataPortalFile(DataPortalAsset):
         Instantiate by listing files from a dataset.
 
         ```python
-        from cirro import DataPortal()
+        from cirro import DataPortal
         portal = DataPortal()
         dataset = portal.get_dataset(
             project="id-or-name-of-project",
@@ -108,7 +111,7 @@ class DataPortalFile(DataPortalAsset):
             elif self.relative_path.endswith('.bz2'):
                 compression = dict(method='bz2')
             elif self.relative_path.endswith('.xz'):
-                compression = dict(method='zstd')
+                compression = dict(method='xz')
             elif self.relative_path.endswith('.zst'):
                 compression = dict(method='zstd')
             else:
@@ -140,6 +143,44 @@ class DataPortalFile(DataPortalAsset):
         # Download the file to a temporary file handle and parse the contents
         with BytesIO(self._get()) as handle:
             return ad.read_h5ad(handle)
+
+    def read_json(self, **kwargs):
+        """Read the file contents as a parsed JSON object (dict, list, etc.)."""
+        return json.loads(self._get(), **kwargs)
+
+    def read_parquet(self, **kwargs) -> 'DataFrame':
+        """
+        Read a Parquet file as a Pandas DataFrame.
+
+        Requires ``pyarrow`` or ``fastparquet`` to be installed.
+        All keyword arguments are passed to :func:`pandas.read_parquet`.
+        """
+        import pandas
+        return pandas.read_parquet(BytesIO(self._get()), **kwargs)
+
+    def read_feather(self, **kwargs) -> 'DataFrame':
+        """
+        Read a Feather file as a Pandas DataFrame.
+
+        Requires ``pyarrow`` to be installed.
+        All keyword arguments are passed to :func:`pandas.read_feather`.
+        """
+        import pandas
+        return pandas.read_feather(BytesIO(self._get()), **kwargs)
+
+    def read_pickle(self, **kwargs):
+        """Read the file contents as a Python pickle object."""
+        return pickle.loads(self._get(), **kwargs)
+
+    def read_excel(self, **kwargs) -> 'DataFrame':
+        """
+        Read an Excel file (``.xlsx`` / ``.xls``) as a Pandas DataFrame.
+
+        Requires ``openpyxl`` (for ``.xlsx``) or ``xlrd`` (for ``.xls``).
+        All keyword arguments are passed to :func:`pandas.read_excel`.
+        """
+        import pandas
+        return pandas.read_excel(BytesIO(self._get()), **kwargs)
 
     def readlines(self, encoding='utf-8', compression=None) -> List[str]:
         """Read the file contents as a list of lines."""
@@ -174,17 +215,26 @@ class DataPortalFile(DataPortalAsset):
             ) as handle:
                 return handle.read()
 
-    def download(self, download_location: str = None):
-        """Download the file to a local directory."""
+    def read_bytes(self) -> BytesIO:
+        """Get a generic BytesIO object representing the Data Portal File, to be passed into readers."""
+        return BytesIO(self._get())
+
+    def download(self, download_location: str = None) -> Path:
+        """
+        Download the file to a local directory.
+
+        Returns:
+            Path to download file
+        """
 
         if download_location is None:
             raise DataPortalInputError("Must provide download location")
 
-        self._client.file.download_files(
+        return self._client.file.download_files(
             self._file.access_context,
             download_location,
             [self.relative_path]
-        )
+        )[0]
 
     def validate(self, local_path: PathLike):
         """
@@ -212,19 +262,23 @@ class DataPortalFile(DataPortalAsset):
         if not local_path:
             raise DataPortalInputError("Must provide local path to validate file")
 
-        try:
-            self.validate(local_path)
-            return True
-        except ValueError:
-            return False
+        return self._client.file.is_valid_file(self._file, local_path)
 
 
 class DataPortalFiles(DataPortalAssets[DataPortalFile]):
     """Collection of DataPortalFile objects."""
+
     asset_name = "file"
 
-    def download(self, download_location: str = None) -> None:
-        """Download the collection of files to a local directory."""
+    def download(self, download_location: str = None) -> List[Path]:
+        """
+        Download the collection of files to a local directory.
 
+        Returns:
+            List of paths to downloaded files.
+        """
+
+        local_paths = []
         for f in self:
-            f.download(download_location)
+            local_paths.append(f.download(download_location))
+        return local_paths
