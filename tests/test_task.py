@@ -44,7 +44,7 @@ def _make_task(trace_row=None, file_bytes=b'log content', all_tasks_ref=None):
     """Construct a DataPortalTask with a mocked client."""
     client = _make_client(file_bytes)
     task = DataPortalTask(
-        trace_row=trace_row or dict(TRACE_ROW),
+        trace_row=trace_row if trace_row is not None else dict(TRACE_ROW),
         client=client,
         project_id='proj-1',
         all_tasks_ref=all_tasks_ref,
