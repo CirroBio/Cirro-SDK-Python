@@ -332,7 +332,7 @@ def run_debug(input_params: DebugArguments, interactive=False):
 def _print_task_debug(task, depth: int = 0,
                       show_script: bool = True,
                       show_log: bool = True,
-                      show_files: bool = True):
+                      show_files: bool = True) -> None:
     """Print all debug info for one task, indented according to its depth in the input chain."""
     indent = "  " * depth
     sep = "=" * 60
@@ -387,7 +387,7 @@ def _print_task_debug_recursive(
     _depth: int = 0,
     _seen: Optional[Set[str]] = None,
     _counter: Optional[List[int]] = None
-):
+) -> None:
     """
     Print debug info for a task and then recurse into the tasks that created
     each of its input files.
@@ -445,7 +445,7 @@ _DONE = "Done"
 _BINARY_EXTENSIONS = {'.bam', '.cram', '.bai', '.crai', '.bcf', '.idx'}
 
 
-def _print_task_header(task, indent: str, label: str):
+def _print_task_header(task, indent: str, label: str) -> None:
     print(f"\n{indent}=== {label} ===")
     print(f"{indent}Name:      {task.name}")
     print(f"{indent}Status:    {task.status}")
@@ -454,7 +454,7 @@ def _print_task_header(task, indent: str, label: str):
     print(f"{indent}Work Dir:  {task.work_dir}")
 
 
-def _task_menu(task, depth: int = 0):
+def _task_menu(task, depth: int = 0) -> None:
     """
     Menu-driven exploration of a single task.
 
@@ -499,7 +499,7 @@ def _task_menu(task, depth: int = 0):
             break
 
 
-def _browse_files_menu(files, kind: str, depth: int):
+def _browse_files_menu(files, kind: str, depth: int) -> None:
     """
     Let the user pick a file from a list, then enter its file menu.
 
@@ -562,7 +562,7 @@ def _file_read_options(name: str):
     return options
 
 
-def _file_menu(wf, depth: int):
+def _file_menu(wf, depth: int) -> None:
     """Menu for inspecting a single WorkDirFile: read contents or drill into source task."""
     indent = "  " * depth
     source = f"from task: {wf.source_task.name}" if wf.source_task else "staged input"

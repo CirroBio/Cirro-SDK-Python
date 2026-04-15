@@ -153,6 +153,9 @@ class DataPortalDataset(DataPortalAsset):
         Fetches the log from CloudWatch via the Cirro API.  Returns an empty
         string if no log events are available (e.g. the job has not started
         yet, or the dataset was not created by a Nextflow workflow).
+
+        Returns:
+            str: Execution log text, or an empty string if unavailable.
         """
         try:
             return self._client.execution.get_execution_logs(
@@ -172,6 +175,9 @@ class DataPortalDataset(DataPortalAsset):
         from S3 on demand.
 
         Only available for Nextflow workflow datasets.
+
+        Returns:
+            `List[DataPortalTask]`
 
         Raises:
             DataPortalInputError: If no trace artifact is found.
@@ -237,6 +243,9 @@ class DataPortalDataset(DataPortalAsset):
 
         Uses the execution log to cross-reference the trace for more accurate
         identification of the root-cause task when multiple tasks failed.
+
+        Returns:
+            `cirro.sdk.task.DataPortalTask`, or ``None`` if no failed task is found.
         """
         from cirro.sdk.nextflow_utils import find_primary_failed_task
 

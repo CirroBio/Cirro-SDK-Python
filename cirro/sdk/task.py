@@ -31,6 +31,15 @@ class WorkDirFile:
         size: Optional[int] = None,
         source_task: Optional['DataPortalTask'] = None
     ):
+        """
+        Obtained from a task's ``inputs`` or ``outputs`` property.
+
+        ```python
+        for task in dataset.tasks:
+            for f in task.inputs:
+                print(f.name, f.source_task)
+        ```
+        """
         self._s3_uri = s3_uri
         self._client = client
         self._project_id = project_id
@@ -178,11 +187,19 @@ class DataPortalTask:
         all_tasks_ref: Optional[list] = None
     ):
         """
+        Obtained from a dataset's ``tasks`` property.
+
+        ```python
+        for task in dataset.tasks:
+            print(task.name, task.status)
+            print(task.logs())
+        ```
+
         Args:
-            trace_row: A row from the Nextflow trace TSV, parsed as a dict.
-            client: Authenticated CirroApi client.
-            project_id: ID of the project that owns this dataset.
-            all_tasks_ref: A shared list that will contain all tasks once they
+            trace_row (dict): A row from the Nextflow trace TSV, parsed as a dict.
+            client (CirroApi): Authenticated CirroApi client.
+            project_id (str): ID of the project that owns this dataset.
+            all_tasks_ref (list): A shared list that will contain all tasks once they
                 are all built.  Used by ``inputs`` to resolve ``source_task``.
         """
         self._trace = trace_row
@@ -306,6 +323,7 @@ class DataPortalTask:
         return self._inputs
 
     def _build_inputs(self) -> List[WorkDirFile]:
+        """Parse input URIs from ``.command.run`` and link each to its source task."""
         content = self._read_work_file('.command.run')
         if not content:
             return []
@@ -345,6 +363,7 @@ class DataPortalTask:
         return self._outputs
 
     def _build_outputs(self) -> List[WorkDirFile]:
+        """List non-hidden files directly under the task's S3 work directory."""
         if not self.work_dir:
             return []
         try:
