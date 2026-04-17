@@ -142,8 +142,7 @@ def upload_reference(**kwargs):
     run_upload_reference(kwargs, interactive=kwargs.get('interactive'))
 
 
-# no_args_is_help=False: running 'cirro debug' with no arguments enters interactive mode
-@run.command(help='Debug a failed workflow execution', no_args_is_help=False)
+@run.command(help='Debug a failed workflow execution', no_args_is_help=True)
 @click.option('--project',
               help='Name or ID of the project',
               default=None)
