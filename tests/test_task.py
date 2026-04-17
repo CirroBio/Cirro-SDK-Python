@@ -3,6 +3,10 @@ import json
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
+from cirro_api_client.v1.models import ArtifactType
+
+from cirro.models.assets import DatasetAssets, Artifact
+from cirro.models.file import File
 from cirro.sdk.task import WorkDirFile, DataPortalTask
 from cirro.sdk.exceptions import DataPortalAssetNotFound
 
@@ -209,19 +213,19 @@ class TestDataPortalTaskWorkDirFiles(unittest.TestCase):
     def test_logs_returns_content(self):
         task, client = _make_task(file_bytes=b'execution output')
         with patch('cirro.sdk.task.FileAccessContext'):
-            result = task.logs()
+            result = task.logs
         self.assertEqual(result, 'execution output')
 
     def test_logs_returns_empty_on_error(self):
         task, client = _make_task()
         client.file.get_file_from_path.side_effect = Exception("not found")
         with patch('cirro.sdk.task.FileAccessContext'):
-            result = task.logs()
+            result = task.logs
         self.assertEqual(result, '')
 
     def test_logs_empty_when_no_work_dir(self):
         task, _ = _make_task(trace_row={**TRACE_ROW, 'workdir': ''})
-        result = task.logs()
+        result = task.logs
         self.assertEqual(result, '')
 
     def test_script_returns_content(self):
@@ -290,6 +294,71 @@ class TestDataPortalTaskInputs(unittest.TestCase):
             first = task.inputs
             second = task.inputs
         self.assertIs(first, second)
+
+    def test_inputs_falls_back_to_files_artifact(self):
+        """When .command.run is empty, inputs are resolved from the FILES artifact."""
+        files_csv = (
+            'sample,file,process,dataset,sampleIndex\n'
+            'sample1,s3://bucket/datasets/src/data/reads.fastq.gz,reads,src-ds,1\n'
+        )
+        trace_row = {**TRACE_ROW, 'name': 'FASTQC (sample1)'}
+        task, client = _make_task(trace_row=trace_row, file_bytes=b'', all_tasks_ref=None)
+        task._dataset_id = 'ds-123'
+
+        files_file = MagicMock(spec=File)
+        files_artifact = Artifact(artifact_type=ArtifactType.FILES, file=files_file)
+        assets = DatasetAssets(files=[], artifacts=[files_artifact])
+        client.datasets.get_assets_listing.return_value = assets
+        client.file.get_file.return_value = files_csv.encode()
+
+        with patch('cirro.sdk.task.FileAccessContext'):
+            inputs = task.inputs
+
+        self.assertEqual(len(inputs), 1)
+        self.assertEqual(inputs[0].name, 'reads.fastq.gz')
+
+    def test_inputs_files_artifact_matches_by_filename(self):
+        """Fallback matches on the file basename when identifier looks like a filename."""
+        files_csv = (
+            'sample,file,process,dataset,sampleIndex\n'
+            'genome,s3://bucket/datasets/src/data/genome.fasta,genome_fasta,src-ds,1\n'
+        )
+        trace_row = {**TRACE_ROW, 'name': 'BWA_INDEX (genome.fasta)'}
+        task, client = _make_task(trace_row=trace_row, file_bytes=b'', all_tasks_ref=None)
+        task._dataset_id = 'ds-123'
+
+        files_file = MagicMock(spec=File)
+        files_artifact = Artifact(artifact_type=ArtifactType.FILES, file=files_file)
+        assets = DatasetAssets(files=[], artifacts=[files_artifact])
+        client.datasets.get_assets_listing.return_value = assets
+        client.file.get_file.return_value = files_csv.encode()
+
+        with patch('cirro.sdk.task.FileAccessContext'):
+            inputs = task.inputs
+
+        self.assertEqual(len(inputs), 1)
+        self.assertEqual(inputs[0].name, 'genome.fasta')
+
+    def test_inputs_files_artifact_empty_when_no_match(self):
+        """Fallback returns [] when no FILES artifact entry matches the task name."""
+        files_csv = (
+            'sample,file,process,dataset,sampleIndex\n'
+            'other,s3://bucket/datasets/src/data/other.fasta,genome_fasta,src-ds,1\n'
+        )
+        trace_row = {**TRACE_ROW, 'name': 'BWA_INDEX (genome.fasta)'}
+        task, client = _make_task(trace_row=trace_row, file_bytes=b'')
+        task._dataset_id = 'ds-123'
+
+        files_file = MagicMock(spec=File)
+        files_artifact = Artifact(artifact_type=ArtifactType.FILES, file=files_file)
+        assets = DatasetAssets(files=[], artifacts=[files_artifact])
+        client.datasets.get_assets_listing.return_value = assets
+        client.file.get_file.return_value = files_csv.encode()
+
+        with patch('cirro.sdk.task.FileAccessContext'):
+            inputs = task.inputs
+
+        self.assertEqual(inputs, [])
 
 
 class TestDataPortalTaskRepr(unittest.TestCase):

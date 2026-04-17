@@ -1,7 +1,10 @@
+import csv
+from functools import cached_property
 import gzip
 import json
 from io import BytesIO, StringIO
 from pathlib import PurePath
+import re
 from typing import Any, List, Optional, TYPE_CHECKING
 
 from cirro.models.file import FileAccessContext
@@ -29,7 +32,8 @@ class WorkDirFile:
         client: 'CirroApi',
         project_id: str,
         size: Optional[int] = None,
-        source_task: Optional['DataPortalTask'] = None
+        source_task: Optional['DataPortalTask'] = None,
+        dataset_id: str = ''
     ):
         """
         Obtained from a task's ``inputs`` or ``outputs`` property.
@@ -43,6 +47,7 @@ class WorkDirFile:
         self._s3_uri = s3_uri
         self._client = client
         self._project_id = project_id
+        self._dataset_id = dataset_id
         self._size = size
         self._source_task = source_task
         self._s3_path = S3Path(s3_uri)
@@ -72,14 +77,23 @@ class WorkDirFile:
                 ) from e
         return self._size
 
+    def _access_context(self) -> FileAccessContext:
+        """Return the appropriate FileAccessContext for this file's location."""
+        if self._dataset_id:
+            return FileAccessContext.scratch_download(
+                project_id=self._project_id,
+                dataset_id=self._dataset_id,
+                base_url=self._s3_path.base
+            )
+        return FileAccessContext.download(
+            project_id=self._project_id,
+            base_url=self._s3_path.base
+        )
+
     def _get(self) -> bytes:
         """Return the raw bytes of the file."""
         try:
-            access_context = FileAccessContext.download(
-                project_id=self._project_id,
-                base_url=self._s3_path.base
-            )
-            return self._client.file.get_file_from_path(access_context, self._s3_path.key)
+            return self._client.file.get_file_from_path(self._access_context(), self._s3_path.key)
         except Exception as e:
             raise DataPortalAssetNotFound(
                 f"Could not read {self.name!r} — "
@@ -157,11 +171,7 @@ class WorkDirFile:
             handle.close()
 
     def _get_s3_client(self):
-        access_context = FileAccessContext.download(
-            project_id=self._project_id,
-            base_url=self._s3_path.base
-        )
-        return self._client.file.get_aws_s3_client(access_context)
+        return self._client.file.get_aws_s3_client(self._access_context())
 
     def __str__(self):
         return self.name
@@ -270,6 +280,12 @@ class DataPortalTask:
                 f"Task {self.name!r} has no work directory recorded in the trace"
             )
         s3_path = S3Path(self.work_dir)
+        if self._dataset_id:
+            return FileAccessContext.scratch_download(
+                project_id=self._project_id,
+                dataset_id=self._dataset_id,
+                base_url=s3_path.base
+            )
         return FileAccessContext.download(
             project_id=self._project_id,
             base_url=s3_path.base
@@ -294,6 +310,7 @@ class DataPortalTask:
         except Exception:
             return ''
 
+    @cached_property
     def logs(self) -> str:
         """
         Return the task log (combined stdout/stderr of the task process).
@@ -319,10 +336,76 @@ class DataPortalTask:
         Return the contents of ``.command.sh`` from the task's work directory.
 
         This is the actual shell script that Nextflow executed — the user's
-        pipeline code for this task.
-        Returns an empty string if the file cannot be read.
+        pipeline code for this task.  Falls back to parsing the script from the
+        ``WORKFLOW_LOGS`` artifact when the work directory is not accessible
+        (scratch bucket requires elevated permissions).
+        Returns an empty string if the script cannot be obtained.
         """
-        return self._read_work_file('.command.sh')
+        content = self._read_work_file('.command.sh')
+        if content:
+            return content
+        return self._script_from_workflow_log()
+
+    def _script_from_workflow_log(self) -> str:
+        """
+        Parse this task's shell script from the WORKFLOW_LOGS artifact.
+
+        When a Nextflow task fails the head-node log includes a block:
+
+            Error executing process > 'TASK_NAME'
+            ...
+            Command executed:
+              <script lines>
+            Command exit status:
+
+        This method extracts that block and returns the dedented script.
+        Returns an empty string when the artifact is absent or the task name
+        does not appear in the log.
+        """
+        if not self._dataset_id:
+            return ''
+        try:
+            from cirro_api_client.v1.models import ArtifactType
+
+            assets = self._client.datasets.get_assets_listing(
+                project_id=self._project_id,
+                dataset_id=self._dataset_id
+            )
+            log_artifact = next(
+                (a for a in assets.artifacts if a.artifact_type == ArtifactType.WORKFLOW_LOGS),
+                None
+            )
+            if log_artifact is None:
+                return ''
+
+            log_text = self._client.file.get_file(log_artifact.file).decode(
+                'utf-8', errors='replace'
+            )
+
+            # Nextflow error block format:
+            #   Error executing process > 'TASK_NAME'
+            #   ...blank / metadata lines...
+            #   Command executed:
+            #   <indented script>
+            #   Command exit status:
+            pattern = (
+                r"Error executing process > '"
+                + re.escape(self.name)
+                + r"'[\s\S]*?Command executed:\n([\s\S]*?)Command exit status:"
+            )
+            m = re.search(pattern, log_text)
+            if not m:
+                return ''
+
+            lines = m.group(1).splitlines()
+            non_empty = [ln for ln in lines if ln.strip()]
+            if not non_empty:
+                return ''
+            # Strip the common leading indent
+            min_indent = min(len(ln) - len(ln.lstrip()) for ln in non_empty)
+            return '\n'.join(ln[min_indent:] for ln in lines).strip()
+        except Exception:
+            return ''
 
     # ------------------------------------------------------------------ #
     # Inputs                                                               #
@@ -344,26 +427,81 @@ class DataPortalTask:
     def _build_inputs(self) -> List[WorkDirFile]:
         """Parse input URIs from ``.command.run`` and link each to its source task."""
         content = self._read_work_file('.command.run')
-        if not content:
-            return []
+        if content:
+            uris = parse_inputs_from_command_run(content)
+            result = []
+            for uri in uris:
+                source_task = None
+                for other_task in self._all_tasks_ref:
+                    if other_task is not self and other_task.work_dir and uri.startswith(
+                        other_task.work_dir.rstrip('/') + '/'
+                    ):
+                        source_task = other_task
+                        break
+                result.append(WorkDirFile(
+                    s3_uri=uri,
+                    client=self._client,
+                    project_id=self._project_id,
+                    source_task=source_task,
+                    dataset_id=self._dataset_id
+                ))
+            return result
 
-        uris = parse_inputs_from_command_run(content)
-        result = []
-        for uri in uris:
-            source_task = None
-            for other_task in self._all_tasks_ref:
-                if other_task is not self and other_task.work_dir and uri.startswith(
-                    other_task.work_dir.rstrip('/') + '/'
-                ):
-                    source_task = other_task
-                    break
-            result.append(WorkDirFile(
-                s3_uri=uri,
-                client=self._client,
+        # Fallback: try to identify staged inputs from the workflow's FILES artifact.
+        # This is used when the scratch bucket is not directly accessible.
+        return self._build_inputs_from_files_artifact()
+
+    def _build_inputs_from_files_artifact(self) -> List[WorkDirFile]:
+        """
+        Fallback: identify input files from the workflow's FILES artifact.
+
+        Used when the task work directory (scratch bucket) is not accessible.
+        Matches staged input files based on the identifier embedded in the task name,
+        e.g. ``BWA_INDEX (genome.fasta)`` → looks for a file named ``genome.fasta``.
+        """
+        if not self._dataset_id:
+            return []
+        try:
+            from cirro_api_client.v1.models import ArtifactType
+
+            assets = self._client.datasets.get_assets_listing(
                 project_id=self._project_id,
-                source_task=source_task
-            ))
-        return result
+                dataset_id=self._dataset_id
+            )
+
+            files_artifact = next(
+                (a for a in assets.artifacts if a.artifact_type == ArtifactType.FILES),
+                None
+            )
+            if files_artifact is None:
+                return []
+
+            content = self._client.file.get_file(files_artifact.file).decode('utf-8')
+
+            # Extract the identifier from the task name, e.g. "BWA_INDEX (genome.fasta)" → "genome.fasta"
+            match = re.search(r'\((.+?)\)', self.name)
+            if not match:
+                return []
+            identifier = match.group(1)
+
+            result = []
+            reader = csv.DictReader(StringIO(content))
+            for row in reader:
+                file_uri = row.get('file', '')
+                sample = row.get('sample', '')
+                if not file_uri:
+                    continue
+                file_basename = PurePath(file_uri).name
+                file_stem = PurePath(file_basename).stem
+                if identifier in (file_basename, file_stem, sample):
+                    result.append(WorkDirFile(
+                        s3_uri=file_uri,
+                        client=self._client,
+                        project_id=self._project_id,
+                    ))
+            return result
+        except Exception:
+            return []
 
     # ------------------------------------------------------------------ #
     # Outputs                                                              #
@@ -406,7 +544,8 @@ class DataPortalTask:
                         s3_uri=full_uri,
                         client=self._client,
                         project_id=self._project_id,
-                        size=obj['Size']
+                        size=obj['Size'],
+                        dataset_id=self._dataset_id
                     ))
             return result
         except Exception:

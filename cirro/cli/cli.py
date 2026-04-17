@@ -6,7 +6,7 @@ from cirro_api_client.v1.errors import CirroException
 
 from cirro.cli import run_create_pipeline_config, run_validate_folder
 from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets
-from cirro.cli.controller import handle_error, run_upload_reference, run_list_projects, run_list_files, run_debug, run_debug_app
+from cirro.cli.controller import handle_error, run_upload_reference, run_list_projects, run_list_files, run_debug
 from cirro.cli.interactive.utils import InputError
 
 
@@ -156,26 +156,6 @@ def debug(**kwargs):
     check_required_args(kwargs)
     run_debug(kwargs, interactive=kwargs.get('interactive'))
 
-
-@run.command(
-    name='debug-app',
-    help='Launch the interactive Workflow Debugger web app (requires marimo)'
-)
-@click.option('--project',
-              help='Pre-select a project by name or ID',
-              default=None)
-@click.option('--dataset',
-              help='Pre-select a dataset by name or ID',
-              default=None)
-@click.option('--port',
-              help='Local port for the web app',
-              default=2718, show_default=True, type=int)
-def debug_app(**kwargs):
-    run_debug_app(
-        project=kwargs.get('project'),
-        dataset=kwargs.get('dataset'),
-        port=kwargs.get('port', 2718),
-    )
 
 
 @run.command(help='Configure authentication')

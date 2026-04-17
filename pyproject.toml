@@ -27,7 +27,6 @@ miniwdl = {version="^1.13.0", optional=true}
 referencing = "^0.36.2"
 nf-core = {version = "^3.3.2", optional=true}
 awscrt = "==0.30.0"
-marimo = {version = ">=0.10.0", optional=true}
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.1.3"
@@ -39,7 +38,6 @@ pdoc = "15.0.0"
 pyodide = ["requests-aws4auth"]
 wdl = ["miniwdl"]
 nextflow = ["nf-core"]
-debugger = ["marimo"]
 
 [tool.poetry.scripts]
 cirro-cli = "cirro.cli.cli:main"

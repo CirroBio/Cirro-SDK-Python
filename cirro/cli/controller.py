@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Set
 
+from cirro.sdk.task import DataPortalTask
 from cirro_api_client.v1.models import UploadDatasetRequest, Status, Executor
 
 from cirro.cirro_client import CirroApi
@@ -25,9 +26,7 @@ from cirro.config import UserConfig, save_user_config, load_user_config
 from cirro.file_utils import get_files_in_directory
 from cirro.models.process import PipelineDefinition, ConfigAppStatus, CONFIG_APP_URL
 from cirro.sdk.dataset import DataPortalDataset
-from cirro.sdk.nextflow_utils import find_primary_failed_task, parse_inputs_from_command_run
-from cirro.models.s3_path import S3Path
-from cirro.models.file import FileAccessContext
+from cirro.sdk.nextflow_utils import find_primary_failed_task
 from cirro.services.service_helpers import list_all_datasets
 from cirro.utils import convert_size
 
@@ -367,11 +366,18 @@ def run_debug(input_params: DebugArguments, interactive=False):
     sdk_dataset = DataPortalDataset(dataset=dataset_detail, client=cirro)
 
     # --- Execution log ---
-    execution_log = sdk_dataset.logs()
+    execution_log = sdk_dataset.logs
     log_lines = execution_log.splitlines()
 
     print("\n=== Execution Log (last 50 lines) ===")
     print('\n'.join(log_lines[-50:]))
+
+    # Only search for a failed task when the dataset actually failed.
+    if sdk_dataset.status != Status.FAILED:
+        if interactive:
+            if log_lines and ask_yes_no('Show full execution log?'):
+                print(execution_log)
+        return
 
     # --- Tasks from trace ---
     try:
@@ -444,7 +450,7 @@ def _print_task_debug(task, depth: int = 0,
         print('\n'.join(indent + line for line in (task_script or "(empty)").splitlines()))
 
     if show_log:
-        task_log = task.logs()
+        task_log = task.logs
         print(f"\n{indent}--- Task Log ---")
         print('\n'.join(indent + line for line in (task_log or "(empty)").splitlines()))
 
@@ -537,7 +543,7 @@ _DONE = "Done"
 _BINARY_EXTENSIONS = {'.bam', '.cram', '.bai', '.crai', '.bcf', '.idx'}
 
 
-def _print_task_header(task, indent: str, label: str) -> None:
+def _print_task_header(task: DataPortalTask, indent: str, label: str) -> None:
     print(f"\n{indent}=== {label} ===")
     print(f"{indent}Name:      {task.name}")
     print(f"{indent}Status:    {task.status}")
@@ -546,92 +552,7 @@ def _print_task_header(task, indent: str, label: str) -> None:
     print(f"{indent}Work Dir:  {task.work_dir}")
 
 
-def _task_diagnostics(task, indent: str = '') -> None:
-    """
-    Print raw diagnostic information for a task, bypassing silent exception
-    handling so the caller can see exactly what is failing and why.
-    """
-    print(f"\n{indent}=== Diagnostic Info ===")
-    print(f"{indent}work_dir:   {task.work_dir!r}")
-    print(f"{indent}native_id:  {task.native_id!r}")
-    print(f"{indent}dataset_id: {task._dataset_id!r}")
-
-    # Check task log via execution API
-    print(f"\n{indent}--- task log (execution API) ---")
-    if not task._dataset_id or not task.native_id:
-        print(f"{indent}  SKIP: dataset_id={task._dataset_id!r}, native_id={task.native_id!r}")
-    else:
-        try:
-            log = task._client.execution.get_task_logs(
-                project_id=task._project_id,
-                dataset_id=task._dataset_id,
-                task_id=task.native_id
-            )
-            print(f"{indent}  fetched {len(log)} bytes")
-        except Exception as e:
-            print(f"{indent}  ERROR: {type(e).__name__}: {e}")
-
-    # Check each work-directory file individually
-    for filename in ('.command.sh', '.command.log', '.command.run'):
-        print(f"\n{indent}--- {filename} ---")
-        if not task.work_dir:
-            print(f"{indent}  SKIP: work_dir is empty")
-            continue
-        try:
-            s3_path = S3Path(task.work_dir)
-            key = f'{s3_path.key}/{filename}'
-            access_context = FileAccessContext.download(
-                project_id=task._project_id,
-                base_url=s3_path.base
-            )
-            content = task._client.file.get_file_from_path(
-                access_context, key
-            ).decode('utf-8', errors='replace')
-            if filename == '.command.run':
-                uris = parse_inputs_from_command_run(content)
-                print(f"{indent}  fetched {len(content)} bytes")
-                print(f"{indent}  parse_inputs_from_command_run found {len(uris)} URI(s):")
-                for uri in uris:
-                    print(f"{indent}    {uri}")
-                if not uris:
-                    # Show the staging block so the user can see why the regex didn't match
-                    for line in content.splitlines():
-                        if 'aws s3' in line or 'nxf_s3_upload' in line or 'nxf_stage' in line:
-                            print(f"{indent}    [relevant line] {line}")
-            else:
-                print(f"{indent}  fetched {len(content)} bytes")
-        except Exception as e:
-            print(f"{indent}  ERROR: {type(e).__name__}: {e}")
-
-    # Check the S3 work directory listing
-    print(f"\n{indent}--- S3 work directory listing ---")
-    if not task.work_dir:
-        print(f"{indent}  SKIP: work_dir is empty")
-    else:
-        try:
-            s3_path = S3Path(task.work_dir)
-            access_context = FileAccessContext.download(
-                project_id=task._project_id,
-                base_url=s3_path.base
-            )
-            s3 = task._client.file.get_aws_s3_client(access_context)
-            prefix = s3_path.key.rstrip('/') + '/'
-            paginator = s3.get_paginator('list_objects_v2')
-            objects = []
-            for page in paginator.paginate(Bucket=s3_path.bucket, Prefix=prefix):
-                objects.extend(page.get('Contents', []))
-            if not objects:
-                print(f"{indent}  (no objects found under {prefix!r})")
-            else:
-                print(f"{indent}  {len(objects)} object(s) found:")
-                for obj in objects:
-                    remainder = obj['Key'][len(prefix):]
-                    print(f"{indent}    {remainder}  ({obj['Size']} bytes)")
-        except Exception as e:
-            print(f"{indent}  ERROR: {type(e).__name__}: {e}")
-
-
-def _task_menu(task, depth: int = 0) -> None:
+def _task_menu(task: DataPortalTask, depth: int = 0) -> None:
     """
     Menu-driven exploration of a single task.
 
@@ -652,7 +573,6 @@ def _task_menu(task, depth: int = 0) -> None:
             "Show task log",
             f"Browse inputs ({len(inputs)})",
             f"Browse outputs ({len(outputs)})",
-            "Show diagnostic info",
             _DONE if depth == 0 else _BACK,
         ]
         choice = ask('select', 'What would you like to do?', choices=choices)
@@ -663,7 +583,7 @@ def _task_menu(task, depth: int = 0) -> None:
             print(content if content else "(empty)")
 
         elif choice == "Show task log":
-            content = task.logs()
+            content = task.logs
             print(f"\n{indent}--- Task Log ---")
             print(content if content else "(empty)")
 
@@ -672,9 +592,6 @@ def _task_menu(task, depth: int = 0) -> None:
 
         elif choice.startswith("Browse outputs"):
             _browse_files_menu(outputs, "output", depth)
-
-        elif choice == "Show diagnostic info":
-            _task_diagnostics(task, indent)
 
         else:  # Done / Back
             break
@@ -685,10 +602,16 @@ def _browse_files_menu(files, kind: str, depth: int) -> None:
     Let the user pick a file from a list, then enter its file menu.
 
     ``kind`` is ``'input'`` or ``'output'``, used only for the prompt label.
+    When there is only one file the selection step is skipped and the file
+    menu opens immediately.
     """
     indent = "  " * depth
     if not files:
         print(f"\n{indent}No {kind} files available.")
+        return
+
+    if len(files) == 1:
+        _file_menu(files[0], depth)
         return
 
     while True:
@@ -833,76 +756,6 @@ def _check_configure():
     # Legacy check for old config
     if config.base_url == 'cirro.bio':
         run_configure()
-
-
-def run_debug_app(project: Optional[str] = None, dataset: Optional[str] = None, port: int = 2718):
-    """
-    Launch the Cirro Workflow Debugger as a local Marimo web app.
-
-    Opens a browser window with an interactive interface for exploring
-    Nextflow workflow executions, tasks, logs, scripts, and file provenance.
-
-    Authenticates via the normal CLI flow before launching, then passes the
-    access token to the app so it never needs to prompt for credentials.
-
-    Args:
-        project: Pre-select a project by name or ID (optional).
-        dataset: Pre-select a dataset by name or ID (optional).
-        port:    Local port to serve the app on (default 2718).
-    """
-    try:
-        import marimo  # noqa: F401 — confirm marimo is installed
-    except ImportError:
-        raise InputError(
-            "marimo is required for the workflow debugger.\n"
-            "Install it with: pip install marimo"
-        )
-
-    import subprocess
-    from pathlib import Path as _Path
-    from cirro.config import AppConfig
-    from cirro.auth import get_auth_info_from_config
-    from cirro.auth.device_code import DeviceCodeAuth
-    from cirro.auth.client_creds import ClientCredentialsAuth
-    from cirro.auth.access_token import AccessTokenAuth
-
-    app_path = _Path(__file__).parent.parent / "marimo" / "workflow_debugger.py"
-    if not app_path.exists():
-        raise InputError(f"Workflow debugger app not found at: {app_path}")
-
-    # Authenticate in the CLI before launching the subprocess.
-    # This handles the interactive device-code flow (or client-credentials)
-    # so the web app never has to prompt the user.
-    _check_configure()
-    logger.info("Authenticating…")
-    app_config = AppConfig()
-    auth_info = get_auth_info_from_config(app_config)
-
-    # Extract the current access token so it can be injected into the app.
-    if isinstance(auth_info, (DeviceCodeAuth, ClientCredentialsAuth)):
-        access_token = auth_info._get_token()['access_token']
-    elif isinstance(auth_info, AccessTokenAuth):
-        access_token = auth_info._token
-    else:
-        access_token = None
-
-    env = os.environ.copy()
-    # Propagate the base URL so the app doesn't need the config file for that.
-    env["CIRRO_BASE_URL"] = app_config.base_url
-    if access_token:
-        env["CIRRO_ACCESS_TOKEN"] = access_token
-    if project:
-        env["CIRRO_DEBUG_PROJECT"] = project
-    if dataset:
-        env["CIRRO_DEBUG_DATASET"] = dataset
-
-    logger.info(f"Launching Cirro Workflow Debugger on http://localhost:{port}")
-    logger.info("Press Ctrl+C to stop.")
-
-    subprocess.run(
-        [sys.executable, "-m", "marimo", "run", str(app_path), "--port", str(port)],
-        env=env,
-    )
 
 
 def handle_error(e: Exception):

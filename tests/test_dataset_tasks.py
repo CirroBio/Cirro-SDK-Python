@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from cirro_api_client.v1.models import ArtifactType
+from cirro_api_client.v1.models import ArtifactType, Executor
 
 from cirro.models.assets import DatasetAssets, Artifact
 from cirro.models.file import File
@@ -29,6 +29,7 @@ def _make_dataset(execution_log='', trace_content=None):
     dataset_detail.name = 'Test Dataset'
 
     client = Mock()
+    client.processes.get.return_value.executor = Executor.NEXTFLOW
     client.execution.get_execution_logs.return_value = execution_log
 
     # Build asset listing with or without a trace artifact
@@ -50,7 +51,7 @@ class TestDataPortalDatasetLogs(unittest.TestCase):
 
     def test_logs_returns_string(self):
         dataset, client = _make_dataset(execution_log='workflow started\nworkflow ended\n')
-        result = dataset.logs()
+        result = dataset.logs
         self.assertEqual(result, 'workflow started\nworkflow ended\n')
         client.execution.get_execution_logs.assert_called_once_with(
             project_id='proj-1',
@@ -60,12 +61,12 @@ class TestDataPortalDatasetLogs(unittest.TestCase):
     def test_logs_returns_empty_string_on_error(self):
         dataset, client = _make_dataset()
         client.execution.get_execution_logs.side_effect = Exception("CloudWatch unavailable")
-        result = dataset.logs()
+        result = dataset.logs
         self.assertEqual(result, '')
 
     def test_logs_returns_empty_string_when_no_log(self):
         dataset, _ = _make_dataset(execution_log='')
-        self.assertEqual(dataset.logs(), '')
+        self.assertEqual(dataset.logs, '')
 
 
 class TestDataPortalDatasetTasks(unittest.TestCase):
