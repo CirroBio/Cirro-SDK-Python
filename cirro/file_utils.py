@@ -103,7 +103,7 @@ def get_files_in_directory(
     return paths
 
 
-def _bytes_to_human_readable(num_bytes: int) -> str:
+def bytes_to_human_readable(num_bytes: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
         if num_bytes < 1000.0 or unit == 'PB':
             break
