@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v2
@@ -39,9 +40,6 @@ jobs:
         run: |
           poetry build
 
-      - name: Publish python package
+      - name: Publish package distributions to PyPI
         if: github.event_name == 'release'
-        run: |
-          poetry publish
-        env:
-          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b
