@@ -103,7 +103,7 @@ def get_files_in_directory(
     return paths
 
 
-def _bytes_to_human_readable(num_bytes: int) -> str:
+def bytes_to_human_readable(num_bytes: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
         if num_bytes < 1000.0 or unit == 'PB':
             break
@@ -118,7 +118,7 @@ def get_files_stats(files: List[PathLike]) -> DirectoryStatistics:
     sizes = [f.stat().st_size for f in files]
     total_size = sum(sizes)
     return DirectoryStatistics(
-        size_friendly=_bytes_to_human_readable(total_size),
+        size_friendly=bytes_to_human_readable(total_size),
         size=total_size,
         number_of_files=len(sizes)
     )

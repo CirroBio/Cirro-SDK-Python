@@ -13,7 +13,7 @@ from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisReques
     RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
 
 from cirro.cirro_client import CirroApi
-from cirro.file_utils import filter_files_by_pattern
+from cirro.file_utils import bytes_to_human_readable, filter_files_by_pattern
 from cirro.models.assets import DatasetAssets
 from cirro.models.file import PathLike
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
@@ -224,6 +224,18 @@ class DataPortalDataset(DataPortalAsset):
         Share associated with the dataset, if any.
         """
         return self._get_detail().share
+
+    @property
+    def file_count(self) -> int:
+        return self._get_detail().file_count
+
+    @property
+    def total_size_bytes(self) -> int:
+        return self._get_detail().total_size_bytes
+
+    @property
+    def total_size(self) -> str:
+        return bytes_to_human_readable(self.total_size_bytes)
 
     @property
     def created_by(self) -> str:
