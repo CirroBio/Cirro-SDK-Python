@@ -7,6 +7,7 @@ from pathlib import PurePath
 import re
 from typing import Any, List, Optional, TYPE_CHECKING
 
+from cirro_api_client.v1.errors import UnexpectedStatus
 from cirro.models.file import FileAccessContext
 from cirro.models.s3_path import S3Path
 from cirro.sdk.exceptions import DataPortalAssetNotFound
@@ -334,7 +335,7 @@ class DataPortalTask:
                     dataset_id=self._dataset_id,
                     task_id=self.native_id
                 )
-            except Exception:
+            except UnexpectedStatus:
                 pass
         return self._read_work_file('.command.log')
 

@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from cirro.sdk.task import DataPortalTask
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
+from cirro_api_client.v1.errors import UnexpectedStatus
 from cirro_api_client.v1.models import Dataset, DatasetDetail, Executor, RunAnalysisRequest, ProcessDetail, \
     Status, RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
 
@@ -272,7 +273,7 @@ class DataPortalDataset(DataPortalAsset):
                 project_id=self.project_id,
                 dataset_id=self.id
             )
-        except Exception:
+        except UnexpectedStatus:
             return ''
 
     @cached_property
