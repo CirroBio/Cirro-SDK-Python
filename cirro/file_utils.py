@@ -118,7 +118,7 @@ def get_files_stats(files: List[PathLike]) -> DirectoryStatistics:
     sizes = [f.stat().st_size for f in files]
     total_size = sum(sizes)
     return DirectoryStatistics(
-        size_friendly=_bytes_to_human_readable(total_size),
+        size_friendly=bytes_to_human_readable(total_size),
         size=total_size,
         number_of_files=len(sizes)
     )
