@@ -158,17 +158,26 @@ class WorkDirFile:
                 compression = dict(method='gzip')
             elif name.endswith('.bz2'):
                 compression = dict(method='bz2')
+            elif name.endswith('.xz'):
+                compression = dict(method='xz')
             elif name.endswith('.zst'):
                 compression = dict(method='zstd')
             else:
                 compression = None
 
         raw = self._get()
-        handle = BytesIO(raw) if compression is not None else StringIO(raw.decode(encoding))
-        try:
-            return pandas.read_csv(handle, compression=compression, encoding=encoding, **kwargs)
-        finally:
-            handle.close()
+        if compression is not None:
+            handle = BytesIO(raw)
+            try:
+                return pandas.read_csv(handle, compression=compression, **kwargs)
+            finally:
+                handle.close()
+        else:
+            handle = StringIO(raw.decode(encoding))
+            try:
+                return pandas.read_csv(handle, **kwargs)
+            finally:
+                handle.close()
 
     def _get_s3_client(self):
         return self._client.file.get_aws_s3_client(self._access_context())
@@ -203,7 +212,7 @@ class DataPortalTask:
         ```python
         for task in dataset.tasks:
             print(task.name, task.status)
-            print(task.logs())
+            print(task.logs)
         ```
 
         Args:
@@ -219,8 +228,6 @@ class DataPortalTask:
         self._project_id = project_id
         self._dataset_id = dataset_id
         self._all_tasks_ref: list = all_tasks_ref if all_tasks_ref is not None else []
-        self._inputs: Optional[List[WorkDirFile]] = None
-        self._outputs: Optional[List[WorkDirFile]] = None
 
     # ------------------------------------------------------------------ #
     # Trace-derived properties                                             #
@@ -331,6 +338,7 @@ class DataPortalTask:
                 pass
         return self._read_work_file('.command.log')
 
+    @cached_property
     def script(self) -> str:
         """
         Return the contents of ``.command.sh`` from the task's work directory.
@@ -411,7 +419,7 @@ class DataPortalTask:
     # Inputs                                                               #
     # ------------------------------------------------------------------ #
 
-    @property
+    @cached_property
     def inputs(self) -> List[WorkDirFile]:
         """
         List of input files for this task.
@@ -420,9 +428,7 @@ class DataPortalTask:
         is annotated with ``source_task`` if it was produced by another task in
         the same workflow.
         """
-        if self._inputs is None:
-            self._inputs = self._build_inputs()
-        return self._inputs
+        return self._build_inputs()
 
     def _build_inputs(self) -> List[WorkDirFile]:
         """Parse input URIs from ``.command.run`` and link each to its source task."""
@@ -507,7 +513,7 @@ class DataPortalTask:
     # Outputs                                                              #
     # ------------------------------------------------------------------ #
 
-    @property
+    @cached_property
     def outputs(self) -> List[WorkDirFile]:
         """
         List of non-hidden output files in the task's work directory.
@@ -515,9 +521,7 @@ class DataPortalTask:
         Returns an empty list if the directory has been cleaned up or cannot
         be listed.
         """
-        if self._outputs is None:
-            self._outputs = self._build_outputs()
-        return self._outputs
+        return self._build_outputs()
 
     def _build_outputs(self) -> List[WorkDirFile]:
         """List non-hidden files directly under the task's S3 work directory."""

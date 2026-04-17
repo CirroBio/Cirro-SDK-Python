@@ -231,7 +231,7 @@ class TestDataPortalTaskWorkDirFiles(unittest.TestCase):
     def test_script_returns_content(self):
         task, client = _make_task(file_bytes=b'#!/bin/bash\necho hello')
         with patch('cirro.sdk.task.FileAccessContext'):
-            result = task.script()
+            result = task.script
         self.assertEqual(result, '#!/bin/bash\necho hello')
 
     def test_outputs_empty_on_error(self):

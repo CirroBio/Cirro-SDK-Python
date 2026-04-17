@@ -26,7 +26,6 @@ from cirro.config import UserConfig, save_user_config, load_user_config
 from cirro.file_utils import get_files_in_directory
 from cirro.models.process import PipelineDefinition, ConfigAppStatus, CONFIG_APP_URL
 from cirro.sdk.dataset import DataPortalDataset
-from cirro.sdk.nextflow_utils import find_primary_failed_task
 from cirro.services.service_helpers import list_all_datasets
 from cirro.utils import convert_size
 
@@ -379,18 +378,16 @@ def run_debug(input_params: DebugArguments, interactive=False):
                 print(execution_log)
         return
 
-    # --- Tasks from trace ---
+    # --- Primary failed task ---
     try:
         if interactive:
             print("\nSearching for the primary failed task (this may take a moment)...")
-        tasks = sdk_dataset.tasks
+        failed_task = sdk_dataset.primary_failed_task
     except Exception as e:
         print(f"\nCould not load task trace: {e}")
         if interactive and log_lines and ask_yes_no('Show full execution log?'):
             print(execution_log)
         return
-
-    failed_task = find_primary_failed_task(tasks, execution_log)
 
     if interactive:
         if failed_task is None:
@@ -433,19 +430,11 @@ def _print_task_debug(task, depth: int = 0,
                       show_files: bool = True) -> None:
     """Print all debug info for one task, indented according to its depth in the input chain."""
     indent = "  " * depth
-    sep = "=" * 60
     label = "Primary Failed Task" if depth == 0 else f"Source Task [depth {depth}]"
-
-    print(f"\n{indent}{sep}")
-    print(f"{indent}{label}: {task.name}")
-    print(f"{indent}{sep}")
-    print(f"{indent}Status:    {task.status}")
-    print(f"{indent}Exit Code: {task.exit_code}")
-    print(f"{indent}Hash:      {task.hash}")
-    print(f"{indent}Work Dir:  {task.work_dir}")
+    _print_task_header(task, indent, label)
 
     if show_script:
-        task_script = task.script()
+        task_script = task.script
         print(f"\n{indent}--- Task Script ---")
         print('\n'.join(indent + line for line in (task_script or "(empty)").splitlines()))
 
@@ -578,7 +567,7 @@ def _task_menu(task: DataPortalTask, depth: int = 0) -> None:
         choice = ask('select', 'What would you like to do?', choices=choices)
 
         if choice == "Show task script":
-            content = task.script()
+            content = task.script
             print(f"\n{indent}--- Task Script ---")
             print(content if content else "(empty)")
 
@@ -614,27 +603,28 @@ def _browse_files_menu(files, kind: str, depth: int) -> None:
         _file_menu(files[0], depth)
         return
 
-    while True:
-        # Build display labels — disambiguate duplicates by appending a counter
-        seen: dict = {}
-        labels = []
-        for f in files:
-            seen[f.name] = seen.get(f.name, 0) + 1
-        counts: dict = {}
-        for f in files:
-            if seen[f.name] > 1:
-                counts[f.name] = counts.get(f.name, 0) + 1
-                label = f"{f.name} [{counts[f.name]}]"
-            else:
-                label = f.name
-            source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
-            try:
-                size_str = convert_size(f.size)
-            except Exception:
-                size_str = "unknown size"
-            labels.append(f"{label}  ({size_str})  [{source}]")
+    # Build display labels — disambiguate duplicates by appending a counter
+    seen: dict = {}
+    labels = []
+    for f in files:
+        seen[f.name] = seen.get(f.name, 0) + 1
+    counts: dict = {}
+    for f in files:
+        if seen[f.name] > 1:
+            counts[f.name] = counts.get(f.name, 0) + 1
+            label = f"{f.name} [{counts[f.name]}]"
+        else:
+            label = f.name
+        source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
+        try:
+            size_str = convert_size(f.size)
+        except Exception:
+            size_str = "unknown size"
+        labels.append(f"{label}  ({size_str})  [{source}]")
 
-        choices = labels + [_BACK]
+    choices = labels + [_BACK]
+
+    while True:
         choice = ask('select', f'Select a {kind} file to inspect', choices=choices)
         if choice == _BACK:
             break

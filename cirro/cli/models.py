@@ -56,7 +56,15 @@ class ListFilesArguments(TypedDict):
     file_limit: int
 
 
-class DebugArguments(TypedDict):
+class _DebugArgumentsBase(TypedDict):
     project: str
     dataset: str
     interactive: bool
+
+
+class DebugArguments(_DebugArgumentsBase, total=False):
+    max_depth: Optional[int]
+    max_tasks: Optional[int]
+    show_script: bool
+    show_log: bool
+    show_files: bool

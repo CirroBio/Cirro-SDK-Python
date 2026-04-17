@@ -90,7 +90,7 @@ class TestDataPortalDatasetTasks(unittest.TestCase):
             second = dataset.tasks
         self.assertIs(first, second)
 
-    def test_tasks_raises_for_non_nextflow_dataset(self):
+    def test_tasks_raises_when_trace_artifact_missing(self):
         dataset, _ = _make_dataset(trace_content=None)
         with self.assertRaises(DataPortalInputError):
             _ = dataset.tasks

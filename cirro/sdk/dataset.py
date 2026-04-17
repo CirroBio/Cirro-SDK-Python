@@ -139,7 +139,6 @@ class DataPortalDataset(DataPortalAsset):
         self._data = dataset
         self._assets: Optional[DatasetAssets] = None
         self._client = client
-        self._tasks: Optional[List] = None
 
     @property
     def id(self) -> str:
@@ -276,7 +275,7 @@ class DataPortalDataset(DataPortalAsset):
         except Exception:
             return ''
 
-    @property
+    @cached_property
     def tasks(self) -> List['DataPortalTask']:
         """
         List of tasks from the workflow execution.
@@ -296,9 +295,7 @@ class DataPortalDataset(DataPortalAsset):
             NotImplementedError: If task inspection is not yet implemented for
                 this executor.
         """
-        if self._tasks is None:
-            self._tasks = self._load_tasks()
-        return self._tasks
+        return self._load_tasks()
 
     def _load_tasks(self) -> List['DataPortalTask']:
         """Dispatch task loading to the executor-specific implementation."""
@@ -366,19 +363,22 @@ class DataPortalDataset(DataPortalAsset):
 
         Returns ``None`` gracefully in all non-error situations:
 
-        - The executor does not have a primary-failed-task implementation yet.
+        - The executor is not Nextflow (currently only implemented for Nextflow).
         - The dataset has no task trace (still queued or just started).
         - The trace is empty (no tasks ran).
         - No tasks have a ``FAILED`` status (the workflow succeeded or was
           stopped before any task actually failed).
 
-        Currently only implemented for Nextflow; returns ``None`` for all
-        other executors.
+        The executor check is performed first to avoid an unnecessary API call
+        when the executor does not support task inspection.
 
         Returns:
             `cirro.sdk.task.DataPortalTask`, or ``None`` if no failed task is found.
         """
         from cirro.sdk.nextflow_utils import find_primary_failed_task
+
+        if self.executor != Executor.NEXTFLOW:
+            return None
 
         try:
             tasks = self.tasks
@@ -386,9 +386,6 @@ class DataPortalDataset(DataPortalAsset):
             return None
 
         if not tasks:
-            return None
-
-        if self.executor != Executor.NEXTFLOW:
             return None
 
         execution_log = self.logs
