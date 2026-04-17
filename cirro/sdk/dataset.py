@@ -306,6 +306,7 @@ class DataPortalDataset(DataPortalAsset):
                 trace_row=row,
                 client=self._client,
                 project_id=self.project_id,
+                dataset_id=self.id,
                 all_tasks_ref=all_tasks_ref
             )
             tasks.append(task)

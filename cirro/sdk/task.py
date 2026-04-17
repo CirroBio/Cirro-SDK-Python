@@ -184,6 +184,7 @@ class DataPortalTask:
         trace_row: dict,
         client: 'CirroApi',
         project_id: str,
+        dataset_id: str = '',
         all_tasks_ref: Optional[list] = None
     ):
         """
@@ -199,12 +200,14 @@ class DataPortalTask:
             trace_row (dict): A row from the Nextflow trace TSV, parsed as a dict.
             client (CirroApi): Authenticated CirroApi client.
             project_id (str): ID of the project that owns this dataset.
+            dataset_id (str): ID of the dataset (execution) that owns this task.
             all_tasks_ref (list): A shared list that will contain all tasks once they
                 are all built.  Used by ``inputs`` to resolve ``source_task``.
         """
         self._trace = trace_row
         self._client = client
         self._project_id = project_id
+        self._dataset_id = dataset_id
         self._all_tasks_ref: list = all_tasks_ref if all_tasks_ref is not None else []
         self._inputs: Optional[List[WorkDirFile]] = None
         self._outputs: Optional[List[WorkDirFile]] = None
@@ -240,6 +243,11 @@ class DataPortalTask:
     def work_dir(self) -> str:
         """Full S3 URI of the task's work directory."""
         return self._trace.get('workdir', '')
+
+    @property
+    def native_id(self) -> str:
+        """Native job ID on the underlying executor (e.g. AWS Batch job ID)."""
+        return self._trace.get('native_id', '')
 
     @property
     def exit_code(self) -> Optional[int]:
@@ -288,11 +296,22 @@ class DataPortalTask:
 
     def logs(self) -> str:
         """
-        Return the contents of ``.command.log`` from the task's work directory.
+        Return the task log (combined stdout/stderr of the task process).
 
-        This file contains the combined stdout/stderr output of the task process.
-        Returns an empty string if the file cannot be read.
+        Fetches via the Cirro execution API when a native job ID is available,
+        which works even when the S3 scratch bucket is not directly accessible.
+        Falls back to reading ``.command.log`` from the S3 work directory.
+        Returns an empty string if neither source can be read.
         """
+        if self._dataset_id and self.native_id:
+            try:
+                return self._client.execution.get_task_logs(
+                    project_id=self._project_id,
+                    dataset_id=self._dataset_id,
+                    task_id=self.native_id
+                )
+            except Exception:
+                pass
         return self._read_work_file('.command.log')
 
     def script(self) -> str:
