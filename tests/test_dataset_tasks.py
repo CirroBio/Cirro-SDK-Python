@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from cirro_api_client.v1.errors import UnexpectedStatus
+from cirro_api_client.v1.errors import NotFoundException
 from cirro_api_client.v1.models import ArtifactType, Executor
 
 from cirro.models.assets import DatasetAssets, Artifact
@@ -61,7 +61,7 @@ class TestDataPortalDatasetLogs(unittest.TestCase):
 
     def test_logs_returns_empty_string_on_error(self):
         dataset, client = _make_dataset()
-        client.execution.get_execution_logs.side_effect = UnexpectedStatus(404, b'', b'')
+        client.execution.get_execution_logs.side_effect = NotFoundException({'errorDetail': 'Not found'})
         result = dataset.logs
         self.assertEqual(result, '')
 
