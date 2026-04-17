@@ -117,6 +117,8 @@ class ExecutionService(BaseService):
             client=self._api_client
         )
 
+        if resp is None or resp.events is None:
+            return ''
         return '\n'.join(e.message for e in resp.events)
 
     def get_tasks_for_execution(self, project_id: str, dataset_id: str, force_live=False) -> Optional[List[Task]]:
@@ -158,4 +160,6 @@ class ExecutionService(BaseService):
             client=self._api_client
         )
 
+        if resp is None or resp.events is None:
+            return ''
         return '\n'.join(e.message for e in resp.events)

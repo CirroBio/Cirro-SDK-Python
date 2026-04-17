@@ -6,7 +6,7 @@ from cirro_api_client.v1.errors import CirroException
 
 from cirro.cli import run_create_pipeline_config, run_validate_folder
 from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets
-from cirro.cli.controller import handle_error, run_upload_reference, run_list_projects, run_list_files
+from cirro.cli.controller import handle_error, run_upload_reference, run_list_projects, run_list_files, run_debug
 from cirro.cli.interactive.utils import InputError
 
 
@@ -140,6 +140,22 @@ def validate(**kwargs):
 def upload_reference(**kwargs):
     check_required_args(kwargs)
     run_upload_reference(kwargs, interactive=kwargs.get('interactive'))
+
+
+# no_args_is_help=False: running 'cirro debug' with no arguments enters interactive mode
+@run.command(help='Debug a failed workflow execution', no_args_is_help=False)
+@click.option('--project',
+              help='Name or ID of the project',
+              default=None)
+@click.option('--dataset',
+              help='Name or ID of the dataset',
+              default=None)
+@click.option('-i', '--interactive',
+              help='Gather arguments interactively',
+              is_flag=True, default=False)
+def debug(**kwargs):
+    check_required_args(kwargs)
+    run_debug(kwargs, interactive=kwargs.get('interactive'))
 
 
 @run.command(help='Configure authentication')

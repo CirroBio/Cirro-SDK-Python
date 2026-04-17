@@ -86,6 +86,7 @@ class TestPreprocess(unittest.TestCase):
                     df.sort_index(axis=1).to_csv(index=False)
                 )
 
+    @unittest.skipIf(os.environ.get('CI') == 'true', "Skipping S3 integration test in CI")
     def test_load_running(self):
         ds = PreprocessDataset.from_path(dataset_root=f'{TEST_DATA_PATH}/dataset1')
 
