@@ -1,11 +1,18 @@
+import csv
 import datetime
+from functools import cached_property
 import re
+from io import StringIO
 from pathlib import Path
-from typing import Union, List, Optional, Any
+from typing import Union, List, Optional, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cirro.sdk.task import DataPortalTask
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
-from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
-    RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
+from cirro_api_client.v1.errors import CirroException, UnexpectedStatus
+from cirro_api_client.v1.models import Dataset, DatasetDetail, Executor, RunAnalysisRequest, ProcessDetail, \
+    Status, RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
 
 from cirro.cirro_client import CirroApi
 from cirro.file_utils import bytes_to_human_readable, filter_files_by_pattern
@@ -161,6 +168,14 @@ class DataPortalDataset(DataPortalAsset):
         """
         return self._client.processes.get(self.process_id)
 
+    @cached_property
+    def executor(self) -> Executor:
+        """
+        Executor type for the process that created this dataset
+        (e.g. ``Executor.NEXTFLOW``, ``Executor.CROMWELL``).
+        """
+        return self.process.executor
+
     @property
     def project_id(self) -> str:
         """ID of the project containing the dataset"""
@@ -240,6 +255,142 @@ class DataPortalDataset(DataPortalAsset):
     def created_at(self) -> datetime.datetime:
         """Timestamp of dataset creation"""
         return self._data.created_at
+
+    @cached_property
+    def logs(self) -> str:
+        """
+        Return the top-level Nextflow execution log for this dataset.
+
+        Fetches the log from CloudWatch via the Cirro API.  Returns an empty
+        string if no log events are available (e.g. the job has not started
+        yet, or the dataset was not created by a Nextflow workflow).
+
+        Returns:
+            str: Execution log text, or an empty string if unavailable.
+        """
+        try:
+            return self._client.execution.get_execution_logs(
+                project_id=self.project_id,
+                dataset_id=self.id
+            )
+        except (CirroException, UnexpectedStatus):
+            return ''
+
+    @cached_property
+    def tasks(self) -> List['DataPortalTask']:
+        """
+        List of tasks from the workflow execution.
+
+        Task metadata and the parsing logic depend on the executor:
+
+        - **Nextflow**: read from the ``WORKFLOW_TRACE`` TSV artifact.
+        - **Cromwell**: not yet implemented (raises ``NotImplementedError``).
+
+        Input and output files for each task are fetched from S3 on demand.
+
+        Returns:
+            `List[DataPortalTask]`
+
+        Raises:
+            DataPortalInputError: If the required trace artifact is missing.
+            NotImplementedError: If task inspection is not yet implemented for
+                this executor.
+        """
+        return self._load_tasks()
+
+    def _load_tasks(self) -> List['DataPortalTask']:
+        """Dispatch task loading to the executor-specific implementation."""
+        if self.executor == Executor.NEXTFLOW:
+            return self._load_tasks_nextflow()
+        elif self.executor == Executor.CROMWELL:
+            return self._load_tasks_cromwell()
+        else:
+            raise DataPortalInputError(
+                f"Task inspection is not supported for executor '{self.executor}'"
+            )
+
+    def _load_tasks_nextflow(self) -> List['DataPortalTask']:
+        """Load tasks from the Nextflow WORKFLOW_TRACE TSV artifact."""
+        from cirro.sdk.task import DataPortalTask
+
+        try:
+            trace_file = self.get_artifact(ArtifactType.WORKFLOW_TRACE)
+        except DataPortalAssetNotFound:
+            raise DataPortalInputError(
+                "WORKFLOW_TRACE artifact not found for this Nextflow dataset"
+            )
+
+        try:
+            content = trace_file.read()
+        except Exception as e:
+            raise DataPortalInputError(
+                f"Could not read the workflow trace artifact: {e}"
+            ) from e
+
+        if not content.strip():
+            return []
+
+        reader = csv.DictReader(StringIO(content), delimiter='\t')
+
+        # Build all tasks with a shared reference list so each task can look up
+        # sibling tasks when resolving input source_task links.
+        all_tasks_ref: List = []
+        tasks = []
+        for row in reader:
+            task = DataPortalTask(
+                trace_row=row,
+                client=self._client,
+                project_id=self.project_id,
+                dataset_id=self.id,
+                all_tasks_ref=all_tasks_ref
+            )
+            tasks.append(task)
+
+        # Populate the shared list after all tasks are constructed so that
+        # lazy input resolution can see the complete set.
+        all_tasks_ref.extend(tasks)
+        return tasks
+
+    def _load_tasks_cromwell(self) -> List['DataPortalTask']:
+        """Load tasks for a Cromwell workflow execution (not yet implemented)."""
+        raise NotImplementedError(
+            "Task inspection for Cromwell workflows is not yet implemented"
+        )
+
+    @property
+    def primary_failed_task(self) -> Optional['DataPortalTask']:
+        """
+        Find the root-cause failed task in this workflow execution.
+
+        Returns ``None`` gracefully in all non-error situations:
+
+        - The executor is not Nextflow (currently only implemented for Nextflow).
+        - The dataset has no task trace (still queued or just started).
+        - The trace is empty (no tasks ran).
+        - No tasks have a ``FAILED`` status (the workflow succeeded or was
+          stopped before any task actually failed).
+
+        The executor check is performed first to avoid an unnecessary API call
+        when the executor does not support task inspection.
+
+        Returns:
+            `cirro.sdk.task.DataPortalTask`, or ``None`` if no failed task is found.
+        """
+        from cirro.sdk.nextflow_utils import find_primary_failed_task
+
+        if self.executor != Executor.NEXTFLOW:
+            return None
+
+        try:
+            tasks = self.tasks
+        except (DataPortalInputError, NotImplementedError):
+            return None
+
+        if not tasks:
+            return None
+
+        execution_log = self.logs
+        return find_primary_failed_task(tasks, execution_log)
 
     def _get_detail(self):
         if not isinstance(self._data, DatasetDetail):
