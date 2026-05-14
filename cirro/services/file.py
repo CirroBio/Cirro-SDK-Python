@@ -60,22 +60,20 @@ class FileService(BaseService):
 
     def _get_scratch_read_credentials(self, access_context: FileAccessContext):
         """
-        Retrieves credentials to read the Nextflow scratch bucket, cached by (project_id, dataset_id)
+        Retrieves credentials to read the Nextflow scratch bucket, cached by project_id
         """
         access_request = access_context.file_access_request
         project_id = access_context.project_id
-        dataset_id = access_request.dataset_id or ''
-        cache_key = f'{project_id}:{dataset_id}'
         with self._get_token_lock:
-            cached_token = self._scratch_token_cache.get(cache_key)
+            cached_token = self._scratch_token_cache.get(project_id)
             if not cached_token or datetime.now(tz=timezone.utc) > cached_token.expiration:
                 new_token = generate_project_file_access_token.sync(
                     client=self._api_client,
                     project_id=project_id,
                     body=access_request
                 )
-                self._scratch_token_cache[cache_key] = new_token
-        return self._scratch_token_cache[cache_key]
+                self._scratch_token_cache[project_id] = new_token
+        return self._scratch_token_cache[project_id]
 
     def _get_project_read_credentials(self, access_context: FileAccessContext):
         """
