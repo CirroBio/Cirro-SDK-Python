@@ -11,10 +11,12 @@ from botocore import UNSIGNED
 from botocore.config import Config
 from botocore.exceptions import NoCredentialsError
 
+from cirro.clients import S3Client
+from cirro.models.s3_path import S3Path
+
 if TYPE_CHECKING:
     from pandas import DataFrame
 
-from cirro.models.s3_path import S3Path
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +411,6 @@ class PreprocessDataset:
         DataFrame contains `file`, `dataset`, and `process` to help distinguish
         where the files came from.
         """
-        from cirro.clients import S3Client
         import pandas as pd
         s3_client = S3Client()
         return pd.DataFrame(
