@@ -402,7 +402,7 @@ class PreprocessDataset:
             raise ValueError("The only supported value for `values` is 'file'")
         return self.pivot_files(index=index, pivot_columns=[columns], column_prefix=column_prefix)
 
-    def input_files(self) -> DataFrame:
+    def input_files(self) -> 'DataFrame':
         """
         Retrieves a dataframe of files from the input datasets
         This contains ALL files, including ones not associated with samples.
