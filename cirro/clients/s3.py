@@ -32,7 +32,7 @@ class ProgressPercentage:
 
 
 class S3Client:
-    def __init__(self, creds_getter: Callable[[], AWSCredentials], checksum_method: str = None):
+    def __init__(self, creds_getter: Callable[[], AWSCredentials] = None, checksum_method: str = None):
         self._creds_getter = creds_getter
         self._client = self._build_session_client()
         self._upload_args = dict(ChecksumAlgorithm=checksum_method)
@@ -90,7 +90,27 @@ class S3Client:
         """
         return self._client.head_object(Bucket=bucket, Key=key, ChecksumMode='ENABLED')
 
+    def get_file_listing(self, bucket: str, prefix: str) -> list[str]:
+        """
+        Retrieves a list of files given a prefix
+        """
+        files = []
+        paginator = self._client.get_paginator('list_objects_v2')
+        s3_pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+        for page in s3_pages:
+            for obj in page.get('Contents') or []:
+                if obj['Size'] == 0:  # Is directory
+                    continue
+                key = obj["Key"]
+                files.append(key)
+        return files
+
     def _build_session_client(self):
+        # Use standard client if creds are not provided
+        if self._creds_getter is None:
+            s3_config = Config(use_dualstack_endpoint=True)
+            return Session().client('s3', config=s3_config)
+
         creds = self._creds_getter()
 
         if creds.expiration:

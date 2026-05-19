@@ -399,3 +399,24 @@ class PreprocessDataset:
         if values != "file":
             raise ValueError("The only supported value for `values` is 'file'")
         return self.pivot_files(index=index, pivot_columns=[columns], column_prefix=column_prefix)
+
+    def input_files(self) -> DataFrame:
+        """
+        Retrieves a list of files from the input datasets
+        This contains ALL files, including ones not associated with samples.
+        For sample-only files, please use the `files` property instead.
+        """
+        from cirro.clients import S3Client
+        import pandas as pd
+        s3_client = S3Client()
+        return pd.DataFrame(
+            [
+                {'file': file, 'dataset': d['id'], 'process': d['processId']}
+                for d in self.metadata['inputs']
+                for file in s3_client.get_file_listing(
+                    bucket=S3Path(d['dataPath']).bucket,
+                    prefix=S3Path(d['dataPath']).key
+                )
+            ],
+            columns=['file', 'dataset', 'process']
+        )
