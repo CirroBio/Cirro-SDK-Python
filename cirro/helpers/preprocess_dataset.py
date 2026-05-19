@@ -85,8 +85,8 @@ class PreprocessDataset:
     """
     files: 'DataFrame'
     """
-    A DataFrame containing information on the files contained in the input datasets,
-    and the sample that each file is assigned to.
+    A DataFrame containing information on the files that are associated with
+    a sample within the input datasets.
 
     More info: https://docs.cirro.bio/pipelines/preprocess-script/#dsfiles
     """
@@ -402,9 +402,12 @@ class PreprocessDataset:
 
     def input_files(self) -> DataFrame:
         """
-        Retrieves a list of files from the input datasets
+        Retrieves a dataframe of files from the input datasets
         This contains ALL files, including ones not associated with samples.
         For sample-only files, please use the `files` property instead.
+
+        DataFrame contains `file`, `dataset`, and `process` to help distinguish
+        where the files came from.
         """
         from cirro.clients import S3Client
         import pandas as pd
