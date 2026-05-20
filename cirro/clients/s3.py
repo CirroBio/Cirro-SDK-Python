@@ -102,7 +102,7 @@ class S3Client:
                 if obj['Size'] == 0:  # Is directory
                     continue
                 key = obj["Key"]
-                files.append(key)
+                files.append(f"s3://{bucket}/{key}")
         return files
 
     def _build_session_client(self):
