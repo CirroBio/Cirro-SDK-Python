@@ -40,9 +40,16 @@ class DeveloperHelper:
         Generates a PreprocessDataset object for the given datasets
 
         With optional parameters to pass into the preprocess script.
-        `metadata` is not available in this context, so it is mocked.
+        Certain properties of `metadata` are available in this context.
         """
         samplesheets = self._generate_samplesheets_for_datasets(project_id, input_dataset_ids)
+        project = self.client.projects.get(project_id)
+        inputs = []
+        for dataset_id in input_dataset_ids:
+            input_dataset = self.client.datasets.get(project_id, dataset_id).to_dict()
+            input_dataset['dataPath'] = input_dataset['s3'] + '/data'
+            inputs.append(input_dataset)
+
         return PreprocessDataset(
             samplesheet=samplesheets.samples,
             files=samplesheets.files,
@@ -50,8 +57,8 @@ class DeveloperHelper:
             # Mock metadata
             metadata={
                 'dataset': {},
-                'project': {},
-                'inputs': [],
+                'project': project.to_dict(),
+                'inputs': inputs,
                 'process': {}
             }
         )
