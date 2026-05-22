@@ -248,7 +248,7 @@ class DataPortalDataset(DataPortalAsset):
     @cached_property
     def logs(self) -> str:
         """
-        Return the top-level Nextflow execution log for this dataset.
+        Return the top-level execution log for this dataset.
 
         Returns an empty string if no log events are available (e.g. the job has not started yet).
 
