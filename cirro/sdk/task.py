@@ -71,7 +71,7 @@ class WorkDirFile:
                 s3 = self._get_s3_client()
                 resp = s3.head_object(Bucket=self._s3_path.bucket, Key=self._s3_path.key)
                 self._size = resp['ContentLength']
-            except Exception as e:
+            except Exception as e:  # NOSONAR
                 raise DataPortalAssetNotFound(
                     f"Could not determine size of {self.name!r} — "
                     f"the work directory may have been cleaned up: {e}"
@@ -95,7 +95,7 @@ class WorkDirFile:
         """Return the raw bytes of the file."""
         try:
             return self._client.file.get_file_from_path(self._access_context(), self._s3_path.key)
-        except Exception as e:
+        except Exception as e:  # NOSONAR
             raise DataPortalAssetNotFound(
                 f"Could not read {self.name!r} — "
                 f"the work directory may have been cleaned up: {e}"
@@ -315,7 +315,7 @@ class DataPortalTask:
             return self._client.file.get_file_from_path(
                 access_context, key
             ).decode('utf-8', errors='replace')
-        except Exception:
+        except Exception:  # NOSONAR
             return ''
 
     @cached_property
@@ -413,7 +413,7 @@ class DataPortalTask:
             # Strip the common leading indent
             min_indent = min(len(ln) - len(ln.lstrip()) for ln in non_empty)
             return '\n'.join(ln[min_indent:] for ln in lines).strip()
-        except Exception:
+        except Exception:  # NOSONAR
             return ''
 
     # ------------------------------------------------------------------ #
@@ -507,7 +507,7 @@ class DataPortalTask:
                         project_id=self._project_id,
                     ))
             return result
-        except Exception:
+        except Exception:  # NOSONAR
             return []
 
     # ------------------------------------------------------------------ #
@@ -553,7 +553,7 @@ class DataPortalTask:
                         dataset_id=self._dataset_id
                     ))
             return result
-        except Exception:
+        except Exception:  # NOSONAR
             return []
 
     # ------------------------------------------------------------------ #

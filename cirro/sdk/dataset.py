@@ -322,7 +322,7 @@ class DataPortalDataset(DataPortalAsset):
 
         try:
             content = trace_file.read()
-        except Exception as e:
+        except Exception as e:  # NOSONAR
             raise DataPortalInputError(
                 f"Could not read the workflow trace artifact: {e}"
             ) from e

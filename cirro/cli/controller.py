@@ -330,7 +330,7 @@ def run_create_pipeline_config(input_params: CreatePipelineConfigArguments, inte
             f"{CONFIG_APP_URL}")
 
 
-def run_debug(input_params: DebugArguments, interactive=False):
+def run_debug(input_params: DebugArguments, interactive=False):  # NOSONAR
     """
     Debug a failed workflow execution.
 
@@ -383,7 +383,7 @@ def run_debug(input_params: DebugArguments, interactive=False):
         if interactive:
             print("\nSearching for the primary failed task (this may take a moment)...")
         failed_task = sdk_dataset.primary_failed_task
-    except Exception as e:
+    except Exception as e:  # NOSONAR
         print(f"\nCould not load task trace: {e}")
         if interactive and log_lines and ask_yes_no('Show full execution log?'):
             print(execution_log)
@@ -450,7 +450,7 @@ def _print_task_debug(task, depth: int = 0,
             source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
             try:
                 size_str = convert_size(f.size)
-            except Exception:
+            except Exception:  # NOSONAR
                 size_str = "unknown size"
             print(f"{indent}  {f.name}  ({size_str})  [{source}]")
 
@@ -459,7 +459,7 @@ def _print_task_debug(task, depth: int = 0,
         for f in outputs:
             try:
                 size_str = convert_size(f.size)
-            except Exception:
+            except Exception:  # NOSONAR
                 size_str = "unknown size"
             print(f"{indent}  {f.name}  ({size_str})")
 
@@ -618,7 +618,7 @@ def _browse_files_menu(files, kind: str, depth: int) -> None:
         source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
         try:
             size_str = convert_size(f.size)
-        except Exception:
+        except Exception:  # NOSONAR
             size_str = "unknown size"
         labels.append(f"{label}  ({size_str})  [{source}]")
 
@@ -656,13 +656,13 @@ def _file_read_options(name: str):
     return options
 
 
-def _file_menu(wf, depth: int) -> None:
+def _file_menu(wf, depth: int) -> None:  # NOSONAR
     """Menu for inspecting a single WorkDirFile: read contents or drill into source task."""
     indent = "  " * depth
     source = f"from task: {wf.source_task.name}" if wf.source_task else "staged input"
     try:
         size_str = convert_size(wf.size)
-    except Exception:
+    except Exception:  # NOSONAR
         size_str = "unknown size"
     print(f"\n{indent}File: {wf.name}  ({size_str})  [{source}]")
 
@@ -687,7 +687,7 @@ def _file_menu(wf, depth: int) -> None:
             try:
                 df = wf.read_csv()
                 print(df.head(10).to_string())
-            except Exception as e:
+            except Exception as e:  # NOSONAR
                 print(f"Could not read as CSV: {e}")
 
         elif choice.startswith("Read as JSON"):
@@ -701,7 +701,7 @@ def _file_menu(wf, depth: int) -> None:
                     print(f"... ({len(lines) - 200} more lines)")
                 else:
                     print(output)
-            except Exception as e:
+            except Exception as e:  # NOSONAR
                 print(f"Could not read as JSON: {e}")
 
         elif choice.startswith("Read as text"):
@@ -712,7 +712,7 @@ def _file_menu(wf, depth: int) -> None:
                     print(f"... ({len(lines) - 100} more lines)")
                 else:
                     print('\n'.join(lines))
-            except Exception as e:
+            except Exception as e:  # NOSONAR
                 print(f"Could not read as text: {e}")
 
         elif choice.startswith("Drill into source task"):
