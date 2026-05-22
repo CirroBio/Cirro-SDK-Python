@@ -261,9 +261,7 @@ class DataPortalDataset(DataPortalAsset):
         """
         Return the top-level Nextflow execution log for this dataset.
 
-        Fetches the log from CloudWatch via the Cirro API.  Returns an empty
-        string if no log events are available (e.g. the job has not started
-        yet, or the dataset was not created by a Nextflow workflow).
+        Returns an empty string if no log events are available (e.g. the job has not started yet).
 
         Returns:
             str: Execution log text, or an empty string if unavailable.
