@@ -1,50 +1,22 @@
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock
 
 from cirro_api_client.v1.errors import UnexpectedStatus
-from cirro_api_client.v1.models import ArtifactType, Executor, Task
+from cirro_api_client.v1.models import Task
 from cirro_api_client.v1.types import Unset
 
-from cirro.models.assets import DatasetAssets, Artifact
-from cirro.models.file import File
 from cirro.sdk.dataset import DataPortalDataset
-from cirro.sdk.exceptions import DataPortalInputError
 
 
-TRACE_TSV = (
-    "task_id\tname\tstatus\thash\tworkdir\texit\n"
-    "1\tFASTQC (s1)\tCOMPLETED\tab/cd01\ts3://b/proj/work/ab/cd01\t0\n"
-    "2\tTRIMGALORE (s1)\tFAILED\tef/gh02\ts3://b/proj/work/ef/gh02\t1\n"
-)
-
-
-def _make_dataset(execution_log='', trace_content=None):
-    """
-    Build a DataPortalDataset backed by a fully mocked CirroApi client.
-
-    If ``trace_content`` is a string the mock will serve it as the
-    WORKFLOW_TRACE artifact; if it is None the artifact is absent.
-    """
+def _make_dataset(execution_log=''):
     dataset_detail = MagicMock()
     dataset_detail.id = 'ds-123'
     dataset_detail.project_id = 'proj-1'
     dataset_detail.name = 'Test Dataset'
 
     client = Mock()
-    client.processes.get.return_value.executor = Executor.NEXTFLOW
     client.execution.get_execution_logs.return_value = execution_log
-
-    # Build asset listing with or without a trace artifact
-    if trace_content is not None:
-        trace_file = MagicMock(spec=File)
-        trace_file.absolute_path = 's3://bucket/proj/artifacts/trace.tsv'
-        trace_artifact = Artifact(artifact_type=ArtifactType.WORKFLOW_TRACE, file=trace_file)
-        assets = DatasetAssets(files=[], artifacts=[trace_artifact])
-        client.file.get_file.return_value = trace_content.encode()
-    else:
-        assets = DatasetAssets(files=[], artifacts=[])
-
-    client.datasets.get_assets_listing.return_value = assets
+    client.execution.get_tasks_for_execution.return_value = []
 
     return DataPortalDataset(dataset=dataset_detail, client=client), client
 
@@ -73,142 +45,98 @@ class TestDataPortalDatasetLogs(unittest.TestCase):
 
 class TestDataPortalDatasetTasks(unittest.TestCase):
 
-    def test_tasks_parsed_from_trace(self):
-        dataset, _ = _make_dataset(trace_content=TRACE_TSV)
-        with patch('cirro.sdk.task.FileAccessContext'):
-            tasks = dataset.tasks
+    def test_tasks_from_api(self):
+        dataset, client = _make_dataset()
+        client.execution.get_tasks_for_execution.return_value = [
+            Task(name='FASTQC (s1)', status='COMPLETED', native_job_id='job-1'),
+            Task(name='TRIMGALORE (s1)', status='FAILED', native_job_id='job-2'),
+        ]
+        tasks = dataset.tasks
         self.assertEqual(len(tasks), 2)
         self.assertEqual(tasks[0].name, 'FASTQC (s1)')
         self.assertEqual(tasks[0].status, 'COMPLETED')
-        self.assertEqual(tasks[0].exit_code, 0)
+        self.assertEqual(tasks[0].native_id, 'job-1')
         self.assertEqual(tasks[1].name, 'TRIMGALORE (s1)')
         self.assertEqual(tasks[1].status, 'FAILED')
-        self.assertEqual(tasks[1].exit_code, 1)
 
     def test_tasks_cached(self):
-        dataset, _ = _make_dataset(trace_content=TRACE_TSV)
-        with patch('cirro.sdk.task.FileAccessContext'):
-            first = dataset.tasks
-            second = dataset.tasks
+        dataset, client = _make_dataset()
+        first = dataset.tasks
+        second = dataset.tasks
         self.assertIs(first, second)
+        client.execution.get_tasks_for_execution.assert_called_once()
 
-    def test_tasks_falls_back_to_api_when_trace_missing(self):
-        dataset, client = _make_dataset(trace_content=None)
-        client.execution.get_tasks_for_execution.return_value = []
+    def test_tasks_empty_when_api_returns_none(self):
+        dataset, client = _make_dataset()
+        client.execution.get_tasks_for_execution.return_value = None
         self.assertEqual(dataset.tasks, [])
 
-    def test_tasks_empty_list_for_empty_trace(self):
-        # Trace file exists but has no rows (header only)
-        dataset, _ = _make_dataset(trace_content='task_id\tname\tstatus\thash\tworkdir\texit\n')
-        with patch('cirro.sdk.task.FileAccessContext'):
-            tasks = dataset.tasks
-        self.assertEqual(tasks, [])
+    def test_tasks_empty_when_api_returns_empty_list(self):
+        dataset, _ = _make_dataset()
+        self.assertEqual(dataset.tasks, [])
 
-    def test_tasks_all_tasks_ref_populated(self):
-        """All tasks share a common all_tasks_ref so source_task resolution works."""
-        dataset, _ = _make_dataset(trace_content=TRACE_TSV)
-        with patch('cirro.sdk.task.FileAccessContext'):
-            tasks = dataset.tasks
-        # Each task's _all_tasks_ref should contain all tasks
-        self.assertEqual(len(tasks[0]._all_tasks_ref), 2)
-        self.assertIs(tasks[0]._all_tasks_ref, tasks[1]._all_tasks_ref)
-
-
-class TestDataPortalDatasetPrimaryFailedTask(unittest.TestCase):
-
-    def test_returns_failed_task(self):
-        dataset, _ = _make_dataset(trace_content=TRACE_TSV)
-        with patch('cirro.sdk.task.FileAccessContext'):
-            result = dataset.primary_failed_task
-        self.assertIsNotNone(result)
-        self.assertEqual(result.name, 'TRIMGALORE (s1)')
-
-    def test_returns_none_when_no_tasks_in_api(self):
-        dataset, client = _make_dataset(trace_content=None)
-        client.execution.get_tasks_for_execution.return_value = []
-        result = dataset.primary_failed_task
-        self.assertIsNone(result)
-
-    def test_returns_none_when_no_tasks_failed(self):
-        trace = (
-            "task_id\tname\tstatus\thash\tworkdir\texit\n"
-            "1\tFASTQC (s1)\tCOMPLETED\tab/cd01\ts3://b/proj/work/ab/cd01\t0\n"
-        )
-        dataset, _ = _make_dataset(trace_content=trace)
-        with patch('cirro.sdk.task.FileAccessContext'):
-            result = dataset.primary_failed_task
-        self.assertIsNone(result)
-
-    def test_returns_none_for_empty_trace(self):
-        dataset, _ = _make_dataset(trace_content='task_id\tname\tstatus\thash\tworkdir\texit\n')
-        with patch('cirro.sdk.task.FileAccessContext'):
-            result = dataset.primary_failed_task
-        self.assertIsNone(result)
-
-    def test_uses_execution_log_for_disambiguation(self):
-        trace = (
-            "task_id\tname\tstatus\thash\tworkdir\texit\n"
-            "1\tFASTQC (s1)\tFAILED\tab/cd01\ts3://b/proj/work/ab/cd01\t1\n"
-            "2\tTRIMGALORE (s1)\tFAILED\tef/gh02\ts3://b/proj/work/ef/gh02\t1\n"
-        )
-        log = "Error executing process > 'TRIMGALORE (s1)'"
-        dataset, _ = _make_dataset(execution_log=log, trace_content=trace)
-        with patch('cirro.sdk.task.FileAccessContext'):
-            result = dataset.primary_failed_task
-        self.assertEqual(result.name, 'TRIMGALORE (s1)')
-
-
-class TestDataPortalDatasetTasksFromApi(unittest.TestCase):
-
-    def test_cromwell_tasks_loaded_from_api(self):
-        dataset, client = _make_dataset(trace_content=None)
-        client.processes.get.return_value.executor = Executor.CROMWELL
-        api_task_with_id = Task(name='FASTQC', status='COMPLETED', native_job_id='batch-abc')
-        api_task_no_id = Task(name='BWA', status='FAILED', native_job_id=None)
-        client.execution.get_tasks_for_execution.return_value = [api_task_with_id, api_task_no_id]
-        tasks = dataset.tasks
-        self.assertEqual(len(tasks), 2)
-        self.assertEqual(tasks[0].name, 'FASTQC')
-        self.assertEqual(tasks[0].status, 'COMPLETED')
-        self.assertEqual(tasks[0].native_id, 'batch-abc')
-        self.assertEqual(tasks[1].name, 'BWA')
-        self.assertEqual(tasks[1].status, 'FAILED')
-        self.assertEqual(tasks[1].native_id, '')
-
-    def test_cromwell_tasks_empty_when_api_returns_none(self):
-        dataset, client = _make_dataset(trace_content=None)
-        client.processes.get.return_value.executor = Executor.CROMWELL
-        client.execution.get_tasks_for_execution.return_value = None
-        tasks = dataset.tasks
-        self.assertEqual(tasks, [])
-
-    def test_nextflow_falls_back_to_api_when_trace_missing(self):
-        dataset, client = _make_dataset(trace_content=None)
-        api_task = Task(name='ALIGN', status='COMPLETED', native_job_id='job-999')
-        client.execution.get_tasks_for_execution.return_value = [api_task]
-        tasks = dataset.tasks
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0].name, 'ALIGN')
+    def test_tasks_api_called_with_correct_ids(self):
+        dataset, client = _make_dataset()
+        _ = dataset.tasks
         client.execution.get_tasks_for_execution.assert_called_once_with(
             project_id='proj-1',
             dataset_id='ds-123'
         )
 
     def test_api_task_native_id_mapping(self):
-        dataset, client = _make_dataset(trace_content=None)
-        client.processes.get.return_value.executor = Executor.CROMWELL
-        api_task = Task(name='TRIM', status='COMPLETED', native_job_id='batch-job-123')
-        client.execution.get_tasks_for_execution.return_value = [api_task]
-        tasks = dataset.tasks
-        self.assertEqual(tasks[0].native_id, 'batch-job-123')
+        dataset, client = _make_dataset()
+        client.execution.get_tasks_for_execution.return_value = [
+            Task(name='TRIM', status='COMPLETED', native_job_id='batch-job-123')
+        ]
+        self.assertEqual(dataset.tasks[0].native_id, 'batch-job-123')
 
     def test_api_task_unset_native_id(self):
-        dataset, client = _make_dataset(trace_content=None)
-        client.processes.get.return_value.executor = Executor.CROMWELL
-        api_task = Task(name='BWA', status='FAILED', native_job_id=Unset())
-        client.execution.get_tasks_for_execution.return_value = [api_task]
-        tasks = dataset.tasks
-        self.assertEqual(tasks[0].native_id, '')
+        dataset, client = _make_dataset()
+        client.execution.get_tasks_for_execution.return_value = [
+            Task(name='BWA', status='FAILED', native_job_id=Unset())
+        ]
+        self.assertEqual(dataset.tasks[0].native_id, '')
+
+    def test_api_task_none_native_id(self):
+        dataset, client = _make_dataset()
+        client.execution.get_tasks_for_execution.return_value = [
+            Task(name='BWA', status='FAILED', native_job_id=None)
+        ]
+        self.assertEqual(dataset.tasks[0].native_id, '')
+
+
+class TestDataPortalDatasetPrimaryFailedTask(unittest.TestCase):
+
+    def test_returns_failed_task(self):
+        dataset, client = _make_dataset()
+        client.execution.get_tasks_for_execution.return_value = [
+            Task(name='FASTQC (s1)', status='COMPLETED', native_job_id=None),
+            Task(name='TRIMGALORE (s1)', status='FAILED', native_job_id=None),
+        ]
+        result = dataset.primary_failed_task
+        self.assertIsNotNone(result)
+        self.assertEqual(result.name, 'TRIMGALORE (s1)')
+
+    def test_returns_none_when_api_returns_empty(self):
+        dataset, _ = _make_dataset()
+        self.assertIsNone(dataset.primary_failed_task)
+
+    def test_returns_none_when_no_tasks_failed(self):
+        dataset, client = _make_dataset()
+        client.execution.get_tasks_for_execution.return_value = [
+            Task(name='FASTQC (s1)', status='COMPLETED', native_job_id=None),
+        ]
+        self.assertIsNone(dataset.primary_failed_task)
+
+    def test_uses_execution_log_for_disambiguation(self):
+        log = "Error executing process > 'TRIMGALORE (s1)'"
+        dataset, client = _make_dataset(execution_log=log)
+        client.execution.get_tasks_for_execution.return_value = [
+            Task(name='FASTQC (s1)', status='FAILED', native_job_id=None),
+            Task(name='TRIMGALORE (s1)', status='FAILED', native_job_id=None),
+        ]
+        result = dataset.primary_failed_task
+        self.assertEqual(result.name, 'TRIMGALORE (s1)')
 
 
 if __name__ == '__main__':
