@@ -3,11 +3,9 @@ import json
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from cirro_api_client.v1.models import ArtifactType, Task
+from cirro_api_client.v1.models import Task
 from cirro_api_client.v1.types import Unset
 
-from cirro.models.assets import DatasetAssets, Artifact
-from cirro.models.file import File
 from cirro.sdk.task import WorkDirFile, DataPortalTask
 from cirro.sdk.exceptions import DataPortalAssetNotFound
 
@@ -36,18 +34,15 @@ def _make_wf(uri='s3://bucket/proj/work/ab/cdef/file.txt',
         ), client
 
 
-API_TASK = Task(
-    name='NFCORE:RNASEQ:FASTQC (sample1)',
-    status='FAILED',
-    native_job_id='job-1',
-)
+def _default_task():
+    return Task(name='NFCORE:RNASEQ:FASTQC (sample1)', status='FAILED', native_job_id='job-1')
 
 
 def _make_task(task=None, file_bytes=b'log content', all_tasks_ref=None, dataset_id=''):
     """Construct a DataPortalTask with a mocked client."""
     client = _make_client(file_bytes)
     t = DataPortalTask(
-        task=task if task is not None else API_TASK,
+        task=task if task is not None else _default_task(),
         client=client,
         project_id='proj-1',
         dataset_id=dataset_id,
@@ -171,9 +166,20 @@ class TestWorkDirFileRepr(unittest.TestCase):
 
 class TestDataPortalTaskProperties(unittest.TestCase):
 
-    def test_task_id(self):
+    def test_task_id_default(self):
         task, _ = _make_task()
         self.assertEqual(task.task_id, 0)
+
+    def test_task_id_custom(self):
+        client = _make_client()
+        t = DataPortalTask(
+            task=_default_task(),
+            client=client,
+            project_id='proj-1',
+            dataset_id='ds-1',
+            task_id=5,
+        )
+        self.assertEqual(t.task_id, 5)
 
     def test_name(self):
         task, _ = _make_task()
@@ -183,17 +189,63 @@ class TestDataPortalTaskProperties(unittest.TestCase):
         task, _ = _make_task()
         self.assertEqual(task.status, 'FAILED')
 
-    def test_hash(self):
-        task, _ = _make_task()
+    def test_hash_unset(self):
+        task, client = _make_task()
+        client.execution.get_task.return_value = None
         self.assertEqual(task.hash, '')
 
-    def test_work_dir(self):
-        task, _ = _make_task()
+    def test_work_dir_present_on_task(self):
+        task, _ = _make_task(task=Task(name='X', status='COMPLETED', work_dir='s3://bucket/work/ab/cd'))
+        self.assertEqual(task.work_dir, 's3://bucket/work/ab/cd')
+
+    def test_work_dir_unset(self):
+        task, client = _make_task()
+        client.execution.get_task.return_value = None
         self.assertEqual(task.work_dir, '')
 
-    def test_exit_code(self):
-        task, _ = _make_task()
+    def test_exit_code_fetched_via_get_task(self):
+        task, client = _make_task(dataset_id='ds-123')
+        client.execution.get_task.return_value = Task(
+            name='FASTQC', status='FAILED', exit_code=1, work_dir='s3://b/w', hash='ab/cd'
+        )
+        self.assertEqual(task.exit_code, 1)
+        client.execution.get_task.assert_called_once_with(
+            project_id='proj-1', dataset_id='ds-123', task_id='job-1'
+        )
+
+    def test_exit_code_none_when_api_returns_none(self):
+        task, client = _make_task(dataset_id='ds-123')
+        client.execution.get_task.return_value = Task(name='X', status='FAILED', exit_code=None)
         self.assertIsNone(task.exit_code)
+
+    def test_exit_code_from_task_if_already_set(self):
+        t = Task(name='X', status='COMPLETED', native_job_id='job-1', exit_code=0)
+        task, client = _make_task(task=t, dataset_id='ds-123')
+        self.assertEqual(task.exit_code, 0)
+        client.execution.get_task.assert_not_called()
+
+    def test_work_dir_fetched_via_get_task(self):
+        task, client = _make_task(dataset_id='ds-123')
+        client.execution.get_task.return_value = Task(
+            name='FASTQC', status='FAILED', work_dir='s3://bucket/work/ab/cd'
+        )
+        self.assertEqual(task.work_dir, 's3://bucket/work/ab/cd')
+
+    def test_hash_fetched_via_get_task(self):
+        task, client = _make_task(dataset_id='ds-123')
+        client.execution.get_task.return_value = Task(
+            name='FASTQC', status='FAILED', hash='ab/cdef12'
+        )
+        self.assertEqual(task.hash, 'ab/cdef12')
+
+    def test_get_task_called_once_for_multiple_fields(self):
+        task, client = _make_task(dataset_id='ds-123')
+        detail = Task(name='FASTQC', status='FAILED', exit_code=1, work_dir='s3://b/w', hash='ab/cd')
+        client.execution.get_task.return_value = detail
+        _ = task.exit_code
+        _ = task.work_dir
+        _ = task.hash
+        client.execution.get_task.assert_called_once()
 
     def test_native_id(self):
         task, _ = _make_task()
@@ -236,8 +288,8 @@ class TestDataPortalTaskLogs(unittest.TestCase):
         result = task.script
         self.assertEqual(result, '')
 
-    def test_outputs_empty_without_work_dir(self):
-        task, _ = _make_task()
+    def test_outputs_empty_without_dataset_id(self):
+        task, _ = _make_task(dataset_id='')
         result = task.outputs
         self.assertEqual(result, [])
 
@@ -248,55 +300,107 @@ class TestDataPortalTaskInputs(unittest.TestCase):
         task, _ = _make_task(dataset_id='')
         self.assertEqual(task.inputs, [])
 
+    def test_inputs_empty_when_no_native_id(self):
+        task, _ = _make_task(task=Task(name='X', status='COMPLETED'), dataset_id='ds-1')
+        self.assertEqual(task.inputs, [])
+
     def test_inputs_cached(self):
-        task, _ = _make_task(dataset_id='')
+        from cirro_api_client.v1.models import TaskFilesResponse
+        task, client = _make_task(dataset_id='ds-1')
+        client.execution.get_task_files.return_value = TaskFilesResponse(input_files=[], output_files=[])
         first = task.inputs
         second = task.inputs
         self.assertIs(first, second)
+        client.execution.get_task_files.assert_called_once()
 
-    def _make_task_with_files_artifact(self, task_name, files_csv):
-        t, client = _make_task(
-            task=Task(name=task_name, status='FAILED', native_job_id='job-1'),
-            dataset_id='ds-123',
+    def test_inputs_from_api(self):
+        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
+        task, client = _make_task(dataset_id='ds-1')
+        client.execution.get_task_files.return_value = TaskFilesResponse(
+            input_files=[TaskFile(uri='s3://bucket/work/ab/cd/reads.fastq.gz', size=100)],
+            output_files=[],
         )
-        files_file = MagicMock(spec=File)
-        files_artifact = Artifact(artifact_type=ArtifactType.FILES, file=files_file)
-        assets = DatasetAssets(files=[], artifacts=[files_artifact])
-        client.datasets.get_assets_listing.return_value = assets
-        client.file.get_file.return_value = files_csv.encode()
-        return t, client
-
-    def test_inputs_from_files_artifact(self):
-        files_csv = (
-            'sample,file,process,dataset,sampleIndex\n'
-            'sample1,s3://bucket/datasets/src/data/reads.fastq.gz,reads,src-ds,1\n'
-        )
-        task, _ = self._make_task_with_files_artifact('FASTQC (sample1)', files_csv)
-        with patch('cirro.sdk.task.FileAccessContext'):
-            inputs = task.inputs
+        inputs = task.inputs
         self.assertEqual(len(inputs), 1)
         self.assertEqual(inputs[0].name, 'reads.fastq.gz')
-
-    def test_inputs_files_artifact_matches_by_filename(self):
-        files_csv = (
-            'sample,file,process,dataset,sampleIndex\n'
-            'genome,s3://bucket/datasets/src/data/genome.fasta,genome_fasta,src-ds,1\n'
+        self.assertEqual(inputs[0].size, 100)
+        client.execution.get_task_files.assert_called_once_with(
+            project_id='proj-1', dataset_id='ds-1', task_id='job-1'
         )
-        task, _ = self._make_task_with_files_artifact('BWA_INDEX (genome.fasta)', files_csv)
-        with patch('cirro.sdk.task.FileAccessContext'):
-            inputs = task.inputs
+
+    def test_inputs_source_task_linked(self):
+        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
+        upstream_task = MagicMock()
+        upstream_task.native_id = 'job-upstream'
+        all_tasks_ref = [upstream_task]
+
+        task, client = _make_task(dataset_id='ds-1', all_tasks_ref=all_tasks_ref)
+        all_tasks_ref.append(task)
+        client.execution.get_task_files.return_value = TaskFilesResponse(
+            input_files=[TaskFile(uri='s3://bucket/work/ab/cd/reads.fastq.gz', size=50, source_task='job-upstream')],
+            output_files=[],
+        )
+        inputs = task.inputs
         self.assertEqual(len(inputs), 1)
-        self.assertEqual(inputs[0].name, 'genome.fasta')
+        self.assertIs(inputs[0].source_task, upstream_task)
 
-    def test_inputs_files_artifact_empty_when_no_match(self):
-        files_csv = (
-            'sample,file,process,dataset,sampleIndex\n'
-            'other,s3://bucket/datasets/src/data/other.fasta,genome_fasta,src-ds,1\n'
+    def test_inputs_source_task_null(self):
+        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
+        task, client = _make_task(dataset_id='ds-1')
+        client.execution.get_task_files.return_value = TaskFilesResponse(
+            input_files=[TaskFile(uri='s3://external/reference/genome.fa', size=1000, source_task=None)],
+            output_files=[],
         )
-        task, _ = self._make_task_with_files_artifact('BWA_INDEX (genome.fasta)', files_csv)
-        with patch('cirro.sdk.task.FileAccessContext'):
-            inputs = task.inputs
-        self.assertEqual(inputs, [])
+        inputs = task.inputs
+        self.assertEqual(len(inputs), 1)
+        self.assertIsNone(inputs[0].source_task)
+
+    def test_inputs_empty_on_api_error(self):
+        task, client = _make_task(dataset_id='ds-1')
+        client.execution.get_task_files.side_effect = Exception('network error')
+        self.assertEqual(task.inputs, [])
+
+
+class TestDataPortalTaskOutputs(unittest.TestCase):
+
+    def test_outputs_empty_when_no_dataset_id(self):
+        task, _ = _make_task(dataset_id='')
+        self.assertEqual(task.outputs, [])
+
+    def test_outputs_empty_when_no_native_id(self):
+        task, _ = _make_task(task=Task(name='X', status='COMPLETED'), dataset_id='ds-1')
+        self.assertEqual(task.outputs, [])
+
+    def test_outputs_from_api(self):
+        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
+        task, client = _make_task(dataset_id='ds-1')
+        client.execution.get_task_files.return_value = TaskFilesResponse(
+            input_files=[],
+            output_files=[TaskFile(uri='s3://bucket/work/ab/cd/result.bam', size=2048)],
+        )
+        outputs = task.outputs
+        self.assertEqual(len(outputs), 1)
+        self.assertEqual(outputs[0].name, 'result.bam')
+        self.assertEqual(outputs[0].size, 2048)
+        client.execution.get_task_files.assert_called_once_with(
+            project_id='proj-1', dataset_id='ds-1', task_id='job-1'
+        )
+
+    def test_outputs_empty_on_api_error(self):
+        task, client = _make_task(dataset_id='ds-1')
+        client.execution.get_task_files.side_effect = Exception('network error')
+        self.assertEqual(task.outputs, [])
+
+    def test_api_called_once_for_inputs_and_outputs(self):
+        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
+        task, client = _make_task(dataset_id='ds-1')
+        client.execution.get_task_files.return_value = TaskFilesResponse(
+            input_files=[TaskFile(uri='s3://b/w/in.txt', size=10)],
+            output_files=[TaskFile(uri='s3://b/w/out.txt', size=20)],
+        )
+        _ = task.inputs
+        _ = task.outputs
+        client.execution.get_task_files.assert_called_once()
 
 
 class TestDataPortalTaskRepr(unittest.TestCase):

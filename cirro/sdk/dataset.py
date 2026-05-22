@@ -281,15 +281,20 @@ class DataPortalDataset(DataPortalAsset):
         if not api_tasks:
             return []
 
-        return [
+        all_tasks_ref: List[DataPortalTask] = []
+        tasks = [
             DataPortalTask(
                 task=t,
                 client=self._client,
                 project_id=self.project_id,
                 dataset_id=self.id,
+                all_tasks_ref=all_tasks_ref,
+                task_id=i,
             )
-            for t in api_tasks
+            for i, t in enumerate(api_tasks)
         ]
+        all_tasks_ref.extend(tasks)
+        return tasks
 
     @property
     def primary_failed_task(self) -> Optional[DataPortalTask]:

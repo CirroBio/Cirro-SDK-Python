@@ -1,4 +1,3 @@
-import csv
 from functools import cached_property
 import gzip
 import json
@@ -13,7 +12,6 @@ from cirro_api_client.v1.types import Unset
 from cirro.models.file import FileAccessContext
 from cirro.models.s3_path import S3Path
 from cirro.sdk.exceptions import DataPortalAssetNotFound
-from cirro.sdk.nextflow_utils import parse_inputs_from_command_run
 
 if TYPE_CHECKING:
     from cirro.cirro_client import CirroApi
@@ -207,7 +205,8 @@ class DataPortalTask:
         client: 'CirroApi',
         project_id: str,
         dataset_id: str = '',
-        all_tasks_ref: Optional[list] = None
+        all_tasks_ref: Optional[list] = None,
+        task_id: int = 0
     ):
         """
         Obtained from a dataset's ``tasks`` property.
@@ -225,12 +224,14 @@ class DataPortalTask:
             dataset_id (str): ID of the dataset (execution) that owns this task.
             all_tasks_ref (list): A shared list that will contain all tasks once they
                 are all built.  Used by ``inputs`` to resolve ``source_task``.
+            task_id (int): Numeric index of this task in the execution's task list.
         """
         self._task = task
         self._client = client
         self._project_id = project_id
         self._dataset_id = dataset_id
         self._all_tasks_ref: list = all_tasks_ref if all_tasks_ref is not None else []
+        self._task_id = task_id
 
     # ------------------------------------------------------------------ #
     # Task properties                                                      #
@@ -238,8 +239,8 @@ class DataPortalTask:
 
     @property
     def task_id(self) -> int:
-        """Sequential task identifier (not available from the API; always 0)."""
-        return 0
+        """Sequential task identifier — the 0-based index of this task in the execution's task list."""
+        return self._task_id
 
     @property
     def name(self) -> str:
@@ -253,13 +254,23 @@ class DataPortalTask:
 
     @property
     def hash(self) -> str:
-        """Short hash prefix used by Nextflow (not available from the API; always empty)."""
-        return ''
+        """Short hash prefix used by Nextflow, e.g. ``99/b42c07``."""
+        val = self._task.hash
+        if isinstance(val, Unset):
+            val = self._task_details.hash
+        if isinstance(val, Unset) or val is None:
+            return ''
+        return val
 
     @property
     def work_dir(self) -> str:
-        """S3 URI of the task's work directory (not available from the API; always empty)."""
-        return ''
+        """S3 URI of the task's work directory."""
+        val = self._task.work_dir
+        if isinstance(val, Unset):
+            val = self._task_details.work_dir
+        if isinstance(val, Unset) or val is None:
+            return ''
+        return val
 
     @property
     def native_id(self) -> str:
@@ -269,10 +280,27 @@ class DataPortalTask:
             return ''
         return val
 
-    @property
+    @cached_property
     def exit_code(self) -> Optional[int]:
-        """Process exit code (not available from the API; always ``None``)."""
-        return None
+        """Process exit code."""
+        val = self._task.exit_code
+        if isinstance(val, Unset):
+            val = self._task_details.exit_code
+        if isinstance(val, Unset) or val is None:
+            return None
+        return val
+
+    @cached_property
+    def _task_details(self) -> Task:
+        """Fetch full task details from the API (lazy, cached)."""
+        if not self._dataset_id or not self.native_id:
+            return self._task
+        detail = self._client.execution.get_task(
+            project_id=self._project_id,
+            dataset_id=self._dataset_id,
+            task_id=self.native_id
+        )
+        return detail if detail is not None else self._task
 
     # ------------------------------------------------------------------ #
     # Work-directory file access                                           #
@@ -419,92 +447,51 @@ class DataPortalTask:
     @cached_property
     def inputs(self) -> List[WorkDirFile]:
         """
-        List of input files for this task.
+        List of input files for this task, fetched from the execution API.
 
-        Parsed from ``.command.run`` (the Nextflow staging script).  Each file
-        is annotated with ``source_task`` if it was produced by another task in
-        the same workflow.
+        Each file is annotated with ``source_task`` if its URI falls within
+        another task's work directory.
         """
         return self._build_inputs()
 
-    def _build_inputs(self) -> List[WorkDirFile]:
-        """Parse input URIs from ``.command.run`` and link each to its source task."""
-        content = self._read_work_file('.command.run')
-        if content:
-            uris = parse_inputs_from_command_run(content)
-            result = []
-            for uri in uris:
-                source_task = None
-                for other_task in self._all_tasks_ref:
-                    if other_task is not self and other_task.work_dir and uri.startswith(
-                        other_task.work_dir.rstrip('/') + '/'
-                    ):
-                        source_task = other_task
-                        break
-                result.append(WorkDirFile(
-                    s3_uri=uri,
-                    client=self._client,
-                    project_id=self._project_id,
-                    source_task=source_task,
-                    dataset_id=self._dataset_id
-                ))
-            return result
-
-        # Fallback: try to identify staged inputs from the workflow's FILES artifact.
-        # This is used when the scratch bucket is not directly accessible.
-        return self._build_inputs_from_files_artifact()
-
-    def _build_inputs_from_files_artifact(self) -> List[WorkDirFile]:
-        """
-        Fallback: identify input files from the workflow's FILES artifact.
-
-        Used when the task work directory (scratch bucket) is not accessible.
-        Matches staged input files based on the identifier embedded in the task name,
-        e.g. ``BWA_INDEX (genome.fasta)`` → looks for a file named ``genome.fasta``.
-        """
-        if not self._dataset_id:
-            return []
+    @cached_property
+    def _task_files(self):
+        """Fetch input and output files from the API (lazy, cached)."""
+        if not self._dataset_id or not self.native_id:
+            return None
         try:
-            from cirro_api_client.v1.models import ArtifactType
-
-            assets = self._client.datasets.get_assets_listing(
+            return self._client.execution.get_task_files(
                 project_id=self._project_id,
-                dataset_id=self._dataset_id
+                dataset_id=self._dataset_id,
+                task_id=self.native_id
             )
-
-            files_artifact = next(
-                (a for a in assets.artifacts if a.artifact_type == ArtifactType.FILES),
-                None
-            )
-            if files_artifact is None:
-                return []
-
-            content = self._client.file.get_file(files_artifact.file).decode('utf-8')
-
-            # Extract the identifier from the task name, e.g. "BWA_INDEX (genome.fasta)" → "genome.fasta"
-            match = re.search(r'\((.+?)\)', self.name)
-            if not match:
-                return []
-            identifier = match.group(1)
-
-            result = []
-            reader = csv.DictReader(StringIO(content))
-            for row in reader:
-                file_uri = row.get('file', '')
-                sample = row.get('sample', '')
-                if not file_uri:
-                    continue
-                file_basename = PurePath(file_uri).name
-                file_stem = PurePath(file_basename).stem
-                if identifier in (file_basename, file_stem, sample):
-                    result.append(WorkDirFile(
-                        s3_uri=file_uri,
-                        client=self._client,
-                        project_id=self._project_id,
-                    ))
-            return result
         except Exception:  # NOSONAR
+            return None
+
+    def _build_inputs(self) -> List[WorkDirFile]:
+        """Return input files from the cached task files API response."""
+        task_files = self._task_files
+        if task_files is None:
             return []
+        native_id_to_task = {
+            t.native_id: t
+            for t in self._all_tasks_ref
+            if t is not self and t.native_id
+        }
+        result = []
+        for tf in task_files.input_files:
+            source_native_id = tf.source_task if not isinstance(tf.source_task, Unset) else None
+            source_task = native_id_to_task.get(source_native_id) if source_native_id else None
+            size = tf.size if not isinstance(tf.size, Unset) else None
+            result.append(WorkDirFile(
+                s3_uri=tf.uri,
+                client=self._client,
+                project_id=self._project_id,
+                size=size,
+                source_task=source_task,
+                dataset_id=self._dataset_id
+            ))
+        return result
 
     # ------------------------------------------------------------------ #
     # Outputs                                                              #
@@ -521,36 +508,21 @@ class DataPortalTask:
         return self._build_outputs()
 
     def _build_outputs(self) -> List[WorkDirFile]:
-        """List non-hidden files directly under the task's S3 work directory."""
-        if not self.work_dir:
+        """Return output files from the cached task files API response."""
+        task_files = self._task_files
+        if task_files is None:
             return []
-        try:
-            s3_path = S3Path(self.work_dir)
-            access_context = self._get_access_context()
-            s3 = self._client.file.get_aws_s3_client(access_context)
-
-            prefix = s3_path.key.rstrip('/') + '/'
-            result = []
-
-            paginator = s3.get_paginator('list_objects_v2')
-            for page in paginator.paginate(Bucket=s3_path.bucket, Prefix=prefix):
-                for obj in page.get('Contents', []):
-                    key = obj['Key']
-                    remainder = key[len(prefix):]
-                    # Skip subdirectory contents and hidden files
-                    if '/' in remainder or remainder.startswith('.'):
-                        continue
-                    full_uri = f's3://{s3_path.bucket}/{key}'
-                    result.append(WorkDirFile(
-                        s3_uri=full_uri,
-                        client=self._client,
-                        project_id=self._project_id,
-                        size=obj['Size'],
-                        dataset_id=self._dataset_id
-                    ))
-            return result
-        except Exception:  # NOSONAR
-            return []
+        result = []
+        for tf in task_files.output_files:
+            size = tf.size if not isinstance(tf.size, Unset) else None
+            result.append(WorkDirFile(
+                s3_uri=tf.uri,
+                client=self._client,
+                project_id=self._project_id,
+                size=size,
+                dataset_id=self._dataset_id
+            ))
+        return result
 
     # ------------------------------------------------------------------ #
     # Repr                                                                 #
