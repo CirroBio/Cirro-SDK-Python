@@ -2,7 +2,8 @@ import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 from cirro_api_client.v1.errors import UnexpectedStatus
-from cirro_api_client.v1.models import ArtifactType, Executor
+from cirro_api_client.v1.models import ArtifactType, Executor, Task
+from cirro_api_client.v1.types import Unset
 
 from cirro.models.assets import DatasetAssets, Artifact
 from cirro.models.file import File
@@ -91,10 +92,10 @@ class TestDataPortalDatasetTasks(unittest.TestCase):
             second = dataset.tasks
         self.assertIs(first, second)
 
-    def test_tasks_raises_when_trace_artifact_missing(self):
-        dataset, _ = _make_dataset(trace_content=None)
-        with self.assertRaises(DataPortalInputError):
-            _ = dataset.tasks
+    def test_tasks_falls_back_to_api_when_trace_missing(self):
+        dataset, client = _make_dataset(trace_content=None)
+        client.execution.get_tasks_for_execution.return_value = []
+        self.assertEqual(dataset.tasks, [])
 
     def test_tasks_empty_list_for_empty_trace(self):
         # Trace file exists but has no rows (header only)
@@ -122,8 +123,9 @@ class TestDataPortalDatasetPrimaryFailedTask(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(result.name, 'TRIMGALORE (s1)')
 
-    def test_returns_none_for_non_nextflow_dataset(self):
-        dataset, _ = _make_dataset(trace_content=None)
+    def test_returns_none_when_no_tasks_in_api(self):
+        dataset, client = _make_dataset(trace_content=None)
+        client.execution.get_tasks_for_execution.return_value = []
         result = dataset.primary_failed_task
         self.assertIsNone(result)
 
@@ -154,6 +156,59 @@ class TestDataPortalDatasetPrimaryFailedTask(unittest.TestCase):
         with patch('cirro.sdk.task.FileAccessContext'):
             result = dataset.primary_failed_task
         self.assertEqual(result.name, 'TRIMGALORE (s1)')
+
+
+class TestDataPortalDatasetTasksFromApi(unittest.TestCase):
+
+    def test_cromwell_tasks_loaded_from_api(self):
+        dataset, client = _make_dataset(trace_content=None)
+        client.processes.get.return_value.executor = Executor.CROMWELL
+        api_task_with_id = Task(name='FASTQC', status='COMPLETED', native_job_id='batch-abc')
+        api_task_no_id = Task(name='BWA', status='FAILED', native_job_id=None)
+        client.execution.get_tasks_for_execution.return_value = [api_task_with_id, api_task_no_id]
+        tasks = dataset.tasks
+        self.assertEqual(len(tasks), 2)
+        self.assertEqual(tasks[0].name, 'FASTQC')
+        self.assertEqual(tasks[0].status, 'COMPLETED')
+        self.assertEqual(tasks[0].native_id, 'batch-abc')
+        self.assertEqual(tasks[1].name, 'BWA')
+        self.assertEqual(tasks[1].status, 'FAILED')
+        self.assertEqual(tasks[1].native_id, '')
+
+    def test_cromwell_tasks_empty_when_api_returns_none(self):
+        dataset, client = _make_dataset(trace_content=None)
+        client.processes.get.return_value.executor = Executor.CROMWELL
+        client.execution.get_tasks_for_execution.return_value = None
+        tasks = dataset.tasks
+        self.assertEqual(tasks, [])
+
+    def test_nextflow_falls_back_to_api_when_trace_missing(self):
+        dataset, client = _make_dataset(trace_content=None)
+        api_task = Task(name='ALIGN', status='COMPLETED', native_job_id='job-999')
+        client.execution.get_tasks_for_execution.return_value = [api_task]
+        tasks = dataset.tasks
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0].name, 'ALIGN')
+        client.execution.get_tasks_for_execution.assert_called_once_with(
+            project_id='proj-1',
+            dataset_id='ds-123'
+        )
+
+    def test_api_task_native_id_mapping(self):
+        dataset, client = _make_dataset(trace_content=None)
+        client.processes.get.return_value.executor = Executor.CROMWELL
+        api_task = Task(name='TRIM', status='COMPLETED', native_job_id='batch-job-123')
+        client.execution.get_tasks_for_execution.return_value = [api_task]
+        tasks = dataset.tasks
+        self.assertEqual(tasks[0].native_id, 'batch-job-123')
+
+    def test_api_task_unset_native_id(self):
+        dataset, client = _make_dataset(trace_content=None)
+        client.processes.get.return_value.executor = Executor.CROMWELL
+        api_task = Task(name='BWA', status='FAILED', native_job_id=Unset())
+        client.execution.get_tasks_for_execution.return_value = [api_task]
+        tasks = dataset.tasks
+        self.assertEqual(tasks[0].native_id, '')
 
 
 if __name__ == '__main__':

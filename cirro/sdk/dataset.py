@@ -281,25 +281,28 @@ class DataPortalDataset(DataPortalAsset):
 
         Task metadata and the parsing logic depend on the executor:
 
-        - **Nextflow**: read from the ``WORKFLOW_TRACE`` TSV artifact.
-        - **Cromwell**: not yet implemented (raises ``NotImplementedError``).
+        - **Nextflow**: read from the ``WORKFLOW_TRACE`` TSV artifact; falls back
+          to the execution API when the artifact is unavailable.
+        - **Cromwell**: fetched from the execution API.
 
-        Input and output files for each task are fetched from S3 on demand.
+        Input and output files for each task are fetched from S3 on demand
+        (Nextflow trace-based tasks only).
 
         Returns:
             `List[DataPortalTask]`
 
         Raises:
-            DataPortalInputError: If the required trace artifact is missing.
-            NotImplementedError: If task inspection is not yet implemented for
-                this executor.
+            DataPortalInputError: If the executor is not supported.
         """
         return self._load_tasks()
 
     def _load_tasks(self) -> List['DataPortalTask']:
         """Dispatch task loading to the executor-specific implementation."""
         if self.executor == Executor.NEXTFLOW:
-            return self._load_tasks_nextflow()
+            try:
+                return self._load_tasks_nextflow()
+            except DataPortalInputError:
+                return self._load_tasks_from_api()
         elif self.executor == Executor.CROMWELL:
             return self._load_tasks_cromwell()
         else:
@@ -350,10 +353,34 @@ class DataPortalDataset(DataPortalAsset):
         return tasks
 
     def _load_tasks_cromwell(self) -> List['DataPortalTask']:
-        """Load tasks for a Cromwell workflow execution (not yet implemented)."""
-        raise NotImplementedError(
-            "Task inspection for Cromwell workflows is not yet implemented"
+        """Load tasks for a Cromwell workflow execution via the execution API."""
+        return self._load_tasks_from_api()
+
+    def _load_tasks_from_api(self) -> List['DataPortalTask']:
+        """Load tasks via the execution API (used for Cromwell and as a Nextflow fallback)."""
+        from cirro.sdk.task import DataPortalTask
+        from cirro_api_client.v1.types import Unset
+
+        api_tasks = self._client.execution.get_tasks_for_execution(
+            project_id=self.project_id,
+            dataset_id=self.id
         )
+        if not api_tasks:
+            return []
+
+        return [
+            DataPortalTask(
+                trace_row={
+                    'name': t.name,
+                    'status': t.status,
+                    'native_id': t.native_job_id if not isinstance(t.native_job_id, Unset) and t.native_job_id else '',
+                },
+                client=self._client,
+                project_id=self.project_id,
+                dataset_id=self.id,
+            )
+            for t in api_tasks
+        ]
 
     @property
     def primary_failed_task(self) -> Optional['DataPortalTask']:
