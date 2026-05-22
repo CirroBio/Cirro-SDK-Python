@@ -1,0 +1,255 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "9164b8d8-eb56-4362-b9d9-cf44835fbe43",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Get the Dataset object for a pipeline run that failed\n",
+    "from cirro import DataPortal\n",
+    "portal = DataPortal()\n",
+    "dataset = portal.get_dataset(project=\"<snipped>\", dataset=\"<snipped>\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "3ceecf55-5e3a-4053-875a-a35eb0b422a4",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "PW_AWS_REGION=us-west-2\n",
+      "PW_BATCH_JOB_ROLE=arn:aws:iam::523221283927:role/Cirro-BatchJobRole-9a31492a\n",
+      "PW_COMPUTE_ENV=AWS_BATCH\n",
+      "PW_DATASET=4e76655e-7abc-4e97-9adf-408461407a7d\n",
+      "PW_EXECUTOR=NEXTFLOW\n",
+      "PW_ONDEMAND_JOB_QUEUE=arn:aws:batch:us-west-2:523221283927:job-queue/Cirro-OnDemand-9a31492a\n",
+      "PW_PROJECT=9a31492a-e679-43ce-9f06-d84213c8f7f7\n",
+      "PW_RESUME_DATASET_ID=f51bc6dd-a211-4f29-8a54-eca93c1d5037\n",
+      "PW_S3_DATASET=s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7/datasets/4e76655e-7abc-4e97-9adf-408461407a7d\n",
+      "PW_S3_PREPROCESS_SCRIPT=s3://cirro-resources-us-west-2-20240514213007426400000005/process/public/community/index_genomes/preprocess.py\n",
+      "PW_S3_RESTORE_SESSION_DIR=s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7-scratch/workdir/session/f51bc6dd-a211-4f29-8a54-eca93c1d5037\n",
+      "PW_S3_SESSION_DIR=s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7-scratch/workdir/session/4e76655e-7abc-4e97-9adf-408461407a7d\n",
+      "PW_S3_TRANSFORM_WORKFLOW=s3://cirro-resources-us-west-2-20240514213007426400000005/process/hutch/data-transforms/workflow/\n",
+      "PW_S3_WORK=s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7-scratch/workdir\n",
+      "PW_SPOT_JOB_QUEUE=arn:aws:batch:us-west-2:523221283927:job-queue/Cirro-Spot-9a31492a\n",
+      "PW_WORKFLOW=CirroBio/nf-index-genome\n",
+      "PW_WORKFLOW_SCRIPT=main_bwa.nf\n",
+      "PW_WORKFLOW_VERSION=main\n",
+      "Fri Apr 17 17:00:57 UTC 2026 SETTING UP SHARED FUNCTIONS\n",
+      "Fri Apr 17 17:00:57 UTC 2026 RUNNING WORKFLOW\n",
+      "Fri Apr 17 17:00:57 UTC 2026 Workflow found, running main workflow\n",
+      "Fri Apr 17 17:00:57 UTC 2026 Running Nextflow executor\n",
+      "Fri Apr 17 17:00:57 UTC 2026 Skipping local agent status update\n",
+      "Fri Apr 17 17:00:57 UTC 2026 RUNNING WORKFLOW - NEXTFLOW\n",
+      "Fri Apr 17 17:00:57 UTC 2026 Workflow path: CirroBio/nf-index-genome/main_bwa.nf -r main\n",
+      "download: s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7/datasets/4e76655e-7abc-4e97-9adf-408461407a7d/config/params.json to ./params.json\n",
+      "download: s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7/datasets/4e76655e-7abc-4e97-9adf-408461407a7d/config/compute.config to ./nextflow-override.config\n",
+      "Fri Apr 17 17:01:01 UTC 2026 SYNC SESSION\n",
+      "Fri Apr 17 17:01:01 UTC 2026 Using Nextflow cloudcache\n",
+      "Fri Apr 17 17:01:01 UTC 2026 Using generated run name: cirro-d28a5-0eccb\n",
+      "Fri Apr 17 17:01:03 UTC 2026 Nextflow cloudcache session: b341dce3-89b8-45e8-8bd7-5da5fd09f25c\n",
+      "Fri Apr 17 17:01:03 UTC 2026 Nextflow '-resume' ENABLED\n",
+      "Fri Apr 17 17:01:03 UTC 2026 RUNNING PREPROCESS\n",
+      "Fri Apr 17 17:01:03 UTC 2026 Preprocess script found\n",
+      "Fri Apr 17 17:01:03 UTC 2026 Downloading preprocess script from s3://cirro-resources-us-west-2-20240514213007426400000005/process/public/community/index_genomes/preprocess.py\n",
+      "Fri Apr 17 17:01:05 UTC 2026 Running the preprocess script\n",
+      "2026-04-17 17:01:07,773 INFO     [PreprocessDataset] Validated bwa_extra_args: 'FOOBAR -asdf-asdf-asdf'\n",
+      "Fri Apr 17 17:01:08 UTC 2026 Completed preprocess\n",
+      "NXF_CLOUDCACHE_PATH=s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7-scratch/workdir/cache\n",
+      "NXF_DISABLE_CHECK_LATEST=true\n",
+      "NXF_IGNORE_RESUME_HISTORY=true\n",
+      "NXF_LOG_FILE=/opt/work/a66f77dff7fd3bfc152212e17cc7d8db/artifacts/.nextflow.log\n",
+      "NXF_VER=25.04.8\n",
+      "Fri Apr 17 17:01:08 UTC 2026 Nextflow launched, PID: 138\n",
+      "N E X T F L O W  ~  version 25.04.8\n",
+      "Pulling CirroBio/nf-index-genome ...\n",
+      " downloaded from https://github.com/CirroBio/nf-index-genome.git\n",
+      "Launching `https://github.com/CirroBio/nf-index-genome` [cirro-d28a5-0eccb] DSL2 - revision: ecc8f120d5 [main]\n",
+      "[99/929dbf] Submitted process > BWA_INDEX_WORKFLOW:BWA_INDEX (genome.fasta)\n",
+      "[d2/0aaf64] Submitted process > BWA_INDEX_WORKFLOW:PUBLISH_FASTA (1)\n",
+      "ERROR ~ Error executing process > 'BWA_INDEX_WORKFLOW:BWA_INDEX (genome.fasta)'\n",
+      "\n",
+      "Caused by:\n",
+      "  Essential container in task exited\n",
+      "\n",
+      "\n",
+      "Command executed:\n",
+      "\n",
+      "  #!/bin/bash\n",
+      "      set -euo pipefail\n",
+      "  \n",
+      "      # Build the BWA genome index; all output files share the prefix 'genome'\n",
+      "      bwa index -p genome --incorrect-flag genome.fasta 2>&1 | tee bwa_index.log\n",
+      "  \n",
+      "      # Record the BWA version used to build this index\n",
+      "      bwa 2>&1 | head -4 | tail -n 3 > versions.txt\n",
+      "\n",
+      "Command exit status:\n",
+      "  1\n",
+      "\n",
+      "Command output:\n",
+      "  [bwa_index] ERROR: '--incorrect-flag'.\n",
+      "\n",
+      "Command error:\n",
+      "  [bwa_index] ERROR: '--incorrect-flag'.\n",
+      "\n",
+      "Work dir:\n",
+      "  s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7-scratch/workdir/99/929dbf7102284c995dd498f663afbf\n",
+      "\n",
+      "Container:\n",
+      "  quay.io/biocontainers/bwa:0.7.18--he4a0461_0\n",
+      "\n",
+      "Tip: view the complete command output by changing to the process work dir and entering the command `cat .command.out`\n",
+      "\n",
+      " -- Check '/opt/work/a66f77dff7fd3bfc152212e17cc7d8db/artifacts/.nextflow.log' file for details\n",
+      "Fri Apr 17 17:06:17 UTC 2026 Cleaning up\n",
+      "Fri Apr 17 17:06:17 UTC 2026 Preserving session to s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7-scratch/workdir/session/4e76655e-7abc-4e97-9adf-408461407a7d\n",
+      "Fri Apr 17 17:06:19 UTC 2026 Copying /opt/work/a66f77dff7fd3bfc152212e17cc7d8db/artifacts/process.log to s3://project-9a31492a-e679-43ce-9f06-d84213c8f7f7/datasets/4e76655e-7abc-4e97-9adf-408461407a7d/artifacts/\n"
+     ]
+    }
+   ],
+   "source": [
+    "# The complete set of logs from the workflow execution\n",
+    "print(dataset.logs)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "222ddc6b-ff9f-47bd-8561-c6a2fcea88e8",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "DataPortalTask(name='BWA_INDEX_WORKFLOW:BWA_INDEX (genome.fasta)', status='FAILED')"
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# Instead of having to look through the logs, we can quickly jump to the primary failed task\n",
+    "failed_task = dataset.primary_failed_task\n",
+    "failed_task"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "id": "c0f5d0fd-3693-49d3-97ba-4d70e3ad922d",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[WorkDirFile(name='genome.fasta')]"
+      ]
+     },
+     "execution_count": 4,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# The DataPortalTask object contains:\n",
+    "# - name\n",
+    "# - exit_code\n",
+    "# - logs\n",
+    "# - script\n",
+    "# - inputs\n",
+    "# - output\n",
+    "\n",
+    "# It can be useful to inspect the list of files that were provided as inputs to the task\n",
+    "failed_task.inputs"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "id": "96d1cf47-74c1-49b6-8869-ecc676ed4acc",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "['>I',\n",
+       " 'CCACACCACACCCACACACCCACACACCACACCACACACCACACCACACCCACACACACA',\n",
+       " 'CATCCTAACACTACCCTAACACAGCCCTAATCTAACCCTGGCCAACCTGTCTCTCAACTT',\n",
+       " 'ACCCTCCATTACCCTGCCTCCACTCGTTACCCTGTCCCATTCAACCATACCACTCCGAAC',\n",
+       " 'CACCATCCATCCCTCTACTTACTACCACTCACCCACCGTTACCCTCCAATTACCCATATC',\n",
+       " 'CAACCCACTGCCACTTACCCTACCATTACCCTACCATCCACCATGACCTACTCACCATAC',\n",
+       " 'TGTTCTTCTACCCACCATATTGAAACGCTAACAAATGATCGTAAATAACACACACGTGCT',\n",
+       " 'TACCCTACCACTTTATACCACCACCACATGCCATACTCACCCTCACTTGTATACTGATTT',\n",
+       " 'TACGTACGCACACGGATGCTACAGTATATACCATCTCAAACTTACCCTACTCTCAGATTC',\n",
+       " 'CACTTCACTCCATGGCCCATCTCTCACTGAATCAGTACCAAATGCACTCACATCATTATG']"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# In case an error is due to some unexpected input file content, the WorkDirFile object\n",
+    "# can be read directly (.read(), .read_csv(), .readlines(), .read_json())\n",
+    "input_fasta = failed_task.inputs[0]\n",
+    "input_fasta.readlines()[:10]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "id": "e70ad1f4-2c32-4893-97e7-d1d9809b679c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# While in this case the input_fasta was provided as an input to the workflow,\n",
+    "# if any WorkDirFile was created by an upstream task, that task can be inspected\n",
+    "# in the same way as `failed_task` above.\n",
+    "# This lets you walk through the chain of files and tasks that often helps\n",
+    "# identify the root cause of a failure.\n",
+    "\n",
+    "# e.g.\n",
+    "upstream_task = input_fasta.source_task"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b1293c13-549a-405a-bf8e-33ea1474707f",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.7"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
