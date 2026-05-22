@@ -373,9 +373,8 @@ def run_debug(input_params: DebugArguments, interactive=False):  # NOSONAR
 
     # Only search for a failed task when the dataset actually failed.
     if sdk_dataset.status != Status.FAILED:
-        if interactive:
-            if log_lines and ask_yes_no('Show full execution log?'):
-                print(execution_log)
+        if interactive and log_lines and ask_yes_no(_SHOW_FULL_LOG):
+            print(execution_log)
         return
 
     # --- Primary failed task ---
@@ -385,14 +384,14 @@ def run_debug(input_params: DebugArguments, interactive=False):  # NOSONAR
         failed_task = sdk_dataset.primary_failed_task
     except Exception as e:  # NOSONAR
         print(f"\nCould not load task trace: {e}")
-        if interactive and log_lines and ask_yes_no('Show full execution log?'):
+        if interactive and log_lines and ask_yes_no(_SHOW_FULL_LOG):
             print(execution_log)
         return
 
     if interactive:
         if failed_task is None:
             print("\nNo failed tasks found in this execution.")
-            if log_lines and ask_yes_no('Show full execution log?'):
+            if log_lines and ask_yes_no(_SHOW_FULL_LOG):
                 print(execution_log)
             return
 
@@ -424,7 +423,7 @@ def run_debug(input_params: DebugArguments, interactive=False):  # NOSONAR
         )
 
 
-def _print_task_debug(task, depth: int = 0,
+def _print_task_debug(task, depth: int = 0,  # NOSONAR
                       show_script: bool = True,
                       show_log: bool = True,
                       show_files: bool = True) -> None:
@@ -436,22 +435,22 @@ def _print_task_debug(task, depth: int = 0,
     if show_script:
         task_script = task.script
         print(f"\n{indent}--- Task Script ---")
-        print('\n'.join(indent + line for line in (task_script or "(empty)").splitlines()))
+        print('\n'.join(indent + line for line in (task_script or _EMPTY_LABEL).splitlines()))
 
     if show_log:
         task_log = task.logs
         print(f"\n{indent}--- Task Log ---")
-        print('\n'.join(indent + line for line in (task_log or "(empty)").splitlines()))
+        print('\n'.join(indent + line for line in (task_log or _EMPTY_LABEL).splitlines()))
 
     if show_files:
         inputs = task.inputs
         print(f"\n{indent}--- Inputs ({len(inputs)}) ---")
         for f in inputs:
-            source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
+            source = f"from task: {f.source_task.name}" if f.source_task else _STAGED_INPUT
             try:
                 size_str = convert_size(f.size)
             except Exception:  # NOSONAR
-                size_str = "unknown size"
+                size_str = _UNKNOWN_SIZE
             print(f"{indent}  {f.name}  ({size_str})  [{source}]")
 
         outputs = task.outputs
@@ -460,7 +459,7 @@ def _print_task_debug(task, depth: int = 0,
             try:
                 size_str = convert_size(f.size)
             except Exception:  # NOSONAR
-                size_str = "unknown size"
+                size_str = _UNKNOWN_SIZE
             print(f"{indent}  {f.name}  ({size_str})")
 
 
@@ -528,6 +527,10 @@ def _print_task_debug_recursive(
 
 _BACK = "Back"
 _DONE = "Done"
+_SHOW_FULL_LOG = 'Show full execution log?'
+_EMPTY_LABEL = '(empty)'
+_STAGED_INPUT = 'staged input'
+_UNKNOWN_SIZE = 'unknown size'
 # Binary formats that cannot be meaningfully displayed as text
 _BINARY_EXTENSIONS = {'.bam', '.cram', '.bai', '.crai', '.bcf', '.idx'}
 
@@ -541,7 +544,7 @@ def _print_task_header(task: DataPortalTask, indent: str, label: str) -> None:
     print(f"{indent}Work Dir:  {task.work_dir}")
 
 
-def _task_menu(task: DataPortalTask, depth: int = 0) -> None:
+def _task_menu(task: DataPortalTask, depth: int = 0) -> None:  # NOSONAR
     """
     Menu-driven exploration of a single task.
 
@@ -569,12 +572,12 @@ def _task_menu(task: DataPortalTask, depth: int = 0) -> None:
         if choice == "Show task script":
             content = task.script
             print(f"\n{indent}--- Task Script ---")
-            print(content if content else "(empty)")
+            print(content if content else _EMPTY_LABEL)
 
         elif choice == "Show task log":
             content = task.logs
             print(f"\n{indent}--- Task Log ---")
-            print(content if content else "(empty)")
+            print(content if content else _EMPTY_LABEL)
 
         elif choice.startswith("Browse inputs"):
             _browse_files_menu(inputs, "input", depth)
@@ -615,11 +618,11 @@ def _browse_files_menu(files, kind: str, depth: int) -> None:
             label = f"{f.name} [{counts[f.name]}]"
         else:
             label = f.name
-        source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
+        source = f"from task: {f.source_task.name}" if f.source_task else _STAGED_INPUT
         try:
             size_str = convert_size(f.size)
         except Exception:  # NOSONAR
-            size_str = "unknown size"
+            size_str = _UNKNOWN_SIZE
         labels.append(f"{label}  ({size_str})  [{source}]")
 
     choices = labels + [_BACK]
@@ -659,11 +662,11 @@ def _file_read_options(name: str):
 def _file_menu(wf, depth: int) -> None:  # NOSONAR
     """Menu for inspecting a single WorkDirFile: read contents or drill into source task."""
     indent = "  " * depth
-    source = f"from task: {wf.source_task.name}" if wf.source_task else "staged input"
+    source = f"from task: {wf.source_task.name}" if wf.source_task else _STAGED_INPUT
     try:
         size_str = convert_size(wf.size)
     except Exception:  # NOSONAR
-        size_str = "unknown size"
+        size_str = _UNKNOWN_SIZE
     print(f"\n{indent}File: {wf.name}  ({size_str})  [{source}]")
 
     read_options = _file_read_options(wf.name)

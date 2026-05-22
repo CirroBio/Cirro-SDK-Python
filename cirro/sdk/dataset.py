@@ -8,7 +8,6 @@ from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.errors import CirroException, UnexpectedStatus
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, \
     Status, RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
-from cirro_api_client.v1.types import Unset
 
 from cirro.cirro_client import CirroApi
 from cirro.file_utils import bytes_to_human_readable, filter_files_by_pattern
@@ -284,11 +283,7 @@ class DataPortalDataset(DataPortalAsset):
 
         return [
             DataPortalTask(
-                trace_row={
-                    'name': t.name,
-                    'status': t.status,
-                    'native_id': t.native_job_id if not isinstance(t.native_job_id, Unset) and t.native_job_id else '',
-                },
+                task=t,
                 client=self._client,
                 project_id=self.project_id,
                 dataset_id=self.id,

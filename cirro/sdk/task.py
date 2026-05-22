@@ -8,6 +8,8 @@ import re
 from typing import Any, List, Optional, TYPE_CHECKING
 
 from cirro_api_client.v1.errors import CirroException, UnexpectedStatus
+from cirro_api_client.v1.models import Task
+from cirro_api_client.v1.types import Unset
 from cirro.models.file import FileAccessContext
 from cirro.models.s3_path import S3Path
 from cirro.sdk.exceptions import DataPortalAssetNotFound
@@ -156,13 +158,13 @@ class WorkDirFile:
         if compression == 'infer':
             name = self.name
             if name.endswith('.gz'):
-                compression = dict(method='gzip')
+                compression = {'method': 'gzip'}
             elif name.endswith('.bz2'):
-                compression = dict(method='bz2')
+                compression = {'method': 'bz2'}
             elif name.endswith('.xz'):
-                compression = dict(method='xz')
+                compression = {'method': 'xz'}
             elif name.endswith('.zst'):
-                compression = dict(method='zstd')
+                compression = {'method': 'zstd'}
             else:
                 compression = None
 
@@ -201,7 +203,7 @@ class DataPortalTask:
 
     def __init__(
         self,
-        trace_row: dict,
+        task: Task,
         client: 'CirroApi',
         project_id: str,
         dataset_id: str = '',
@@ -217,66 +219,60 @@ class DataPortalTask:
         ```
 
         Args:
-            trace_row (dict): A row from the Nextflow trace TSV, parsed as a dict.
+            task (Task): Task object returned by the execution API.
             client (CirroApi): Authenticated CirroApi client.
             project_id (str): ID of the project that owns this dataset.
             dataset_id (str): ID of the dataset (execution) that owns this task.
             all_tasks_ref (list): A shared list that will contain all tasks once they
                 are all built.  Used by ``inputs`` to resolve ``source_task``.
         """
-        self._trace = trace_row
+        self._task = task
         self._client = client
         self._project_id = project_id
         self._dataset_id = dataset_id
         self._all_tasks_ref: list = all_tasks_ref if all_tasks_ref is not None else []
 
     # ------------------------------------------------------------------ #
-    # Trace-derived properties                                             #
+    # Task properties                                                      #
     # ------------------------------------------------------------------ #
 
     @property
     def task_id(self) -> int:
-        """Sequential task identifier from the trace."""
-        try:
-            return int(self._trace.get('task_id', 0))
-        except (ValueError, TypeError):
-            return 0
+        """Sequential task identifier (not available from the API; always 0)."""
+        return 0
 
     @property
     def name(self) -> str:
         """Full task name, e.g. ``NFCORE_RNASEQ:RNASEQ:TRIMGALORE (sample1)``."""
-        return self._trace.get('name', '')
+        return self._task.name
 
     @property
     def status(self) -> str:
-        """Task status string from the trace, e.g. ``COMPLETED``, ``FAILED``, ``ABORTED``."""
-        return self._trace.get('status', '')
+        """Task status string, e.g. ``COMPLETED``, ``FAILED``, ``ABORTED``."""
+        return self._task.status
 
     @property
     def hash(self) -> str:
-        """Short hash prefix used by Nextflow, e.g. ``99/b42c07``."""
-        return self._trace.get('hash', '')
+        """Short hash prefix used by Nextflow (not available from the API; always empty)."""
+        return ''
 
     @property
     def work_dir(self) -> str:
-        """Full S3 URI of the task's work directory."""
-        return self._trace.get('workdir', '')
+        """S3 URI of the task's work directory (not available from the API; always empty)."""
+        return ''
 
     @property
     def native_id(self) -> str:
         """Native job ID on the underlying executor (e.g. AWS Batch job ID)."""
-        return self._trace.get('native_id', '')
+        val = self._task.native_job_id
+        if isinstance(val, Unset) or val is None:
+            return ''
+        return val
 
     @property
     def exit_code(self) -> Optional[int]:
-        """Process exit code, or ``None`` if the task did not reach completion."""
-        val = self._trace.get('exit', '')
-        if val in ('', None, '-'):
-            return None
-        try:
-            return int(val)
-        except (ValueError, TypeError):
-            return None
+        """Process exit code (not available from the API; always ``None``)."""
+        return None
 
     # ------------------------------------------------------------------ #
     # Work-directory file access                                           #

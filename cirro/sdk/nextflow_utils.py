@@ -19,7 +19,7 @@ def parse_inputs_from_command_run(content: str) -> List[str]:
     return re.findall(r'aws s3 cp(?:\s+--\S+)*\s+(s3://\S+)\s+\S', content)
 
 
-def find_primary_failed_task(
+def find_primary_failed_task(  # NOSONAR
     tasks: List['DataPortalTask'],
     execution_log: str
 ) -> Optional['DataPortalTask']:
