@@ -69,7 +69,8 @@ class FileAccessContext:
         )
 
     @classmethod
-    def scratch_download(cls, project_id: str, base_url: str, token_lifetime_override: int = None):
+    def scratch_download(cls, project_id: str, base_url: str, token_lifetime_override: int = None,
+                         dataset_id: str = ''):
         """Create an access context for reading files from the Nextflow scratch bucket."""
         return cls(
             file_access_request=ProjectFileAccessRequest(

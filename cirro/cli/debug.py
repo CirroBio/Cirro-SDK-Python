@@ -54,8 +54,9 @@ def run_debug(input_params: DebugArguments, interactive=False):  # NOSONAR
     else:
         input_params['project'] = get_id_from_name(projects, input_params['project'])
         datasets = cirro.datasets.list(input_params['project'])
+        original_dataset = input_params['dataset']
         input_params['dataset'] = get_id_from_name(datasets, input_params['dataset'])
-        dataset_obj = get_item_from_name_or_id(datasets, input_params['dataset'])
+        dataset_obj = get_item_from_name_or_id(datasets, original_dataset)
         if dataset_obj and dataset_obj.status == Status.RUNNING:
             raise InputError(
                 f"Dataset '{dataset_obj.name}' ({dataset_obj.id}) is currently RUNNING. "

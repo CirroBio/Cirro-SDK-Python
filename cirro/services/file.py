@@ -24,9 +24,6 @@ class FileService(BaseService):
     """
     checksum_method: str
     transfer_retries: int
-    _get_token_lock = threading.Lock()
-    _read_token_cache: Dict[str, AWSCredentials] = {}
-    _scratch_token_cache: Dict[str, AWSCredentials] = {}
 
     def __init__(self, api_client, checksum_method, transfer_retries):
         """
@@ -35,6 +32,9 @@ class FileService(BaseService):
         self._api_client = api_client
         self.checksum_method = checksum_method
         self.transfer_retries = transfer_retries
+        self._get_token_lock = threading.Lock()
+        self._read_token_cache: Dict[str, AWSCredentials] = {}
+        self._scratch_token_cache: Dict[str, AWSCredentials] = {}
 
     def get_access_credentials(self, access_context: FileAccessContext) -> AWSCredentials:
         """
@@ -272,7 +272,7 @@ class FileService(BaseService):
         """
         s3_client = self._generate_s3_client(file.access_context)
 
-        full_path = f'{file.access_context.prefix}/{file.relative_path}'
+        full_path = f'{file.access_context.prefix}/{file.relative_path}'.lstrip('/')
 
         stats = s3_client.get_file_stats(
             bucket=file.access_context.bucket,
