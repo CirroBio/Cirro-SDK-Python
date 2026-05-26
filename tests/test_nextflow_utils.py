@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from cirro.sdk.nextflow_utils import parse_inputs_from_command_run, find_primary_failed_task
+from cirro.sdk.nextflow_utils import find_primary_failed_task
 
 
 def _make_task(task_id, name, status, exit_code=None):
@@ -12,50 +12,6 @@ def _make_task(task_id, name, status, exit_code=None):
     task.status = status
     task.exit_code = exit_code
     return task
-
-
-class TestParseInputsFromCommandRun(unittest.TestCase):
-
-    def test_basic_s3_copy(self):
-        content = "aws s3 cp s3://my-bucket/path/to/file.bam ./file.bam\n"
-        result = parse_inputs_from_command_run(content)
-        self.assertEqual(result, ['s3://my-bucket/path/to/file.bam'])
-
-    def test_with_only_show_errors_flag(self):
-        content = "aws s3 cp --only-show-errors s3://my-bucket/data/sample.fastq.gz ./sample.fastq.gz\n"
-        result = parse_inputs_from_command_run(content)
-        self.assertEqual(result, ['s3://my-bucket/data/sample.fastq.gz'])
-
-    def test_multiple_flags(self):
-        content = "aws s3 cp --quiet --no-progress s3://bucket/work/ab/cdef/reads.bam ./reads.bam\n"
-        result = parse_inputs_from_command_run(content)
-        self.assertEqual(result, ['s3://bucket/work/ab/cdef/reads.bam'])
-
-    def test_multiple_files(self):
-        content = (
-            "aws s3 cp --only-show-errors s3://bucket/data/r1.fastq.gz ./r1.fastq.gz\n"
-            "aws s3 cp --only-show-errors s3://bucket/data/r2.fastq.gz ./r2.fastq.gz\n"
-        )
-        result = parse_inputs_from_command_run(content)
-        self.assertEqual(result, [
-            's3://bucket/data/r1.fastq.gz',
-            's3://bucket/data/r2.fastq.gz',
-        ])
-
-    def test_no_s3_lines(self):
-        content = "#!/bin/bash\nset -e\necho hello\n"
-        result = parse_inputs_from_command_run(content)
-        self.assertEqual(result, [])
-
-    def test_empty_string(self):
-        result = parse_inputs_from_command_run('')
-        self.assertEqual(result, [])
-
-    def test_ignores_upload_lines(self):
-        # aws s3 cp in the other direction (local → s3) should not be captured
-        content = "aws s3 cp ./output.bam s3://bucket/results/output.bam\n"
-        result = parse_inputs_from_command_run(content)
-        self.assertEqual(result, [])
 
 
 class TestFindPrimaryFailedTask(unittest.TestCase):

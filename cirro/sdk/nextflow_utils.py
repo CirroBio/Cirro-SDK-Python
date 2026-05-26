@@ -5,20 +5,6 @@ if TYPE_CHECKING:
     from cirro.sdk.task import DataPortalTask
 
 
-def parse_inputs_from_command_run(content: str) -> List[str]:
-    """
-    Parse S3 source URIs from a Nextflow .command.run staging block.
-
-    Nextflow stages inputs with lines like:
-        aws s3 cp --only-show-errors s3://bucket/path/file.bam ./file.bam
-    or without flags:
-        aws s3 cp s3://bucket/path/file.bam ./file.bam
-
-    Returns the list of S3 URIs found.
-    """
-    return re.findall(r'aws s3 cp(?:\s+--\S+)*\s+(s3://\S+)\s+\S', content)
-
-
 def find_primary_failed_task(  # NOSONAR
     tasks: List['DataPortalTask'],
     execution_log: str
