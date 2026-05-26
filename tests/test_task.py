@@ -3,11 +3,21 @@ import json
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
-from cirro_api_client.v1.models import Task
+from cirro_api_client.v1.models import Task, GetTaskFilesResponse
+from cirro_api_client.v1.models.file_entry import FileEntry
 from cirro_api_client.v1.types import Unset
 
 from cirro.sdk.task import WorkDirFile, DataPortalTask
 from cirro.sdk.exceptions import DataPortalAssetNotFound
+
+
+def _make_file_entry(uri: str, size: int = None, source_task: str = None) -> FileEntry:
+    """Build a FileEntry that mimics the API response with 'uri' and optional 'sourceTask' in additional_properties."""
+    fe = FileEntry(path=uri, size=size)
+    fe.additional_properties['uri'] = uri
+    if source_task is not None:
+        fe.additional_properties['sourceTask'] = source_task
+    return fe
 
 
 def _make_client(file_bytes=b'hello world'):
@@ -189,9 +199,9 @@ class TestDataPortalTaskProperties(unittest.TestCase):
         task, _ = _make_task()
         self.assertEqual(task.status, 'FAILED')
 
-    def test_hash_unset(self):
-        task, client = _make_task()
-        client.execution.get_task.return_value = None
+    def test_hash_always_empty(self):
+        """hash is not in the 1.5.0 API; property always returns ''."""
+        task, _ = _make_task()
         self.assertEqual(task.hash, '')
 
     def test_work_dir_present_on_task(self):
@@ -206,7 +216,7 @@ class TestDataPortalTaskProperties(unittest.TestCase):
     def test_exit_code_fetched_via_get_task(self):
         task, client = _make_task(dataset_id='ds-123')
         client.execution.get_task.return_value = Task(
-            name='FASTQC', status='FAILED', exit_code=1, work_dir='s3://b/w', hash='ab/cd'
+            name='FASTQC', status='FAILED', exit_code=1, work_dir='s3://b/w'
         )
         self.assertEqual(task.exit_code, 1)
         client.execution.get_task.assert_called_once_with(
@@ -231,21 +241,31 @@ class TestDataPortalTaskProperties(unittest.TestCase):
         )
         self.assertEqual(task.work_dir, 's3://bucket/work/ab/cd')
 
-    def test_hash_fetched_via_get_task(self):
-        task, client = _make_task(dataset_id='ds-123')
-        client.execution.get_task.return_value = Task(
-            name='FASTQC', status='FAILED', hash='ab/cdef12'
-        )
-        self.assertEqual(task.hash, 'ab/cdef12')
-
     def test_get_task_called_once_for_multiple_fields(self):
         task, client = _make_task(dataset_id='ds-123')
-        detail = Task(name='FASTQC', status='FAILED', exit_code=1, work_dir='s3://b/w', hash='ab/cd')
+        detail = Task(name='FASTQC', status='FAILED', exit_code=1, work_dir='s3://b/w')
         client.execution.get_task.return_value = detail
         _ = task.exit_code
         _ = task.work_dir
-        _ = task.hash
         client.execution.get_task.assert_called_once()
+
+    def test_command_line_present(self):
+        t = Task(name='X', status='COMPLETED', command_line='bash .command.sh')
+        task, _ = _make_task(task=t)
+        self.assertEqual(task.command_line, 'bash .command.sh')
+
+    def test_command_line_unset(self):
+        task, _ = _make_task()
+        self.assertEqual(task.command_line, '')
+
+    def test_log_location_present(self):
+        t = Task(name='X', status='COMPLETED', log_location='s3://bucket/logs/task.log')
+        task, _ = _make_task(task=t)
+        self.assertEqual(task.log_location, 's3://bucket/logs/task.log')
+
+    def test_log_location_unset(self):
+        task, _ = _make_task()
+        self.assertEqual(task.log_location, '')
 
     def test_native_id(self):
         task, _ = _make_task()
@@ -305,19 +325,17 @@ class TestDataPortalTaskInputs(unittest.TestCase):
         self.assertEqual(task.inputs, [])
 
     def test_inputs_cached(self):
-        from cirro_api_client.v1.models import TaskFilesResponse
         task, client = _make_task(dataset_id='ds-1')
-        client.execution.get_task_files.return_value = TaskFilesResponse(input_files=[], output_files=[])
+        client.execution.get_task_files.return_value = GetTaskFilesResponse(input_files=[], output_files=[])
         first = task.inputs
         second = task.inputs
         self.assertIs(first, second)
         client.execution.get_task_files.assert_called_once()
 
     def test_inputs_from_api(self):
-        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
         task, client = _make_task(dataset_id='ds-1')
-        client.execution.get_task_files.return_value = TaskFilesResponse(
-            input_files=[TaskFile(uri='s3://bucket/work/ab/cd/reads.fastq.gz', size=100)],
+        client.execution.get_task_files.return_value = GetTaskFilesResponse(
+            input_files=[_make_file_entry('s3://bucket/work/ab/cd/reads.fastq.gz', size=100)],
             output_files=[],
         )
         inputs = task.inputs
@@ -329,15 +347,14 @@ class TestDataPortalTaskInputs(unittest.TestCase):
         )
 
     def test_inputs_source_task_linked(self):
-        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
         upstream_task = MagicMock()
         upstream_task.native_id = 'job-upstream'
         all_tasks_ref = [upstream_task]
 
         task, client = _make_task(dataset_id='ds-1', all_tasks_ref=all_tasks_ref)
         all_tasks_ref.append(task)
-        client.execution.get_task_files.return_value = TaskFilesResponse(
-            input_files=[TaskFile(uri='s3://bucket/work/ab/cd/reads.fastq.gz', size=50, source_task='job-upstream')],
+        client.execution.get_task_files.return_value = GetTaskFilesResponse(
+            input_files=[_make_file_entry('s3://bucket/work/ab/cd/reads.fastq.gz', size=50, source_task='job-upstream')],
             output_files=[],
         )
         inputs = task.inputs
@@ -345,10 +362,9 @@ class TestDataPortalTaskInputs(unittest.TestCase):
         self.assertIs(inputs[0].source_task, upstream_task)
 
     def test_inputs_source_task_null(self):
-        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
         task, client = _make_task(dataset_id='ds-1')
-        client.execution.get_task_files.return_value = TaskFilesResponse(
-            input_files=[TaskFile(uri='s3://external/reference/genome.fa', size=1000, source_task=None)],
+        client.execution.get_task_files.return_value = GetTaskFilesResponse(
+            input_files=[_make_file_entry('s3://external/reference/genome.fa', size=1000)],
             output_files=[],
         )
         inputs = task.inputs
@@ -372,11 +388,10 @@ class TestDataPortalTaskOutputs(unittest.TestCase):
         self.assertEqual(task.outputs, [])
 
     def test_outputs_from_api(self):
-        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
         task, client = _make_task(dataset_id='ds-1')
-        client.execution.get_task_files.return_value = TaskFilesResponse(
+        client.execution.get_task_files.return_value = GetTaskFilesResponse(
             input_files=[],
-            output_files=[TaskFile(uri='s3://bucket/work/ab/cd/result.bam', size=2048)],
+            output_files=[_make_file_entry('s3://bucket/work/ab/cd/result.bam', size=2048)],
         )
         outputs = task.outputs
         self.assertEqual(len(outputs), 1)
@@ -392,11 +407,10 @@ class TestDataPortalTaskOutputs(unittest.TestCase):
         self.assertEqual(task.outputs, [])
 
     def test_api_called_once_for_inputs_and_outputs(self):
-        from cirro_api_client.v1.models import TaskFile, TaskFilesResponse
         task, client = _make_task(dataset_id='ds-1')
-        client.execution.get_task_files.return_value = TaskFilesResponse(
-            input_files=[TaskFile(uri='s3://b/w/in.txt', size=10)],
-            output_files=[TaskFile(uri='s3://b/w/out.txt', size=20)],
+        client.execution.get_task_files.return_value = GetTaskFilesResponse(
+            input_files=[_make_file_entry('s3://b/w/in.txt', size=10)],
+            output_files=[_make_file_entry('s3://b/w/out.txt', size=20)],
         )
         _ = task.inputs
         _ = task.outputs

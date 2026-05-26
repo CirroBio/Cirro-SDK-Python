@@ -254,13 +254,11 @@ class DataPortalTask:
 
     @property
     def hash(self) -> str:
-        """Short hash prefix used by Nextflow, e.g. ``99/b42c07``."""
-        val = self._task.hash
-        if isinstance(val, Unset):
-            val = self._task_details.hash
-        if isinstance(val, Unset) or val is None:
-            return ''
-        return val
+        """Short hash prefix used by Nextflow, e.g. ``99/b42c07``.
+
+        Note: this field is not available in cirro_api_client >= 1.5.0 and always returns ''.
+        """
+        return ''
 
     @property
     def work_dir(self) -> str:
@@ -276,6 +274,22 @@ class DataPortalTask:
     def native_id(self) -> str:
         """Native job ID on the underlying executor (e.g. AWS Batch job ID)."""
         val = self._task.native_job_id
+        if isinstance(val, Unset) or val is None:
+            return ''
+        return val
+
+    @property
+    def command_line(self) -> str:
+        """The shell command that was executed for this task."""
+        val = self._task.command_line
+        if isinstance(val, Unset) or val is None:
+            return ''
+        return val
+
+    @property
+    def log_location(self) -> str:
+        """S3 URI or path to the task log file."""
+        val = self._task.log_location
         if isinstance(val, Unset) or val is None:
             return ''
         return val
@@ -480,11 +494,17 @@ class DataPortalTask:
         }
         result = []
         for tf in task_files.input_files:
-            source_native_id = tf.source_task if not isinstance(tf.source_task, Unset) else None
+            # Prefer 'uri' from additional_properties (full S3 URI); fall back to path
+            uri = tf.additional_properties.get('uri') or (
+                tf.path if not isinstance(tf.path, Unset) else None
+            )
+            if not uri:
+                continue
+            source_native_id = tf.additional_properties.get('sourceTask')
             source_task = native_id_to_task.get(source_native_id) if source_native_id else None
             size = tf.size if not isinstance(tf.size, Unset) else None
             result.append(WorkDirFile(
-                s3_uri=tf.uri,
+                s3_uri=uri,
                 client=self._client,
                 project_id=self._project_id,
                 size=size,
@@ -514,9 +534,15 @@ class DataPortalTask:
             return []
         result = []
         for tf in task_files.output_files:
+            # Prefer 'uri' from additional_properties (full S3 URI); fall back to path
+            uri = tf.additional_properties.get('uri') or (
+                tf.path if not isinstance(tf.path, Unset) else None
+            )
+            if not uri:
+                continue
             size = tf.size if not isinstance(tf.size, Unset) else None
             result.append(WorkDirFile(
-                s3_uri=tf.uri,
+                s3_uri=uri,
                 client=self._client,
                 project_id=self._project_id,
                 size=size,
