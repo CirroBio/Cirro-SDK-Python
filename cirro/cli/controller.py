@@ -2,16 +2,15 @@ import json
 import logging
 import os
 import sys
-from typing import List, Optional
+from pathlib import Path
 
 from cirro_api_client.v1.models import UploadDatasetRequest, Status, Executor
 
 from cirro.cirro_client import CirroApi
 from cirro.cli.interactive.auth_args import gather_auth_config
-from cirro.cli.interactive.common_args import ask_project
 from cirro.cli.interactive.create_pipeline_config import gather_create_pipeline_config_arguments
 from cirro.cli.interactive.download_args import gather_download_arguments, ask_dataset_files, \
-    ask_dataset, gather_download_arguments_dataset
+    gather_download_arguments_dataset
 from cirro.cli.interactive.list_dataset_args import gather_list_arguments
 from cirro.cli.interactive.upload_args import gather_upload_arguments
 from cirro.cli.interactive.upload_reference_args import gather_reference_upload_arguments
