@@ -19,8 +19,17 @@ _SHOW_FULL_LOG = 'Show full execution log?'
 _EMPTY_LABEL = '(empty)'
 _STAGED_INPUT = 'staged input'
 _UNKNOWN_SIZE = 'unknown size'
-# Binary formats that cannot be meaningfully displayed as text
-_BINARY_EXTENSIONS = {'.bam', '.cram', '.bai', '.crai', '.bcf', '.idx'}
+# Extensions that can be meaningfully displayed as text
+_CSV_EXTENSIONS = {'.csv', '.tsv'}
+_JSON_EXTENSIONS = {'.json'}
+_TEXT_EXTENSIONS = _CSV_EXTENSIONS | _JSON_EXTENSIONS | {
+    '.txt', '.log', '.out', '.err',
+    '.md', '.rst',
+    '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
+    '.sh', '.bash', '.py', '.r', '.nf', '.wdl', '.cwl',
+    '.html', '.xml',
+    '.bed', '.vcf', '.gff', '.gff3', '.gtf', '.sam', '.fasta', '.fa', '.fastq', '.fq',
+}
 
 
 def run_debug(input_params: DebugArguments, interactive=False):  # NOSONAR
@@ -332,13 +341,13 @@ def _file_read_options(name: str):
 
     suffix = Path(lower).suffix
 
-    if suffix in _BINARY_EXTENSIONS:
-        return []  # no readable options for binary formats
+    if suffix not in _TEXT_EXTENSIONS:
+        return []
 
     options = []
-    if suffix in ('.csv', '.tsv'):
+    if suffix in _CSV_EXTENSIONS:
         options.append("Read as CSV (first 10 rows)")
-    if suffix == '.json':
+    if suffix in _JSON_EXTENSIONS:
         options.append("Read as JSON")
     options.append("Read as text (first 100 lines)")
     return options
