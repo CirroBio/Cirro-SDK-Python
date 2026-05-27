@@ -1,10 +1,7 @@
 from functools import cached_property
-import gzip
-import json
-from io import BytesIO, StringIO
 from pathlib import PurePath
 import re
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 from cirro_api_client.v1.errors import CirroException, UnexpectedStatus
 from cirro_api_client.v1.models import Task
@@ -12,13 +9,13 @@ from cirro_api_client.v1.types import Unset
 from cirro.models.file import FileAccessContext
 from cirro.models.s3_path import S3Path
 from cirro.sdk.exceptions import DataPortalAssetNotFound
+from cirro.sdk.file_mixins import FileReadMixin
 
 if TYPE_CHECKING:
     from cirro.cirro_client import CirroApi
-    from pandas import DataFrame
 
 
-class WorkDirFile:
+class WorkDirFile(FileReadMixin):
     """
     A file that lives in a Nextflow work directory or a dataset staging area.
 
@@ -80,13 +77,7 @@ class WorkDirFile:
 
     def _access_context(self) -> FileAccessContext:
         """Return the appropriate FileAccessContext for this file's location."""
-        if self._dataset_id:
-            return FileAccessContext.scratch_download(
-                project_id=self._project_id,
-                dataset_id=self._dataset_id,
-                base_url=self._s3_path.base
-            )
-        return FileAccessContext.download(
+        return FileAccessContext.scratch_download(
             project_id=self._project_id,
             base_url=self._s3_path.base
         )
@@ -100,85 +91,6 @@ class WorkDirFile:
                 f"Could not read {self.name!r} — "
                 f"the work directory may have been cleaned up: {e}"
             ) from e
-
-    def read(self, encoding: str = 'utf-8', compression: Optional[str] = None) -> str:
-        """
-        Read the file contents as text.
-
-        Args:
-            encoding (str): Character encoding (default 'utf-8').
-            compression (str): ``'gzip'`` to decompress on the fly, or ``None``
-                (default) to read as-is.
-        """
-        raw = self._get()
-        if compression is None:
-            return raw.decode(encoding, errors='replace')
-        if compression == 'gzip':
-            with gzip.open(BytesIO(raw), 'rt', encoding=encoding) as fh:
-                return fh.read()
-        raise ValueError(f"Unsupported compression: {compression!r} (use 'gzip' or None)")
-
-    def readlines(self, encoding: str = 'utf-8', compression: Optional[str] = None) -> List[str]:
-        """Read the file contents as a list of lines."""
-        return self.read(encoding=encoding, compression=compression).splitlines()
-
-    def read_json(self, encoding: str = 'utf-8') -> Any:
-        """
-        Parse the file as JSON.
-
-        Returns whatever the top-level JSON value is (dict, list, etc.).
-        """
-        try:
-            return json.loads(self.read(encoding=encoding))
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Could not parse {self.name!r} as JSON: {e}") from e
-
-    def read_csv(self, compression: str = 'infer', encoding: str = 'utf-8',
-                 **kwargs) -> 'DataFrame':
-        """
-        Parse the file as a Pandas DataFrame.
-
-        The default separator is a comma; pass ``sep='\\t'`` for TSV files.
-        Compression is inferred from the file extension by default, but can be
-        overridden with ``compression='gzip'`` or ``compression=None``.
-
-        All additional keyword arguments are forwarded to
-        ``pandas.read_csv``.
-        """
-        try:
-            import pandas
-        except ImportError:
-            raise ImportError(
-                "pandas is required to read CSV files. "
-                "Install it with: pip install pandas"
-            )
-
-        if compression == 'infer':
-            name = self.name
-            if name.endswith('.gz'):
-                compression = {'method': 'gzip'}
-            elif name.endswith('.bz2'):
-                compression = {'method': 'bz2'}
-            elif name.endswith('.xz'):
-                compression = {'method': 'xz'}
-            elif name.endswith('.zst'):
-                compression = {'method': 'zstd'}
-            else:
-                compression = None
-
-        raw = self._get()
-        if compression is not None:
-            handle = BytesIO(raw)
-            try:
-                return pandas.read_csv(handle, compression=compression, **kwargs)
-            finally:
-                handle.close()
-        else:
-            handle = StringIO(raw.decode(encoding))
-            try:
-                return pandas.read_csv(handle, **kwargs)
-            finally:
-                handle.close()
 
     def _get_s3_client(self):
         return self._client.file.get_aws_s3_client(self._access_context())
@@ -495,16 +407,11 @@ class DataPortalTask:
         result = []
         for tf in task_files.input_files:
             # Prefer 'uri' from additional_properties (full S3 URI); fall back to path
-            uri = tf.additional_properties.get('uri') or (
-                tf.path if not isinstance(tf.path, Unset) else None
-            )
-            if not uri:
-                continue
             source_native_id = tf.additional_properties.get('sourceTask')
             source_task = native_id_to_task.get(source_native_id) if source_native_id else None
             size = tf.size if not isinstance(tf.size, Unset) else None
             result.append(WorkDirFile(
-                s3_uri=uri,
+                s3_uri=tf.path,
                 client=self._client,
                 project_id=self._project_id,
                 size=size,
@@ -514,7 +421,7 @@ class DataPortalTask:
         return result
 
     # ------------------------------------------------------------------ #
-    # Outputs                                                              #
+    # Outputs                                                            #
     # ------------------------------------------------------------------ #
 
     @cached_property
@@ -534,15 +441,9 @@ class DataPortalTask:
             return []
         result = []
         for tf in task_files.output_files:
-            # Prefer 'uri' from additional_properties (full S3 URI); fall back to path
-            uri = tf.additional_properties.get('uri') or (
-                tf.path if not isinstance(tf.path, Unset) else None
-            )
-            if not uri:
-                continue
             size = tf.size if not isinstance(tf.size, Unset) else None
             result.append(WorkDirFile(
-                s3_uri=uri,
+                s3_uri=tf.path,
                 client=self._client,
                 project_id=self._project_id,
                 size=size,

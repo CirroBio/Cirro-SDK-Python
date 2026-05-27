@@ -1,23 +1,15 @@
-import gzip
-import json
-import pickle
-from io import BytesIO, StringIO
 from pathlib import Path
 from typing import List
-
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    import anndata
-    from pandas import DataFrame
 
 from cirro.cirro_client import CirroApi
 from cirro.models.file import File, PathLike
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.exceptions import DataPortalInputError
+from cirro.sdk.file_mixins import FileReadMixin
 from cirro.utils import convert_size
 
 
-class DataPortalFile(DataPortalAsset):
+class DataPortalFile(DataPortalAsset, FileReadMixin):
     """
     Datasets are made up of a collection of File objects in the Data Portal.
     """
@@ -89,135 +81,6 @@ class DataPortalFile(DataPortalAsset):
         """Internal method to call client.file.get_file"""
 
         return self._client.file.get_file(self._file)
-
-    def read_csv(self, compression='infer', encoding='utf-8', **kwargs) -> 'DataFrame':
-        """
-        Parse the file as a Pandas DataFrame.
-
-        The default field separator is a comma (for CSV), use sep='\\t' for TSV.
-
-        File compression is inferred from the extension, but can be set
-        explicitly with the compression= flag.
-
-        All other keyword arguments are passed to pandas.read_csv
-        https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html
-        """
-        import pandas
-
-        if compression == 'infer':
-            # If the file appears to be compressed
-            if self.relative_path.endswith('.gz'):
-                compression = dict(method='gzip')
-            elif self.relative_path.endswith('.bz2'):
-                compression = dict(method='bz2')
-            elif self.relative_path.endswith('.xz'):
-                compression = dict(method='xz')
-            elif self.relative_path.endswith('.zst'):
-                compression = dict(method='zstd')
-            else:
-                compression = None
-
-        if compression is not None:
-            handle = BytesIO(self._get())
-        else:
-            handle = StringIO(self._get().decode(encoding))
-
-        df = pandas.read_csv(
-            handle,
-            compression=compression,
-            encoding=encoding,
-            **kwargs
-        )
-        handle.close()
-        return df
-
-    def read_h5ad(self) -> 'anndata.AnnData':
-        """Read an AnnData object from a file."""
-        # Import the anndata library, and raise an error if it is not available
-        try:
-            import anndata as ad # noqa
-        except ImportError:
-            raise ImportError("The anndata library is required to read AnnData files. "
-                              "Please install it using 'pip install anndata'.")
-
-        # Download the file to a temporary file handle and parse the contents
-        with BytesIO(self._get()) as handle:
-            return ad.read_h5ad(handle)
-
-    def read_json(self, **kwargs):
-        """Read the file contents as a parsed JSON object (dict, list, etc.)."""
-        return json.loads(self._get(), **kwargs)
-
-    def read_parquet(self, **kwargs) -> 'DataFrame':
-        """
-        Read a Parquet file as a Pandas DataFrame.
-
-        Requires ``pyarrow`` or ``fastparquet`` to be installed.
-        All keyword arguments are passed to :func:`pandas.read_parquet`.
-        """
-        import pandas
-        return pandas.read_parquet(BytesIO(self._get()), **kwargs)
-
-    def read_feather(self, **kwargs) -> 'DataFrame':
-        """
-        Read a Feather file as a Pandas DataFrame.
-
-        Requires ``pyarrow`` to be installed.
-        All keyword arguments are passed to :func:`pandas.read_feather`.
-        """
-        import pandas
-        return pandas.read_feather(BytesIO(self._get()), **kwargs)
-
-    def read_pickle(self, **kwargs):
-        """Read the file contents as a Python pickle object."""
-        return pickle.loads(self._get(), **kwargs)
-
-    def read_excel(self, **kwargs) -> 'DataFrame':
-        """
-        Read an Excel file (``.xlsx`` / ``.xls``) as a Pandas DataFrame.
-
-        Requires ``openpyxl`` (for ``.xlsx``) or ``xlrd`` (for ``.xls``).
-        All keyword arguments are passed to :func:`pandas.read_excel`.
-        """
-        import pandas
-        return pandas.read_excel(BytesIO(self._get()), **kwargs)
-
-    def readlines(self, encoding='utf-8', compression=None) -> List[str]:
-        """Read the file contents as a list of lines."""
-
-        return self.read(
-            encoding=encoding,
-            compression=compression
-        ).splitlines()
-
-    def read(self, encoding='utf-8', compression=None) -> str:
-        """Read the file contents as text."""
-
-        # Get the raw file contents
-        cont = self._get()
-
-        # If the file is uncompressed
-        if compression is None:
-            return cont.decode(encoding)
-        # If the file is compressed
-        else:
-
-            # Only gzip-compression is supported currently
-            if compression != "gzip":
-                raise DataPortalInputError("compression may be 'gzip' or None")
-
-            with gzip.open(
-                BytesIO(
-                    cont
-                ),
-                'rt',
-                encoding=encoding
-            ) as handle:
-                return handle.read()
-
-    def read_bytes(self) -> BytesIO:
-        """Get a generic BytesIO object representing the Data Portal File, to be passed into readers."""
-        return BytesIO(self._get())
 
     def download(self, download_location: str = None) -> Path:
         """
