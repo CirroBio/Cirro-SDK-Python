@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from cirro.sdk.nextflow_utils import find_primary_failed_task
+from cirro.helpers.nextflow_utils import find_primary_failed_task
 
 
 def _make_task(task_id, name, status, exit_code=None):
