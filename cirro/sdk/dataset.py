@@ -307,7 +307,7 @@ class DataPortalDataset(DataPortalAsset):
         Returns:
             `cirro.sdk.task.DataPortalTask`, or ``None`` if no failed task is found.
         """
-        from cirro.sdk.nextflow_utils import find_primary_failed_task
+        from cirro.helpers.nextflow_utils import find_primary_failed_task
 
         tasks = self.tasks
 
