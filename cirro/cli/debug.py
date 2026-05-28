@@ -235,7 +235,6 @@ def _print_task_header(task: DataPortalTask, indent: str, label: str) -> None:
     print(f"{indent}Name:      {task.name}")
     print(f"{indent}Status:    {task.status}")
     print(f"{indent}Exit Code: {task.exit_code}")
-    print(f"{indent}Hash:      {task.hash}")
     print(f"{indent}Work Dir:  {task.work_dir}")
 
 

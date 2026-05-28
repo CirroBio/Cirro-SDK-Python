@@ -165,14 +165,6 @@ class DataPortalTask:
         return self._task.status
 
     @property
-    def hash(self) -> str:
-        """Short hash prefix used by Nextflow, e.g. ``99/b42c07``.
-
-        Note: this field is not available in cirro_api_client >= 1.5.0 and always returns ''.
-        """
-        return ''
-
-    @property
     def work_dir(self) -> str:
         """S3 URI of the task's work directory."""
         val = self._task.work_dir
