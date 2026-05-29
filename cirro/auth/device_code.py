@@ -236,7 +236,13 @@ class DeviceCodeAuth(AuthInfo):
         if not self._persistence or not self._token_path.exists():
             return None
 
-        token_info = json.loads(self._persistence.load())
+        try:
+            token_info = json.loads(self._persistence.load())
+        except (json.JSONDecodeError, ValueError):
+            logger.debug('Saved token file is empty or invalid, clearing it')
+            self._clear_token_info()
+            return None
+
         if 'access_token' not in token_info:
             return None
 
