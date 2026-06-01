@@ -14,6 +14,14 @@ from cirro.sdk.file_mixins import FileReadMixin
 if TYPE_CHECKING:
     from cirro.cirro_client import CirroApi
 
+# Nextflow stages these bookkeeping files alongside real inputs; they carry
+# no data value for the user and are excluded from task.inputs.
+_NEXTFLOW_COORDINATION_FILES = {
+    '.command.sh', '.command.run', '.command.log', '.command.out',
+    '.command.err', '.command.begin', '.command.exit', '.command.trace',
+    '.exitcode',
+}
+
 
 class WorkDirFile(FileReadMixin):
     """
@@ -378,11 +386,15 @@ class DataPortalTask:
         if not self._dataset_id or not self.native_id:
             return None
         try:
-            return self._client.execution.get_task_files(
+            task_files = self._client.execution.get_task_files(
                 project_id=self._project_id,
                 dataset_id=self._dataset_id,
                 task_id=self.native_id
             )
+            if task_files is None:
+                
+                raise DataPortalAssetNotFound
+            return task_files
         except Exception:  # NOSONAR
             return None
 
@@ -398,6 +410,8 @@ class DataPortalTask:
         }
         result = []
         for tf in task_files.input_files:
+            if PurePath(tf.path).name in _NEXTFLOW_COORDINATION_FILES:
+                continue
             # Prefer 'uri' from additional_properties (full S3 URI); fall back to path
             source_native_id = tf.additional_properties.get('sourceTask')
             source_task = native_id_to_task.get(source_native_id) if source_native_id else None
