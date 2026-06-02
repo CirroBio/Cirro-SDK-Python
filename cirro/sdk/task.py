@@ -440,8 +440,6 @@ class DataPortalTask:
                     if tf.path else None
                 )
             )
-            if not source_task:
-                assert False, (tf.path, tf.path.rsplit("/", 1)[0], path_to_task, tf.path.rsplit("/", 1)[0] in path_to_task)
             size = tf.size if not isinstance(tf.size, Unset) else None
             result.append(WorkDirFile(
                 s3_uri=tf.path,
