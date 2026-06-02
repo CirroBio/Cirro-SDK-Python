@@ -408,13 +408,26 @@ class DataPortalTask:
             for t in self._all_tasks_ref
             if t is not self and t.native_id
         }
+        path_to_task = {
+            t.work_dir: t
+            for t in self._all_tasks_ref
+            if t is not self and t.work_dir
+        }
         result = []
         for tf in task_files.input_files:
             if PurePath(tf.path).name in _NEXTFLOW_COORDINATION_FILES:
                 continue
-            # Prefer 'uri' from additional_properties (full S3 URI); fall back to path
+            # Prefer 'uri' from additional_properties (full S3 URI); fall back to path-based matching
             source_native_id = tf.additional_properties.get('sourceTask')
-            source_task = native_id_to_task.get(source_native_id) if source_native_id else None
+            source_task = (
+                native_id_to_task.get(source_native_id)
+                if source_native_id else (
+                    path_to_task.get(tf.path.rsplit("/", 1)[0])
+                    if tf.path else None
+                )
+            )
+            if not source_task:
+                assert False, (tf.path, tf.path.rsplit("/", 1)[0], path_to_task, tf.path.rsplit("/", 1)[0] in path_to_task)
             size = tf.size if not isinstance(tf.size, Unset) else None
             result.append(WorkDirFile(
                 s3_uri=tf.path,
