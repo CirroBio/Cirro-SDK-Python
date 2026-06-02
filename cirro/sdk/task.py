@@ -72,36 +72,50 @@ class WorkDirFile(FileReadMixin):
     def size(self) -> int:
         """File size in bytes (fetched lazily via head_object if not pre-populated)."""
         if self._size is None:
-            try:
-                s3 = self._get_s3_client()
-                resp = s3.head_object(Bucket=self._s3_path.bucket, Key=self._s3_path.key)
-                self._size = resp['ContentLength']
-            except Exception as e:  # NOSONAR
+            first_error = None
+            for ctx in self._access_contexts():
+                try:
+                    s3 = self._client.file.get_aws_s3_client(ctx)
+                    self._size = s3.head_object(
+                        Bucket=self._s3_path.bucket, Key=self._s3_path.key
+                    )['ContentLength']
+                    break
+                except Exception as e:  # NOSONAR
+                    if first_error is None:
+                        first_error = e
+            else:
                 raise DataPortalAssetNotFound(
                     f"Could not determine size of {self.name!r} — "
-                    f"the work directory may have been cleaned up: {e}"
-                ) from e
+                    f"the work directory may have been cleaned up: {first_error}"
+                ) from first_error
         return self._size
 
-    def _access_context(self) -> FileAccessContext:
-        """Return the appropriate FileAccessContext for this file's location."""
-        return FileAccessContext.scratch_download(
-            project_id=self._project_id,
-            base_url=self._s3_path.base
-        )
+    def _access_contexts(self):
+        """Return access contexts to try in order: scratch first, then regular download."""
+        return [
+            FileAccessContext.scratch_download(
+                project_id=self._project_id,
+                base_url=self._s3_path.base
+            ),
+            FileAccessContext.download(
+                project_id=self._project_id,
+                base_url=self._s3_path.base
+            ),
+        ]
 
     def _get(self) -> bytes:
         """Return the raw bytes of the file."""
-        try:
-            return self._client.file.get_file_from_path(self._access_context(), self._s3_path.key)
-        except Exception as e:  # NOSONAR
-            raise DataPortalAssetNotFound(
-                f"Could not read {self.name!r} — "
-                f"the work directory may have been cleaned up: {e}"
-            ) from e
-
-    def _get_s3_client(self):
-        return self._client.file.get_aws_s3_client(self._access_context())
+        first_error = None
+        for ctx in self._access_contexts():
+            try:
+                return self._client.file.get_file_from_path(ctx, self._s3_path.key)
+            except Exception as e:  # NOSONAR
+                if first_error is None:
+                    first_error = e
+        raise DataPortalAssetNotFound(
+            f"Could not read {self.name!r} — "
+            f"the work directory may have been cleaned up: {first_error}"
+        ) from first_error
 
     def __str__(self):
         return self.name
