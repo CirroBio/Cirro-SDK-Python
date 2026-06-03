@@ -247,19 +247,10 @@ class DataPortalTask:
     # ------------------------------------------------------------------ #
 
     def _get_access_context(self) -> FileAccessContext:
-        if not self.work_dir:
-            raise DataPortalAssetNotFound(
-                f"Task {self.name!r} has no work directory recorded in the trace"
-            )
         s3_path = S3Path(self.work_dir)
-        if self._dataset_id:
-            return FileAccessContext.scratch_download(
-                project_id=self._project_id,
-                dataset_id=self._dataset_id,
-                base_url=s3_path.base
-            )
-        return FileAccessContext.download(
+        return FileAccessContext.scratch_download(
             project_id=self._project_id,
+            dataset_id=self._dataset_id,
             base_url=s3_path.base
         )
 
@@ -275,9 +266,8 @@ class DataPortalTask:
         try:
             s3_path = S3Path(self.work_dir)
             key = f'{s3_path.key}/{filename}'
-            access_context = self._get_access_context()
             return self._client.file.get_file_from_path(
-                access_context, key
+                self._get_access_context(), key
             ).decode('utf-8', errors='replace')
         except Exception:  # NOSONAR
             return ''
