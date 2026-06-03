@@ -406,7 +406,6 @@ class DataPortalTask:
                 task_id=self.native_id
             )
             if task_files is None:
-                
                 raise DataPortalAssetNotFound
             return task_files
         except Exception:  # NOSONAR
