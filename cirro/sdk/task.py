@@ -483,8 +483,37 @@ class DataPortalTask:
         return result
 
     # ------------------------------------------------------------------ #
-    # Repr                                                                 #
+    # Summary / Repr                                                       #
     # ------------------------------------------------------------------ #
+
+    @cached_property
+    def summary(self) -> str:
+        """Human-readable summary of this task including script, logs, inputs, and outputs."""
+        lines = [
+            f"Name:      {self.name}",
+            f"Status:    {self.status}",
+            f"Exit Code: {self.exit_code}",
+            f"Work Dir:  {self.work_dir}",
+            "",
+            "--- Script ---",
+            self.script or "(empty)",
+            "",
+            "--- Logs ---",
+            self.logs or "(empty)",
+        ]
+
+        inputs = self.inputs
+        lines.append(f"\n--- Inputs ({len(inputs)}) ---")
+        for f in inputs:
+            source = f"from task: {f.source_task.name}" if f.source_task else "staged input"
+            lines.append(f"  {f.name}  [{source}]")
+
+        outputs = self.outputs
+        lines.append(f"\n--- Outputs ({len(outputs)}) ---")
+        for f in outputs:
+            lines.append(f"  {f.name}")
+
+        return "\n".join(lines)
 
     def __str__(self):
         return f'Task(name={self.name}, status={self.status})'
