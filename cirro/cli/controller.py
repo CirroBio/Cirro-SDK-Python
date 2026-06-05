@@ -9,12 +9,13 @@ from cirro_api_client.v1.models import UploadDatasetRequest, Status, Executor
 from cirro.cirro_client import CirroApi
 from cirro.cli.interactive.auth_args import gather_auth_config
 from cirro.cli.interactive.create_pipeline_config import gather_create_pipeline_config_arguments
-from cirro.cli.interactive.download_args import gather_download_arguments, ask_dataset_files
-from cirro.cli.interactive.download_args import gather_download_arguments_dataset
+from cirro.cli.interactive.download_args import gather_download_arguments, ask_dataset_files, \
+    gather_download_arguments_dataset
 from cirro.cli.interactive.list_dataset_args import gather_list_arguments
 from cirro.cli.interactive.upload_args import gather_upload_arguments
 from cirro.cli.interactive.upload_reference_args import gather_reference_upload_arguments
-from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError, validate_files
+from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError, \
+    validate_files
 from cirro.cli.interactive.validate_args import gather_validate_arguments, gather_validate_arguments_dataset
 from cirro.cli.models import ListArguments, UploadArguments, DownloadArguments, CreatePipelineConfigArguments, \
     UploadReferenceArguments, ValidateArguments, ListFilesArguments

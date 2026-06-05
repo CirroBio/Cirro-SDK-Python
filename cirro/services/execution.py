@@ -1,9 +1,9 @@
 from typing import List, Optional, Dict
 
 from cirro_api_client.v1.api.execution import run_analysis, stop_analysis, get_project_summary, \
-    get_tasks_for_execution, get_task_logs, get_execution_logs
+    get_tasks_for_execution, get_task_logs, get_execution_logs, get_task, get_task_files
 from cirro_api_client.v1.api.processes import get_process_parameters
-from cirro_api_client.v1.models import RunAnalysisRequest, CreateResponse, Task
+from cirro_api_client.v1.models import RunAnalysisRequest, CreateResponse, Task, GetTaskFilesResponse
 
 from cirro.models.form_specification import ParameterSpecification
 from cirro.services.base import BaseService
@@ -159,3 +159,38 @@ class ExecutionService(BaseService):
         )
 
         return '\n'.join(e.message for e in resp.events)
+
+    def get_task(self, project_id: str, dataset_id: str, task_id: str) -> Optional[Task]:
+        """
+        Gets detailed information on an individual task
+
+        Args:
+            project_id (str): ID of the Project
+            dataset_id (str): ID of the Dataset
+            task_id (str): ID of the task
+        """
+        return get_task.sync(
+            project_id=project_id,
+            dataset_id=dataset_id,
+            task_id=task_id,
+            client=self._api_client
+        )
+
+    def get_task_files(self, project_id: str, dataset_id: str, task_id: str) -> Optional[GetTaskFilesResponse]:
+        """
+        Gets the input and output files for an individual task.
+
+        Returns ``None`` for non-Nextflow executions (400) or when the task or
+        work directory is not found (404).
+
+        Args:
+            project_id (str): ID of the Project
+            dataset_id (str): ID of the Dataset
+            task_id (str): ID of the task
+        """
+        return get_task_files.sync(
+            project_id=project_id,
+            dataset_id=dataset_id,
+            task_id=task_id,
+            client=self._api_client
+        )
