@@ -11,10 +11,12 @@ from botocore import UNSIGNED
 from botocore.config import Config
 from botocore.exceptions import NoCredentialsError
 
+from cirro.clients import S3Client
+from cirro.models.s3_path import S3Path
+
 if TYPE_CHECKING:
     from pandas import DataFrame
 
-from cirro.models.s3_path import S3Path
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +87,8 @@ class PreprocessDataset:
     """
     files: 'DataFrame'
     """
-    A DataFrame containing information on the files contained in the input datasets,
-    and the sample that each file is assigned to.
+    A DataFrame containing information on the files that are associated with
+    a sample within the input datasets.
 
     More info: https://docs.cirro.bio/pipelines/preprocess-script/#dsfiles
     """
@@ -399,3 +401,26 @@ class PreprocessDataset:
         if values != "file":
             raise ValueError("The only supported value for `values` is 'file'")
         return self.pivot_files(index=index, pivot_columns=[columns], column_prefix=column_prefix)
+
+    def input_files(self) -> 'DataFrame':
+        """
+        Retrieves a dataframe of files from the input datasets
+        This contains ALL files, including ones not associated with samples.
+        For sample-only files, please use the `files` property instead.
+
+        DataFrame contains `file`, `dataset`, and `process` to help distinguish
+        where the files came from.
+        """
+        import pandas as pd
+        s3_client = S3Client()
+        return pd.DataFrame(
+            [
+                {'file': file, 'dataset': d['id'], 'process': d['processId']}
+                for d in self.metadata['inputs']
+                for file in s3_client.get_file_listing(
+                    bucket=S3Path(d['dataPath']).bucket,
+                    prefix=S3Path(d['dataPath']).key
+                )
+            ],
+            columns=['file', 'dataset', 'process']
+        )
