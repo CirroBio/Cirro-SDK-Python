@@ -1,17 +1,20 @@
 import datetime
+from functools import cached_property
 import re
 from pathlib import Path
 from typing import Union, List, Optional, Any
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
-from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, Status, \
-    RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
+from cirro_api_client.v1.errors import CirroException, UnexpectedStatus
+from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, \
+    Status, RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
 
 from cirro.cirro_client import CirroApi
 from cirro.file_utils import bytes_to_human_readable, filter_files_by_pattern
 from cirro.models.assets import DatasetAssets
 from cirro.models.file import PathLike
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
+from cirro.sdk.task import DataPortalTask
 from cirro.sdk.exceptions import DataPortalAssetNotFound
 from cirro.sdk.exceptions import DataPortalInputError
 from cirro.sdk.file import DataPortalFile, DataPortalFiles
@@ -240,6 +243,79 @@ class DataPortalDataset(DataPortalAsset):
     def created_at(self) -> datetime.datetime:
         """Timestamp of dataset creation"""
         return self._data.created_at
+
+    @cached_property
+    def logs(self) -> str:
+        """
+        Return the top-level execution log for this dataset.
+
+        Returns an empty string if no log events are available (e.g. the job has not started yet).
+
+        Returns:
+            str: Execution log text, or an empty string if unavailable.
+        """
+        try:
+            return self._client.execution.get_execution_logs(
+                project_id=self.project_id,
+                dataset_id=self.id
+            )
+        except (CirroException, UnexpectedStatus):
+            return ''
+
+    @cached_property
+    def tasks(self) -> List[DataPortalTask]:
+        """
+        List of tasks from the workflow execution, fetched via the execution API.
+
+        Returns:
+            `List[DataPortalTask]`
+        """
+        return self._load_tasks_from_api()
+
+    def _load_tasks_from_api(self) -> List[DataPortalTask]:
+        """Load tasks via the execution API."""
+        api_tasks = self._client.execution.get_tasks_for_execution(
+            project_id=self.project_id,
+            dataset_id=self.id
+        )
+        if not api_tasks:
+            return []
+
+        all_tasks_ref: List[DataPortalTask] = []
+        tasks = [
+            DataPortalTask(
+                task=t,
+                client=self._client,
+                project_id=self.project_id,
+                dataset_id=self.id,
+                all_tasks_ref=all_tasks_ref,
+                task_id=i,
+            )
+            for i, t in enumerate(api_tasks)
+        ]
+        all_tasks_ref.extend(tasks)
+        return tasks
+
+    @property
+    def primary_failed_task(self) -> Optional[DataPortalTask]:
+        """
+        Find the root-cause failed task in this workflow execution.
+
+        Returns ``None`` gracefully when no tasks are available or none have
+        a ``FAILED`` status.
+
+        Returns:
+            `cirro.sdk.task.DataPortalTask`, or ``None`` if no failed task is found.
+        """
+        from cirro.helpers.nextflow_utils import find_primary_failed_task
+
+        tasks = self.tasks
+
+        if not tasks:
+            return None
+
+        execution_log = self.logs
+        return find_primary_failed_task(tasks, execution_log)
 
     def _get_detail(self):
         if not isinstance(self._data, DatasetDetail):

@@ -24,8 +24,6 @@ class FileService(BaseService):
     """
     checksum_method: str
     transfer_retries: int
-    _get_token_lock = threading.Lock()
-    _read_token_cache: Dict[str, AWSCredentials] = {}
 
     def __init__(self, api_client, checksum_method, transfer_retries):
         """
@@ -34,6 +32,9 @@ class FileService(BaseService):
         self._api_client = api_client
         self.checksum_method = checksum_method
         self.transfer_retries = transfer_retries
+        self._get_token_lock = threading.Lock()
+        self._read_token_cache: Dict[str, AWSCredentials] = {}
+        self._scratch_token_cache: Dict[str, AWSCredentials] = {}
 
     def get_access_credentials(self, access_context: FileAccessContext) -> AWSCredentials:
         """
@@ -47,12 +48,32 @@ class FileService(BaseService):
         if access_request.access_type == ProjectAccessType.PROJECT_DOWNLOAD:
             return self._get_project_read_credentials(access_context)
 
+        elif access_request.access_type == ProjectAccessType.READ_SCRATCH:
+            return self._get_scratch_read_credentials(access_context)
+
         else:
             return generate_project_file_access_token.sync(
                 client=self._api_client,
                 project_id=access_context.project_id,
                 body=access_context.file_access_request
             )
+
+    def _get_scratch_read_credentials(self, access_context: FileAccessContext):
+        """
+        Retrieves credentials to read the Nextflow scratch bucket, cached by project_id
+        """
+        access_request = access_context.file_access_request
+        project_id = access_context.project_id
+        with self._get_token_lock:
+            cached_token = self._scratch_token_cache.get(project_id)
+            if not cached_token or datetime.now(tz=timezone.utc) > cached_token.expiration:
+                new_token = generate_project_file_access_token.sync(
+                    client=self._api_client,
+                    project_id=project_id,
+                    body=access_request
+                )
+                self._scratch_token_cache[project_id] = new_token
+        return self._scratch_token_cache[project_id]
 
     def _get_project_read_credentials(self, access_context: FileAccessContext):
         """
@@ -254,7 +275,7 @@ class FileService(BaseService):
         """
         s3_client = self._generate_s3_client(file.access_context)
 
-        full_path = f'{file.access_context.prefix}/{file.relative_path}'
+        full_path = f'{file.access_context.prefix}/{file.relative_path}'.lstrip('/')
 
         stats = s3_client.get_file_stats(
             bucket=file.access_context.bucket,

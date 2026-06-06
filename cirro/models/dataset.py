@@ -1,10 +1,10 @@
-from attrs import define as _attrs_define
+from attrs import define as _attrs_define, field as _attrs_field
 from cirro_api_client.v1.models import Share, Dataset
 
 
 @_attrs_define
 class DatasetWithShare(Dataset):
-    share: Share
+    share: Share = _attrs_field(kw_only=True)
 
     @classmethod
     def from_dataset(cls, dataset: Dataset, share: Share) -> 'DatasetWithShare':

@@ -1,3 +1,4 @@
+import os
 from os import path
 import json
 import unittest
@@ -26,6 +27,10 @@ class TestPipelineDefinition(unittest.TestCase):
         self.assertEqual(pipeline.input_configuration, expected_input_configuration)
         self.assertEqual(pipeline.config_app_status, process.ConfigAppStatus.OPTIONAL)
 
+    @unittest.skipIf(
+        os.environ.get('CI') == 'true',
+        "Skipping nf-core integration test in CI (requires Nextflow + version-specific schema output)"
+    )
     def test_pipeline_definition_nextflow_without_schema(self):
         root_dir = path.join(DATA_PATH, 'workflows', 'nextflow', 'without-schema')
         pipeline = process.PipelineDefinition(root_dir)
