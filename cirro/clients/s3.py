@@ -105,6 +105,21 @@ class S3Client:
                 files.append(f"s3://{bucket}/{key}")
         return files
 
+    def get_file_sizes(self, bucket: str, prefix: str) -> dict[str, int]:
+        """
+        Retrieves a mapping of object key to size (in bytes) for all files under a prefix.
+        Used when resuming an upload to determine which files are already present and complete.
+        """
+        sizes = {}
+        paginator = self._client.get_paginator('list_objects_v2')
+        s3_pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+        for page in s3_pages:
+            for obj in page.get('Contents') or []:
+                if obj['Size'] == 0:  # Is directory
+                    continue
+                sizes[obj["Key"]] = obj["Size"]
+        return sizes
+
     def _build_session_client(self):
         # Use standard client if creds are not provided
         if self._creds_getter is None:
