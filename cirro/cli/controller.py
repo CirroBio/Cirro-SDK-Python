@@ -17,7 +17,7 @@ from cirro.cli.interactive.upload_reference_args import gather_reference_upload_
 from cirro.cli.interactive.utils import get_id_from_name, get_item_from_name_or_id, InputError, validate_files
 from cirro.cli.interactive.validate_args import gather_validate_arguments, gather_validate_arguments_dataset
 from cirro.cli.models import ListArguments, UploadArguments, DownloadArguments, CreatePipelineConfigArguments, \
-    UploadReferenceArguments, ValidateArguments, ListFilesArguments
+    UploadReferenceArguments, ValidateArguments, ListFilesArguments, ResumeUploadArguments
 from cirro.config import UserConfig, save_user_config, load_user_config
 from cirro.file_utils import get_files_in_directory
 from cirro.models.process import PipelineDefinition, ConfigAppStatus, CONFIG_APP_URL
@@ -104,6 +104,59 @@ def run_ingest(input_params: UploadArguments, interactive=False):
                                 dataset_id=create_resp.id,
                                 directory=directory,
                                 files=files)
+    logger.info(f"File content validated by {cirro.configuration.checksum_method_display}")
+
+
+def run_resume_upload(input_params: ResumeUploadArguments, interactive=False):
+    """Resume uploading files to an existing pending dataset."""
+    cirro = _init_cirro_client()
+    projects = _get_projects(cirro)
+
+    if interactive:
+        from cirro.cli.interactive.common_args import ask_project, ask_dataset
+        from cirro.cli.interactive.upload_args import ask_data_directory, ask_files_in_directory
+        project_name = ask_project(projects, input_params.get('project'))
+        project_id = get_id_from_name(projects, project_name)
+
+        datasets = list_all_datasets(project_id=project_id, client=cirro)
+        # Only datasets that are still pending can be resumed
+        datasets = [d for d in datasets if d.status == Status.PENDING]
+        if len(datasets) == 0:
+            raise InputError("No pending datasets available to resume in this project")
+        dataset_id = ask_dataset(datasets, input_params.get('dataset'), msg_action='resume uploading to')
+
+        directory = ask_data_directory(input_params.get('data_directory'))
+        files = ask_files_in_directory(directory, input_params['include_hidden'])
+    else:
+        project_id = get_id_from_name(projects, input_params['project'])
+        datasets = cirro.datasets.list(project_id)
+        dataset_id = get_id_from_name(datasets, input_params['dataset'])
+        directory = input_params['data_directory']
+        all_files = get_files_in_directory(directory)
+        if input_params['file']:
+            files = input_params['file']
+            validate_files(all_files, files, directory)
+        # Default to all files if file param is not provided
+        else:
+            files = all_files
+
+    # Only pending datasets (e.g. an interrupted upload) can be resumed
+    dataset = next((d for d in datasets if d.id == dataset_id), None)
+    if dataset and dataset.status != Status.PENDING:
+        raise InputError(
+            f"Dataset '{dataset.name}' has status '{dataset.status.value}' and cannot be resumed - "
+            f"only pending datasets can be resumed"
+        )
+
+    if len(files) == 0:
+        raise InputError("No files to upload")
+
+    logger.info("Resuming upload - files already uploaded will be skipped")
+    cirro.datasets.upload_files(project_id=project_id,
+                                dataset_id=dataset_id,
+                                directory=directory,
+                                files=files,
+                                resume=True)
     logger.info(f"File content validated by {cirro.configuration.checksum_method_display}")
 
 

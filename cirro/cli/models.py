@@ -21,6 +21,15 @@ class UploadArguments(TypedDict):
     file: Optional[list[str]]
 
 
+class ResumeUploadArguments(TypedDict):
+    project: str
+    dataset: str
+    data_directory: str
+    include_hidden: bool
+    interactive: bool
+    file: Optional[list[str]]
+
+
 class ValidateArguments(TypedDict):
     dataset: str
     project: str
