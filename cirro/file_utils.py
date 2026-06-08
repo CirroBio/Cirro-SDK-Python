@@ -10,6 +10,7 @@ from botocore.exceptions import ConnectionError
 
 from cirro.clients import S3Client
 from cirro.models.file import DirectoryStatistics, File, PathLike
+from cirro.models.s3_path import S3Path
 
 if os.name == 'nt':
     import win32api
@@ -174,7 +175,9 @@ def upload_directory(directory: PathLike,
 
         # When resuming, skip files already uploaded with a matching size.
         # A size mismatch implies an incomplete upload, so re-upload the file.
-        if resume and already_uploaded.get(key) == file_path.stat().st_size:
+        expected_path = S3Path(f"s3://{bucket}/{key}")
+        if resume and already_uploaded.get(expected_path) == file_path.stat().st_size:
+            print(f"Uploading {file_relative} skipped as it has already been uploaded.")
             continue
 
         success = False
