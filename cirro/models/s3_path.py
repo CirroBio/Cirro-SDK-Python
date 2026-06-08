@@ -23,3 +23,13 @@ class S3Path:
 
     def __str__(self):
         return self._parsed.geturl()
+
+    def __eq__(self, other):
+        if isinstance(other, S3Path):
+            return self.key == other.key
+        if isinstance(other, str):
+            return self.key == other
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(self.key)
