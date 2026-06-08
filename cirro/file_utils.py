@@ -174,7 +174,7 @@ def upload_directory(directory: PathLike,
         key = f'{prefix}/{file_relative}'
 
         # When resuming, skip files already uploaded with a matching size.
-        # A size mismatch implies an incomplete upload, so re-upload the file.
+        # A size mismatch implies a modified file, so re-upload the file.
         expected_path = S3Path(f"s3://{bucket}/{key}")
         if resume and already_uploaded.get(expected_path) == file_path.stat().st_size:
             print(f"Uploading {file_relative} skipped as it has already been uploaded.")

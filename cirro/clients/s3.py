@@ -100,7 +100,6 @@ class S3Client:
     def get_file_sizes(self, bucket: str, prefix: str) -> dict[S3Path, int]:
         """
         Retrieves a mapping of object key to size (in bytes) for all files under a prefix.
-        Used when resuming an upload to determine which files are already present and complete.
         """
         sizes = {}
         paginator = self._client.get_paginator('list_objects_v2')
