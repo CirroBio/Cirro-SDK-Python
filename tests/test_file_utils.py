@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import Mock, call
 
 from cirro.file_utils import upload_directory, get_files_in_directory, get_files_stats
+from cirro.models.s3_path import S3Path
 
 
 class TestFileUtils(unittest.TestCase):
@@ -117,7 +118,7 @@ class TestFileUtils(unittest.TestCase):
         pending = directory / 'files.csv'
 
         self.mock_s3_client.get_file_sizes = Mock(return_value={
-            f'{self.test_prefix}/samplesheet.csv': uploaded.stat().st_size
+            S3Path(f's3://{self.test_bucket}/{self.test_prefix}/samplesheet.csv'): uploaded.stat().st_size
         })
 
         upload_directory(directory=directory,
@@ -139,7 +140,7 @@ class TestFileUtils(unittest.TestCase):
         partial = directory / 'samplesheet.csv'
 
         self.mock_s3_client.get_file_sizes = Mock(return_value={
-            f'{self.test_prefix}/samplesheet.csv': partial.stat().st_size - 1  # remote is incomplete
+            S3Path(f's3://{self.test_bucket}/{self.test_prefix}/samplesheet.csv'): partial.stat().st_size - 1  # remote is incomplete
         })
 
         upload_directory(directory=directory,
