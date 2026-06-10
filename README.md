@@ -81,6 +81,29 @@ Options:
 $ cirro upload --project "Test Project 1" --name "test" --file "sample1.fastq.gz" --file "sample2.fastq.gz" --data-directory "~/data" --data-type "Paired DNAseq (FASTQ)" 
 ```
 
+#### Resuming an upload:
+
+```bash
+Usage: cirro resume-upload [OPTIONS]
+
+  Resume uploading files to an existing pending dataset. Only files not uploaded or modified locally are uploaded.
+
+Options:
+  --project TEXT         Name or ID of the project
+  --dataset TEXT         Name or ID of the dataset to resume uploading to
+  --data-directory TEXT  Directory you wish to upload
+  --file TEXT            Relative path of the file(s) to upload (optional, can
+                         be used multiple times)
+  -i, --interactive      Gather arguments interactively
+  --include-hidden       Include hidden files in the upload (e.g., files
+                         starting with .)
+  --help                 Show this message and exit.
+```
+
+```bash
+$ cirro resume-upload --project "Test Project 1" --name "test" --file "sample1.fastq.gz" --file "sample2.fastq.gz" --data-directory "~/data" --data-type "Paired DNAseq (FASTQ)"
+```
+
 #### Validating that a dataset matches a local folder
 
 ```bash
