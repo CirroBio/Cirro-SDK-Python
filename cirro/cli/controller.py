@@ -69,7 +69,7 @@ def run_ingest(input_params: UploadArguments, interactive=False):
         input_params['project'] = get_id_from_name(projects, input_params['project'])
         input_params['data_type'] = get_id_from_name(processes, input_params['data_type'])
         directory = input_params['data_directory']
-        all_files = get_files_in_directory(directory)
+        all_files = get_files_in_directory(directory, input_params['include_hidden'])
         if input_params['file']:
             files = input_params['file']
             validate_files(all_files, files, directory)
@@ -133,7 +133,7 @@ def run_resume_upload(input_params: ResumeUploadArguments, interactive=False):
         datasets = cirro.datasets.list(project_id)
         dataset_id = get_id_from_name(datasets, input_params['dataset'])
         directory = input_params['data_directory']
-        all_files = get_files_in_directory(directory)
+        all_files = get_files_in_directory(directory, input_params['include_hidden'])
         if input_params['file']:
             files = input_params['file']
             validate_files(all_files, files, directory)
