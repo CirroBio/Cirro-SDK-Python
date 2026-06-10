@@ -243,7 +243,8 @@ class DatasetService(FileEnabledService):
                      dataset_id: str,
                      directory: PathLike,
                      files: List[PathLike] = None,
-                     file_path_map: Dict[PathLike, str] = None) -> None:
+                     file_path_map: Dict[PathLike, str] = None,
+                     resume: bool = False) -> None:
         """
         Uploads files to a given dataset from the specified directory.
 
@@ -259,6 +260,8 @@ class DatasetService(FileEnabledService):
                 must be the same type as directory.
             file_path_map (typing.Dict[str|Path, str|Path]): Optional mapping of file paths to upload
              from source path to destination path, used to "re-write" paths within the dataset.
+            resume (bool): If True, skip files already uploaded to the dataset, only uploading
+             the files that are still missing. Used to continue an interrupted upload.
         ```python
         from cirro.cirro_client import CirroApi
         from cirro.file_utils import generate_flattened_file_map
@@ -301,7 +304,8 @@ class DatasetService(FileEnabledService):
             access_context=access_context,
             directory=directory,
             files=files,
-            file_path_map=file_path_map
+            file_path_map=file_path_map,
+            resume=resume
         )
 
     def validate_folder(

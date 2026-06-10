@@ -9,6 +9,7 @@ from botocore.session import get_session
 from cirro_api_client.v1.models import AWSCredentials
 from tqdm import tqdm
 
+from cirro.models.s3_path import S3Path
 from cirro.utils import convert_size
 
 
@@ -94,16 +95,21 @@ class S3Client:
         """
         Retrieves a list of files given a prefix
         """
-        files = []
+        return [str(f) for f in self.get_file_sizes(bucket, prefix)]
+
+    def get_file_sizes(self, bucket: str, prefix: str) -> dict[S3Path, int]:
+        """
+        Retrieves a mapping of object key to size (in bytes) for all files under a prefix.
+        """
+        sizes = {}
         paginator = self._client.get_paginator('list_objects_v2')
         s3_pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
         for page in s3_pages:
             for obj in page.get('Contents') or []:
                 if obj['Size'] == 0:  # Is directory
                     continue
-                key = obj["Key"]
-                files.append(f"s3://{bucket}/{key}")
-        return files
+                sizes[S3Path(f"s3://{bucket}/{obj['Key']}")] = obj["Size"]
+        return sizes
 
     def _build_session_client(self):
         # Use standard client if creds are not provided

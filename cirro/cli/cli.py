@@ -6,7 +6,8 @@ from cirro_api_client.v1.errors import CirroException
 
 from cirro.cli import run_create_pipeline_config, run_validate_folder
 from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets
-from cirro.cli.controller import handle_error, run_upload_reference, run_list_projects, run_list_files
+from cirro.cli.controller import handle_error, run_upload_reference, run_list_projects, run_list_files, \
+    run_resume_upload
 from cirro.cli.debug import run_debug
 from cirro.cli.interactive.utils import InputError
 
@@ -105,6 +106,28 @@ def download(**kwargs):
 def upload(**kwargs):
     check_required_args(kwargs)
     run_ingest(kwargs, interactive=kwargs.get('interactive'))
+
+
+@run.command(help='Resume uploading files to an existing pending dataset', no_args_is_help=True)
+@click.option('--project',
+              help='Name or ID of the project')
+@click.option('--dataset',
+              help='Name or ID of the dataset to resume uploading to')
+@click.option('--data-directory',
+              help='Directory you wish to upload')
+@click.option('--file',
+              help='Relative path of the file(s) to upload (optional, can be used multiple times)',
+              default=[],
+              multiple=True)
+@click.option('-i', '--interactive',
+              help='Gather arguments interactively',
+              is_flag=True, default=False)
+@click.option('--include-hidden',
+              help='Include hidden files in the upload (e.g., files starting with .)',
+              is_flag=True, default=False)
+def resume_upload(**kwargs):
+    check_required_args(kwargs)
+    run_resume_upload(kwargs, interactive=kwargs.get('interactive'))
 
 
 @run.command(help='Validate a dataset exactly matches a local folder', no_args_is_help=True)

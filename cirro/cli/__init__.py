@@ -1,6 +1,6 @@
 from cirro.cli.controller import run_ingest, run_download, run_configure, run_list_datasets
 from cirro.cli.controller import run_create_pipeline_config, run_validate_folder
-from cirro.cli.controller import run_list_projects, run_list_files
+from cirro.cli.controller import run_list_projects, run_list_files, run_resume_upload
 from cirro.cli.debug import run_debug
 
 __all__ = [
@@ -13,4 +13,5 @@ __all__ = [
     'run_list_projects',
     'run_list_files',
     'run_debug',
+    'run_resume_upload',
 ]

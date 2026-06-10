@@ -10,6 +10,7 @@ from botocore.exceptions import ConnectionError
 
 from cirro.clients import S3Client
 from cirro.models.file import DirectoryStatistics, File, PathLike
+from cirro.models.s3_path import S3Path
 
 if os.name == 'nt':
     import win32api
@@ -130,7 +131,8 @@ def upload_directory(directory: PathLike,
                      s3_client: S3Client,
                      bucket: str,
                      prefix: str,
-                     max_retries=10):
+                     max_retries=10,
+                     resume=False):
     """
     @private
 
@@ -144,10 +146,17 @@ def upload_directory(directory: PathLike,
         bucket (str): S3 bucket
         prefix (str): S3 prefix
         max_retries (int): Number of retries
+        resume (bool): Skip files that are already present in S3 under the prefix
     """
     # Ensure all files are of the same type as the directory
     if not all(isinstance(file, type(directory)) for file in files):
         raise ValueError("All files must be of the same type as the directory (str or Path)")
+
+    # When resuming, map the files already uploaded to their size so completed
+    # uploads can be skipped while half-uploaded files are re-sent.
+    # List with a trailing slash so the request prefix falls within the
+    # ListBucket s3:prefix condition on the vended upload credentials.
+    already_uploaded = s3_client.get_file_sizes(bucket, f'{prefix}/') if resume else {}
 
     for file in files:
         if isinstance(file, str):
@@ -163,6 +172,14 @@ def upload_directory(directory: PathLike,
             file_relative = file_path.relative_to(directory).as_posix()
 
         key = f'{prefix}/{file_relative}'
+
+        # When resuming, skip files already uploaded with a matching size.
+        # A size mismatch implies a modified file, so re-upload the file.
+        expected_path = S3Path(f"s3://{bucket}/{key}")
+        if resume and already_uploaded.get(expected_path) == file_path.stat().st_size:
+            print(f"Uploading {file_relative} skipped as it has already been uploaded.")
+            continue
+
         success = False
 
         # Retry up to max_retries times

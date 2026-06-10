@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import Mock, call
 
 from cirro.file_utils import upload_directory, get_files_in_directory, get_files_stats
+from cirro.models.s3_path import S3Path
 
 
 class TestFileUtils(unittest.TestCase):
@@ -110,3 +111,68 @@ class TestFileUtils(unittest.TestCase):
                  bucket=self.test_bucket,
                  key=f'{self.test_prefix}/folder1/unmapped.txt')
         ], any_order=True)
+
+    def test_upload_directory_resume_skips_already_uploaded(self):
+        directory = Path(__file__).parent / 'data' / 'example_data_1'
+        uploaded = directory / 'samplesheet.csv'
+        pending = directory / 'files.csv'
+
+        self.mock_s3_client.get_file_sizes = Mock(return_value={
+            S3Path(f's3://{self.test_bucket}/{self.test_prefix}/samplesheet.csv'): uploaded.stat().st_size
+        })
+
+        upload_directory(directory=directory,
+                         files=[uploaded, pending],
+                         file_path_map={},
+                         s3_client=self.mock_s3_client,
+                         bucket=self.test_bucket,
+                         prefix=self.test_prefix,
+                         resume=True)
+
+        # Only the file not already present should be uploaded
+        self.mock_s3_client.upload_file.assert_called_once_with(
+            file_path=pending,
+            bucket=self.test_bucket,
+            key=f'{self.test_prefix}/files.csv')
+
+    def test_upload_directory_resume_reuploads_size_mismatch(self):
+        directory = Path(__file__).parent / 'data' / 'example_data_1'
+        partial = directory / 'samplesheet.csv'
+
+        self.mock_s3_client.get_file_sizes = Mock(return_value={
+            S3Path(f's3://{self.test_bucket}/{self.test_prefix}/samplesheet.csv'): partial.stat().st_size - 1  # remote is incomplete
+        })
+
+        upload_directory(directory=directory,
+                         files=[partial],
+                         file_path_map={},
+                         s3_client=self.mock_s3_client,
+                         bucket=self.test_bucket,
+                         prefix=self.test_prefix,
+                         resume=True)
+
+        # A modified file (different size) should be reuploaded
+        self.mock_s3_client.upload_file.assert_called_once_with(
+            file_path=partial,
+            bucket=self.test_bucket,
+            key=f'{self.test_prefix}/samplesheet.csv')
+
+    def test_upload_directory_resume_disabled_ignores_remote(self):
+        directory = Path(__file__).parent / 'data' / 'example_data_1'
+        file1 = directory / 'samplesheet.csv'
+        file2 = directory / 'files.csv'
+
+        upload_directory(directory=directory,
+                         files=[file1, file2],
+                         file_path_map={},
+                         s3_client=self.mock_s3_client,
+                         bucket=self.test_bucket,
+                         prefix=self.test_prefix)
+
+        # Should not get file sizes and should upload all files.
+        self.mock_s3_client.get_file_sizes.assert_not_called()
+        self.mock_s3_client.upload_file.assert_has_calls([
+            call(file_path=file1, bucket=self.test_bucket, key=f'{self.test_prefix}/samplesheet.csv'),
+            call(file_path=file2, bucket=self.test_bucket, key=f'{self.test_prefix}/files.csv'),
+        ], any_order=True)
+
