@@ -101,7 +101,7 @@ Options:
 ```
 
 ```bash
-$ cirro resume-upload --project "Test Project 1" --name "test" --file "sample1.fastq.gz" --file "sample2.fastq.gz" --data-directory "~/data" --data-type "Paired DNAseq (FASTQ)"
+$ cirro resume-upload --project "Test Project 1" --dataset "test" --data-directory "~/data" --file "sample1.fastq.gz" --file "sample2.fastq.gz" --include-hidden
 ```
 
 #### Validating that a dataset matches a local folder
