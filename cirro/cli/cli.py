@@ -147,6 +147,12 @@ def configure():
     run_configure()
 
 
+@run.command(help='Launch the interactive Terminal UI')
+def tui():
+    from cirro.cli.tui import launch
+    launch()
+
+
 @run.command(help='Create pipeline configuration files')
 @click.option('-p', '--pipeline-dir',
               metavar='DIRECTORY',
