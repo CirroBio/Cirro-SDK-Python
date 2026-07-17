@@ -21,7 +21,28 @@ class DirectoryValidator(Validator):
             )
 
 
+def _get_tui_bridge():
+    """Return the active TUIBridge, or None if not running under the TUI.
+
+    Imported lazily so that this module has no hard dependency on textual.
+    """
+    try:
+        from cirro.cli.tui.bridge import get_current_bridge
+    except Exception:
+        return None
+    return get_current_bridge()
+
+
 def prompt_wrapper(questions):
+    bridge = _get_tui_bridge()
+    if bridge is not None:
+        specs = questions if isinstance(questions, list) else [questions]
+        answers = {}
+        for spec in specs:
+            value = bridge.ask(spec)
+            answers[spec.get("name", "value")] = value
+        return answers
+
     answers = prompt(questions)
     # Prompt catches KeyboardInterrupt and sends back an empty dictionary
     # We want to catch this exception
@@ -49,15 +70,6 @@ def ask(function_name: str,
     function_name: https://questionary.readthedocs.io/en/stable/pages/types.html#
     """
 
-    # Get the questionary function
-    questionary_f = questionary.__dict__.get(function_name)
-
-    # Make sure that the function exists
-    assert questionary_f is not None, f"No such questionary function: {function_name}"
-
-    if kwargs.get("use_shortcuts") is None and function_name == "select":
-        kwargs["use_shortcuts"] = True
-
     if validate_type is not None:
         kwargs["validate"] = lambda v: type_validator(validate_type, v)
 
@@ -68,6 +80,23 @@ def ask(function_name: str,
     if kwargs.get("required"):
         del kwargs["required"]
         kwargs["validate"] = lambda val: len(val.strip()) > 0 or "This field is required"
+
+    bridge = _get_tui_bridge()
+    if bridge is not None:
+        spec = {"type": function_name, "message": msg, **kwargs}
+        resp = bridge.ask(spec)
+        if output_transformer is not None:
+            resp = output_transformer(resp)
+        return resp
+
+    # Get the questionary function
+    questionary_f = questionary.__dict__.get(function_name)
+
+    # Make sure that the function exists
+    assert questionary_f is not None, f"No such questionary function: {function_name}"
+
+    if kwargs.get("use_shortcuts") is None and function_name == "select":
+        kwargs["use_shortcuts"] = True
 
     # Add a spacer line before asking the question
     print("")
