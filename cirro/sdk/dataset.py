@@ -630,7 +630,7 @@ class DataPortalDataset(DataPortalAsset):
             samplesheet_contents = Path(file_path).expanduser().read_text()
 
         # Validate samplesheet
-        file_names = [f.file_name for f in self.list_files()]
+        file_names = [f.name.removeprefix('data/') for f in self.list_files()]
         request = ValidateFileRequirementsRequest(
             file_names=file_names,
             sample_sheet=samplesheet_contents,
