@@ -15,7 +15,7 @@ from cirro.sdk.exceptions import DataPortalInputError
 class FileReadMixin(ABC):
     """
     Mixin that adds file-reading methods to any class that provides
-    `_get() -> bytes` and a `name` property.
+    ``_get() -> bytes`` and a ``name`` property.
     """
 
     @property
@@ -132,8 +132,8 @@ class FileReadMixin(ABC):
         """
         Read a Parquet file as a Pandas DataFrame.
 
-        Requires `pyarrow` or `fastparquet` to be installed.
-        All keyword arguments are passed to `pandas.read_parquet()`.
+        Requires ``pyarrow`` or ``fastparquet`` to be installed.
+        All keyword arguments are passed to :func:`pandas.read_parquet`.
         """
         import pandas
         return pandas.read_parquet(BytesIO(self._get()), **kwargs)
@@ -142,8 +142,8 @@ class FileReadMixin(ABC):
         """
         Read a Feather file as a Pandas DataFrame.
 
-        Requires `pyarrow` to be installed.
-        All keyword arguments are passed to `pandas.read_feather()`.
+        Requires ``pyarrow`` to be installed.
+        All keyword arguments are passed to :func:`pandas.read_feather`.
         """
         import pandas
         return pandas.read_feather(BytesIO(self._get()), **kwargs)
@@ -154,10 +154,10 @@ class FileReadMixin(ABC):
 
     def read_excel(self, **kwargs) -> 'DataFrame':
         """
-        Read an Excel file (`.xlsx` / `.xls`) as a Pandas DataFrame.
+        Read an Excel file (``.xlsx`` / ``.xls``) as a Pandas DataFrame.
 
-        Requires `openpyxl` (for `.xlsx`) or `xlrd` (for `.xls`).
-        All keyword arguments are passed to `pandas.read_excel()`.
+        Requires ``openpyxl`` (for ``.xlsx``) or ``xlrd`` (for ``.xls``).
+        All keyword arguments are passed to :func:`pandas.read_excel`.
         """
         import pandas
         return pandas.read_excel(BytesIO(self._get()), **kwargs)

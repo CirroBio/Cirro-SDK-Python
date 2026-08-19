@@ -335,11 +335,11 @@ class DataPortalDataset(DataPortalAsset):
         """
         Find the root-cause failed task in this workflow execution.
 
-        Returns `None` gracefully when no tasks are available or none have
-        a `FAILED` status.
+        Returns ``None`` gracefully when no tasks are available or none have
+        a ``FAILED`` status.
 
         Returns:
-            `cirro.sdk.task.DataPortalTask`, or `None` if no failed task is found.
+            `cirro.sdk.task.DataPortalTask`, or ``None`` if no failed task is found.
         """
         from cirro.helpers.nextflow_utils import find_primary_failed_task
 
@@ -444,24 +444,24 @@ class DataPortalDataset(DataPortalAsset):
         """
         Read the contents of files in the dataset, without downloading them.
 
-        Exactly one of `glob` or `pattern` must be provided.
+        Exactly one of ``glob`` or ``pattern`` must be provided.
 
         **glob** -- standard wildcard matching; yields the file content for each
         matching file:
 
-        - `*` matches any characters within a single path segment
-        - `**` matches zero or more path segments
-        - Matching is suffix-anchored (`*.csv` matches at any depth)
+        - ``*`` matches any characters within a single path segment
+        - ``**`` matches zero or more path segments
+        - Matching is suffix-anchored (``*.csv`` matches at any depth)
 
-        **pattern** -- like `glob` but `{name}` placeholders capture portions of
-        the path automatically; yields `(content, meta)` pairs where *meta* is a
-        `dict` of extracted values:
+        **pattern** -- like ``glob`` but ``{name}`` placeholders capture portions of
+        the path automatically; yields ``(content, meta)`` pairs where *meta* is a
+        ``dict`` of extracted values:
 
-        - `{name}` captures one path segment (no `/`)
-        - `*` and `**` wildcards work as in `glob`
+        - ``{name}`` captures one path segment (no ``/``)
+        - ``*`` and ``**`` wildcards work as in ``glob``
 
-        See `cirro.sdk.portal.DataPortal.read_files()` for the full list of
-        `filetype` values and the extensions each one is inferred from.
+        See :meth:`cirro.sdk.portal.DataPortal.read_files` for the full list of
+        ``filetype`` values and the extensions each one is inferred from.
 
         ```python
         # Every CSV in the dataset, as DataFrames
@@ -480,19 +480,19 @@ class DataPortalDataset(DataPortalAsset):
         Args:
             glob (str): Wildcard expression to match files.
                 Yields one item per matching file: the parsed content.
-            pattern (str): Wildcard expression with `{name}` capture
-                placeholders. Yields `(content, meta)` per matching file.
+            pattern (str): Wildcard expression with ``{name}`` capture
+                placeholders. Yields ``(content, meta)`` per matching file.
             filetype (str): File format used to parse each file
-                (or `None` to infer from extension).
+                (or ``None`` to infer from extension).
             **kwargs: Additional keyword arguments forwarded to the
-                file-parsing function (e.g. `sep='\\t'` for TSV files).
+                file-parsing function (e.g. ``sep='\\t'`` for TSV files).
 
         Yields:
-            - When using `glob`: *content* for each matching file
-            - When using `pattern`: `(content, meta)` for each matching file
+            - When using ``glob``: *content* for each matching file
+            - When using ``pattern``: ``(content, meta)`` for each matching file
 
         Raises:
-            DataPortalInputError: if both `glob` and `pattern` are provided, or
+            DataPortalInputError: if both ``glob`` and ``pattern`` are provided, or
                 if neither is.
         """
         if glob is not None and pattern is not None:
@@ -521,7 +521,7 @@ class DataPortalDataset(DataPortalAsset):
         Read the contents of a single file from the dataset, without
         downloading it.
 
-        Provide either `path` (the exact relative path) or `glob` (a wildcard
+        Provide either ``path`` (the exact relative path) or ``glob`` (a wildcard
         expression, which must match exactly one file).
 
         ```python
@@ -533,17 +533,17 @@ class DataPortalDataset(DataPortalAsset):
             path (str): Exact relative path of the file within the dataset.
             glob (str): Wildcard expression matching exactly one file.
             filetype (str): File format used to parse the file. Supported values
-                are the same as `cirro.sdk.portal.DataPortal.read_files()`.
+                are the same as :meth:`cirro.sdk.portal.DataPortal.read_files`.
             **kwargs: Additional keyword arguments forwarded to the file-parsing
                 function.
 
         Returns:
-            Parsed file content -- a `pandas.DataFrame` for tabular formats, a
-            `str` for text, and so on depending on `filetype`.
+            Parsed file content -- a ``pandas.DataFrame`` for tabular formats, a
+            ``str`` for text, and so on depending on ``filetype``.
 
         Raises:
-            DataPortalInputError: if both or neither of `path`/`glob` are given,
-                or if `glob` matches more than one file.
+            DataPortalInputError: if both or neither of ``path``/``glob`` are given,
+                or if ``glob`` matches more than one file.
             DataPortalAssetNotFound: if nothing matches.
         """
         if path is not None and glob is not None:
@@ -642,7 +642,7 @@ class DataPortalDataset(DataPortalAsset):
         Args:
             download_location (str): Path to local directory
             glob (str): Optional wildcard expression to filter which files are downloaded
-                (e.g., `'*.csv'`, `'data/**/*.tsv.gz'`).
+                (e.g., ``'*.csv'``, ``'data/**/*.tsv.gz'``).
                 If omitted, all files are downloaded.
         """
 

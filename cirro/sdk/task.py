@@ -28,8 +28,8 @@ class WorkDirFile(FileReadMixin):
     A file that lives in a Nextflow work directory or a dataset staging area.
 
     Each WorkDirFile either originated from another task's work directory
-    (`source_task` is set) or was a primary/staged input to the workflow
-    (`source_task` is `None`).
+    (``source_task`` is set) or was a primary/staged input to the workflow
+    (``source_task`` is ``None``).
     """
 
     def __init__(
@@ -42,7 +42,7 @@ class WorkDirFile(FileReadMixin):
         dataset_id: str = ''
     ):
         """
-        Obtained from a task's `inputs` or `outputs` property.
+        Obtained from a task's ``inputs`` or ``outputs`` property.
 
         ```python
         for task in dataset.tasks:
@@ -60,7 +60,7 @@ class WorkDirFile(FileReadMixin):
 
     @property
     def source_task(self) -> Optional['DataPortalTask']:
-        """The task that produced this file, or `None` for staged/primary inputs."""
+        """The task that produced this file, or ``None`` for staged/primary inputs."""
         return self._source_task
 
     @property
@@ -143,7 +143,7 @@ class DataPortalTask:
         task_id: int = 0
     ):
         """
-        Obtained from a dataset's `tasks` property.
+        Obtained from a dataset's ``tasks`` property.
 
         ```python
         for task in dataset.tasks:
@@ -157,7 +157,7 @@ class DataPortalTask:
             project_id (str): ID of the project that owns this dataset.
             dataset_id (str): ID of the dataset (execution) that owns this task.
             all_tasks_ref (list): A shared list that will contain all tasks once they
-                are all built.  Used by `inputs` to resolve `source_task`.
+                are all built.  Used by ``inputs`` to resolve ``source_task``.
             task_id (int): Numeric index of this task in the execution's task list.
         """
         self._task = task
@@ -178,12 +178,12 @@ class DataPortalTask:
 
     @property
     def name(self) -> str:
-        """Full task name, e.g. `NFCORE_RNASEQ:RNASEQ:TRIMGALORE (sample1)`."""
+        """Full task name, e.g. ``NFCORE_RNASEQ:RNASEQ:TRIMGALORE (sample1)``."""
         return self._task.name
 
     @property
     def status(self) -> str:
-        """Task status string, e.g. `COMPLETED`, `FAILED`, `ABORTED`."""
+        """Task status string, e.g. ``COMPLETED``, ``FAILED``, ``ABORTED``."""
         return self._task.status
 
     @property
@@ -279,7 +279,7 @@ class DataPortalTask:
 
         Fetches via the Cirro execution API when a native job ID is available,
         which works even when the S3 scratch bucket is not directly accessible.
-        Falls back to reading `.command.log` from the S3 work directory.
+        Falls back to reading ``.command.log`` from the S3 work directory.
         Returns an empty string if neither source can be read.
         """
         if self._dataset_id and self.native_id:
@@ -296,11 +296,11 @@ class DataPortalTask:
     @cached_property
     def script(self) -> str:
         """
-        Return the contents of `.command.sh` from the task's work directory.
+        Return the contents of ``.command.sh`` from the task's work directory.
 
         This is the actual shell script that Nextflow executed — the user's
         pipeline code for this task.  Falls back to parsing the script from the
-        `WORKFLOW_LOGS` artifact when the work directory is not accessible
+        ``WORKFLOW_LOGS`` artifact when the work directory is not accessible
         (scratch bucket requires elevated permissions).
         Returns an empty string if the script cannot be obtained.
         """
@@ -379,7 +379,7 @@ class DataPortalTask:
         """
         List of input files for this task, fetched from the execution API.
 
-        Each file is annotated with `source_task` if its URI falls within
+        Each file is annotated with ``source_task`` if its URI falls within
         another task's work directory.
         """
         return self._build_inputs()
