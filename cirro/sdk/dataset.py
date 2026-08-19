@@ -24,17 +24,17 @@ from cirro.sdk.process import DataPortalProcess
 
 def _pattern_to_captures_regex(pattern: str):
     """
-    Convert a glob pattern that may contain `{name}` capture placeholders into
-    a compiled regex and return `(compiled_regex, capture_names)`.
+    Convert a glob pattern that may contain ``{name}`` capture placeholders into
+    a compiled regex and return ``(compiled_regex, capture_names)``.
 
     Conversion rules:
-      - `{name}`  → named group matching a single path segment (no `/`)
-      - `*`       → matches any characters within a single path segment
-      - `**`      → matches any characters including `/` (multiple segments)
+      - ``{name}``  → named group matching a single path segment (no ``/``)
+      - ``*``       → matches any characters within a single path segment
+      - ``**``      → matches any characters including ``/`` (multiple segments)
       - All other characters are regex-escaped.
 
-    The resulting regex is suffix-anchored (like `pathlib.PurePath.match`):
-    a pattern without a leading `/` will match at any depth in the path.
+    The resulting regex is suffix-anchored (like ``pathlib.PurePath.match``):
+    a pattern without a leading ``/`` will match at any depth in the path.
     """
     capture_names = re.findall(r'\{(\w+)\}', pattern)
     tokens = re.split(r'(\*\*|\*|\{\w+\})', pattern)
@@ -172,9 +172,10 @@ class DataPortalDataset(DataPortalAsset):
     @property
     def status(self) -> Status:
         """
-        Status of the dataset: one of `PENDING`, `STARTING`, `RUNNING`,
-        `COMPLETED`, `FAILED`, `STOPPING`, `SUSPENDED`, `ARCHIVED`, `DELETING`,
-        `DELETED`, or `UNKNOWN`.
+        Status of the dataset, as a `cirro_api_client.v1.models.Status` -- see
+        that enum for the full set of values. An analysis moves through
+        `PENDING`, `STARTING` and `RUNNING` before reaching `COMPLETED` or
+        `FAILED`.
 
         This is a snapshot taken when the object was built, and it does not
         update. To watch a running analysis, call `portal.get_dataset(...)`
@@ -268,10 +269,11 @@ class DataPortalDataset(DataPortalAsset):
         """
         Return the top-level execution log for this dataset.
 
-        This is the log from the head node driving the workflow -- Nextflow's
-        own output, including which tasks it submitted and why the run stopped.
-        For the stdout/stderr of one task, use `cirro.sdk.task.DataPortalTask.logs`;
-        for the log file archived once the run finishes, use `get_logs`.
+        This is the log from the head node driving the workflow -- the output of
+        Nextflow or Cromwell itself, depending on the process executor,
+        including which tasks it submitted and why the run stopped. For the
+        stdout/stderr of one task, use `cirro.sdk.task.DataPortalTask.logs`; for
+        the log file archived once the run finishes, use `get_logs`.
 
         Returns an empty string if no log events are available (e.g. the job has not started yet).
 
@@ -568,22 +570,22 @@ class DataPortalDataset(DataPortalAsset):
         Read the Nextflow workflow trace file for this dataset as a DataFrame.
 
         One row per task, with timing, resource usage, and exit status. Written
-        when the run finishes.
+        when the run finishes. This artifact is specific to Nextflow -- a
+        Cromwell (WDL) analysis does not produce one.
 
         Returns:
             `pandas.DataFrame`
 
         Raises:
             DataPortalAssetNotFound: if the dataset has no workflow trace
-                artifact, which is the case for datasets that were uploaded
-                rather than produced by a Nextflow analysis, and for runs that
-                have not finished.
+                artifact -- true for uploaded datasets, for Cromwell analyses,
+                and for runs that have not finished.
         """
         return self.get_artifact(ArtifactType.WORKFLOW_TRACE).read_csv(sep='\t')
 
     def get_logs(self) -> str:
         """
-        Read the archived Nextflow workflow log for this dataset as a string.
+        Read the archived workflow log for this dataset as a string.
 
         This reads the `WORKFLOW_LOGS` artifact, written when the run finishes.
         For the live head-node log of a run in progress, use `logs` instead.
