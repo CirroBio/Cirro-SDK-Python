@@ -15,7 +15,7 @@ from cirro.sdk.exceptions import DataPortalInputError
 class FileReadMixin(ABC):
     """
     Mixin that adds file-reading methods to any class that provides
-    ``_get() -> bytes`` and a ``name`` property.
+    `_get() -> bytes` and a `name` property.
     """
 
     @property
@@ -28,7 +28,19 @@ class FileReadMixin(ABC):
         """Return the raw file bytes."""
 
     def read(self, encoding='utf-8', compression=None) -> str:
-        """Read the file contents as text."""
+        """
+        Read the file contents as text.
+
+        Args:
+            encoding (str): Text encoding to decode with.
+            compression (str): Pass `'gzip'` to decompress first, or `None` to
+                read the bytes as-is. Unlike `read_csv`, this is not inferred
+                from the file extension.
+
+        Raises:
+            DataPortalInputError: if `compression` is anything other than
+                `'gzip'` or `None`.
+        """
         cont = self._get()
         if compression is None:
             return cont.decode(encoding)
@@ -38,24 +50,42 @@ class FileReadMixin(ABC):
             return handle.read()
 
     def readlines(self, encoding='utf-8', compression=None) -> List[str]:
-        """Read the file contents as a list of lines."""
+        """
+        Read the file contents as a list of lines, without trailing newlines.
+
+        Args:
+            encoding (str): Text encoding to decode with.
+            compression (str): Pass `'gzip'` to decompress first, or `None` to
+                read the bytes as-is.
+        """
         return self.read(encoding=encoding, compression=compression).splitlines()
 
     def read_bytes(self) -> BytesIO:
-        """Get a BytesIO object for the file contents, to pass into arbitrary readers."""
+        """
+        Get a BytesIO object for the file contents, to pass into arbitrary readers.
+
+        Use this for formats the mixin does not cover -- the whole file is read
+        into memory and handed over as a file-like object.
+        """
         return BytesIO(self._get())
 
     def read_csv(self, compression='infer', encoding='utf-8', **kwargs) -> 'DataFrame':
         """
         Parse the file as a Pandas DataFrame.
 
-        The default field separator is a comma (for CSV), use sep='\\t' for TSV.
+        Args:
+            compression (str | dict): How the file is compressed. The default,
+                `'infer'`, picks gzip/bz2/xz/zstd from a `.gz`, `.bz2`, `.xz`,
+                or `.zst` extension, and no compression otherwise. Pass `None`
+                to force reading as plain text.
+            encoding (str): Text encoding to decode with.
+            **kwargs: Passed through to
+                [pandas.read_csv](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html).
+                The field separator defaults to a comma, so pass `sep='\\t'`
+                for TSV files.
 
-        File compression is inferred from the extension, but can be set
-        explicitly with the compression= flag.
-
-        All other keyword arguments are passed to pandas.read_csv
-        https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html
+        Returns:
+            `pandas.DataFrame`
         """
         import pandas
 
@@ -102,8 +132,8 @@ class FileReadMixin(ABC):
         """
         Read a Parquet file as a Pandas DataFrame.
 
-        Requires ``pyarrow`` or ``fastparquet`` to be installed.
-        All keyword arguments are passed to :func:`pandas.read_parquet`.
+        Requires `pyarrow` or `fastparquet` to be installed.
+        All keyword arguments are passed to `pandas.read_parquet()`.
         """
         import pandas
         return pandas.read_parquet(BytesIO(self._get()), **kwargs)
@@ -112,8 +142,8 @@ class FileReadMixin(ABC):
         """
         Read a Feather file as a Pandas DataFrame.
 
-        Requires ``pyarrow`` to be installed.
-        All keyword arguments are passed to :func:`pandas.read_feather`.
+        Requires `pyarrow` to be installed.
+        All keyword arguments are passed to `pandas.read_feather()`.
         """
         import pandas
         return pandas.read_feather(BytesIO(self._get()), **kwargs)
@@ -124,10 +154,10 @@ class FileReadMixin(ABC):
 
     def read_excel(self, **kwargs) -> 'DataFrame':
         """
-        Read an Excel file (``.xlsx`` / ``.xls``) as a Pandas DataFrame.
+        Read an Excel file (`.xlsx` / `.xls`) as a Pandas DataFrame.
 
-        Requires ``openpyxl`` (for ``.xlsx``) or ``xlrd`` (for ``.xls``).
-        All keyword arguments are passed to :func:`pandas.read_excel`.
+        Requires `openpyxl` (for `.xlsx`) or `xlrd` (for `.xls`).
+        All keyword arguments are passed to `pandas.read_excel()`.
         """
         import pandas
         return pandas.read_excel(BytesIO(self._get()), **kwargs)
