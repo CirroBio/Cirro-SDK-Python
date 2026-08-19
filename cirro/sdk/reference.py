@@ -16,7 +16,7 @@ class DataPortalReference(DataPortalAsset):
         """
         Instantiate by listing the references which have been added to a particular project
         ```python
-        from cirro import DataPortal()
+        from cirro import DataPortal
         portal = DataPortal()
         project = portal.get_project_by_name("Project Name")
         references = project.list_references()

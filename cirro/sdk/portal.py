@@ -108,11 +108,17 @@ class DataPortal:
         """
         Return a project identified by ID or name.
 
+        Tries to match by ID first, then falls back to matching by name.
+
         Args:
             project (str): ID or name of project
 
         Returns:
-            `from cirro.sdk.project import DataPortalProject`
+            `cirro.sdk.project.DataPortalProject`
+
+        Raises:
+            DataPortalAssetNotFound: if no project matches by either ID or name.
+            DataPortalInputError: if more than one project has this name.
         """
         try:
             return self.get_project_by_id(project)
@@ -131,7 +137,7 @@ class DataPortal:
             `cirro.sdk.dataset.DataPortalDataset`
 
             ```python
-            from cirro import DataPortal()
+            from cirro import DataPortal
             portal = DataPortal()
             dataset = portal.get_dataset(
                 project="id-or-name-of-project",

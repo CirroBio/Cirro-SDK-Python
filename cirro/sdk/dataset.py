@@ -340,11 +340,17 @@ class DataPortalDataset(DataPortalAsset):
         """
         Get a file from the dataset using its relative path.
 
+        The leading `data/` prefix is optional -- it is tried automatically if
+        the path is not found as given.
+
         Args:
             relative_path (str): Relative path of file within the dataset
 
         Returns:
-            `from cirro.sdk.file import DataPortalFile`
+            `cirro.sdk.file.DataPortalFile`
+
+        Raises:
+            DataPortalAssetNotFound: if no file in the dataset has this path.
         """
 
         # Get the list of files in this dataset
@@ -545,6 +551,35 @@ class DataPortalDataset(DataPortalAsset):
 
         The process can be provided as either a DataPortalProcess object,
         or a string which corresponds to the name or ID of the process.
+
+        The analysis runs asynchronously. The output dataset is registered
+        immediately in a `PENDING` state and this method returns as soon as the
+        job is submitted -- it does not wait for the analysis to finish.
+
+        To find out which `params` a process accepts, ask the process itself:
+
+        ```python
+        process = portal.get_process_by_name("Name of process")
+        spec = process.get_parameter_spec()
+        spec.print()               # human-readable listing of every parameter
+        spec.validate_params(params)   # raises if params do not fit the schema
+        ```
+
+        To follow the analysis, re-fetch the dataset each time round the loop.
+        `status` on a dataset object you already hold reflects the moment that
+        object was built and will never change:
+
+        ```python
+        from time import sleep
+        from cirro_api_client.v1.models import Status
+
+        dataset_id = dataset.run_analysis(name="Output", process="Name of process")
+        while True:
+            result = portal.get_dataset(project=dataset.project_id, dataset=dataset_id)
+            if result.status in (Status.COMPLETED, Status.FAILED):
+                break
+            sleep(30)
+        ```
 
         Args:
             name (str): Name of newly created dataset

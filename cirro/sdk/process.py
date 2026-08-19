@@ -17,7 +17,7 @@ class DataPortalProcess(DataPortalAsset):
         Instantiate with helper method
 
         ```python
-        from cirro import DataPortal()
+        from cirro import DataPortal
         portal = DataPortal()
         process = portal.get_process_by_name("Process Name")
         ```
@@ -94,6 +94,14 @@ class DataPortalProcess(DataPortalAsset):
     def get_parameter_spec(self) -> ParameterSpecification:
         """
         Gets a specification used to describe the parameters used in the process.
+
+        This is the authoritative source for the keys accepted by the `params`
+        argument of `run_analysis`, along with their types and default values.
+        Call `print()` on the result for a readable listing, or
+        `validate_params()` to check a `params` dict before submitting it.
+
+        Returns:
+            `cirro.models.form_specification.ParameterSpecification`
         """
         return self._client.processes.get_parameter_spec(self.id)
 
@@ -111,6 +119,12 @@ class DataPortalProcess(DataPortalAsset):
     ) -> str:
         """
         Runs this process on one or more input datasets, returns the ID of the newly created dataset.
+
+        The analysis runs asynchronously; this returns as soon as the job is
+        submitted. Call `get_parameter_spec` to discover which `params` this
+        process accepts, and see
+        `cirro.sdk.dataset.DataPortalDataset.run_analysis` for how to follow the
+        analysis to completion.
 
         Args:
             name (str): Name of newly created dataset

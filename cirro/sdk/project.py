@@ -27,7 +27,7 @@ class DataPortalProject(DataPortalAsset):
         Instantiate with helper method
 
         ```python
-        from cirro import DataPortal()
+        from cirro import DataPortal
         portal = DataPortal()
         project = portal.get_project_by_name("Project Name")
         ```
