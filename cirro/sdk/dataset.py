@@ -172,7 +172,13 @@ class DataPortalDataset(DataPortalAsset):
     @property
     def status(self) -> Status:
         """
-        Status of the dataset
+        Status of the dataset: one of `PENDING`, `STARTING`, `RUNNING`,
+        `COMPLETED`, `FAILED`, `STOPPING`, `SUSPENDED`, `ARCHIVED`, `DELETING`,
+        `DELETED`, or `UNKNOWN`.
+
+        This is a snapshot taken when the object was built, and it does not
+        update. To watch a running analysis, call `portal.get_dataset(...)`
+        again each time round the loop rather than re-reading this property.
         """
         return self._data.status
 
@@ -224,14 +230,27 @@ class DataPortalDataset(DataPortalAsset):
 
     @property
     def file_count(self) -> int:
+        """
+        Number of files in the dataset.
+
+        Fetches the full dataset detail from the API on first access if this
+        object was built from a listing.
+        """
         return self._get_detail().file_count
 
     @property
     def total_size_bytes(self) -> int:
+        """
+        Combined size of every file in the dataset, in bytes.
+
+        Fetches the full dataset detail from the API on first access if this
+        object was built from a listing.
+        """
         return self._get_detail().total_size_bytes
 
     @property
     def total_size(self) -> str:
+        """Combined size of every file in the dataset, human-readable (e.g. 4.50 GB)."""
         return bytes_to_human_readable(self.total_size_bytes)
 
     @property
@@ -249,7 +268,16 @@ class DataPortalDataset(DataPortalAsset):
         """
         Return the top-level execution log for this dataset.
 
+        This is the log from the head node driving the workflow -- Nextflow's
+        own output, including which tasks it submitted and why the run stopped.
+        For the stdout/stderr of one task, use `cirro.sdk.task.DataPortalTask.logs`;
+        for the log file archived once the run finishes, use `get_logs`.
+
         Returns an empty string if no log events are available (e.g. the job has not started yet).
+
+        Cached after the first access. Reading this while the analysis is still
+        starting up returns `''` and will keep returning `''` for the lifetime
+        of this object -- re-fetch the dataset to try again.
 
         Returns:
             str: Execution log text, or an empty string if unavailable.
@@ -267,8 +295,12 @@ class DataPortalDataset(DataPortalAsset):
         """
         List of tasks from the workflow execution, fetched via the execution API.
 
+        Cached after the first access, so a list read while the analysis is
+        still running will not pick up tasks that start later -- re-fetch the
+        dataset for an up-to-date list.
+
         Returns:
-            `List[DataPortalTask]`
+            `List[cirro.sdk.task.DataPortalTask]`
         """
         return self._load_tasks_from_api()
 
@@ -374,8 +406,17 @@ class DataPortalDataset(DataPortalAsset):
         """
         Return the list of files which make up the dataset.
 
+        The result is a `cirro.sdk.asset.DataPortalAssets` list, so it also
+        offers `get_by_name`, `get_by_id`, and `filter_by_pattern`. Files are
+        listed by their relative path within the dataset, most of which sit
+        under a `data/` prefix.
+
         Args:
-            file_limit (int): Maximum number of files to return (default 100,000)
+            file_limit (int): Maximum number of files to return (default 100,000).
+                A dataset with more files than this is truncated silently.
+
+        Returns:
+            `cirro.sdk.file.DataPortalFiles`
         """
         assets = self._client.datasets.get_assets_listing(
             project_id=self.project_id,
@@ -479,23 +520,49 @@ class DataPortalDataset(DataPortalAsset):
         """
         Read the Nextflow workflow trace file for this dataset as a DataFrame.
 
+        One row per task, with timing, resource usage, and exit status. Written
+        when the run finishes.
+
         Returns:
             `pandas.DataFrame`
+
+        Raises:
+            DataPortalAssetNotFound: if the dataset has no workflow trace
+                artifact, which is the case for datasets that were uploaded
+                rather than produced by a Nextflow analysis, and for runs that
+                have not finished.
         """
         return self.get_artifact(ArtifactType.WORKFLOW_TRACE).read_csv(sep='\t')
 
     def get_logs(self) -> str:
         """
-        Read the Nextflow workflow logs for this dataset as a string.
+        Read the archived Nextflow workflow log for this dataset as a string.
+
+        This reads the `WORKFLOW_LOGS` artifact, written when the run finishes.
+        For the live head-node log of a run in progress, use `logs` instead.
 
         Returns:
             str
+
+        Raises:
+            DataPortalAssetNotFound: if the dataset has no workflow log
+                artifact yet.
         """
         return self.get_artifact(ArtifactType.WORKFLOW_LOGS).read()
 
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """
-        Get the artifact of a particular type from the dataset
+        Get the artifact of a particular type from the dataset.
+
+        Args:
+            artifact_type (`cirro_api_client.v1.models.ArtifactType`): Type of
+                artifact to return, e.g. `ArtifactType.WORKFLOW_TRACE`.
+
+        Returns:
+            `cirro.sdk.file.DataPortalFile`
+
+        Raises:
+            DataPortalAssetNotFound: if the dataset has no artifact of this type.
         """
         artifacts = self._get_assets().artifacts
         artifact = next((a for a in artifacts if a.artifact_type == artifact_type), None)

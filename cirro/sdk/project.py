@@ -78,7 +78,20 @@ class DataPortalProject(DataPortalAsset):
                                  client=self._client)
 
     def list_datasets(self, force_refresh=False) -> DataPortalDatasets:
-        """List all the datasets available in the project."""
+        """
+        List all the datasets available in the project.
+
+        The listing is fetched once and cached on this object, since a project
+        may hold many thousands of datasets.
+
+        Args:
+            force_refresh (bool): Discard the cached listing and fetch it again.
+                Needed to see datasets created since this object was built.
+
+        Returns:
+            `cirro.sdk.dataset.DataPortalDatasets`, a list which also offers
+            `get_by_name`, `get_by_id`, and `filter_by_pattern`.
+        """
         if force_refresh:
             self._get_datasets.cache_clear()
 
@@ -90,10 +103,24 @@ class DataPortalProject(DataPortalAsset):
         )
 
     def get_dataset(self, name_or_id: str, force_refresh=False) -> DataPortalDataset:
-        """Return the dataset matching the given ID or name.
+        """
+        Return the dataset matching the given ID or name.
 
         Tries to match by ID first, then by name.
-        Raises an error if the name matches multiple datasets.
+
+        Args:
+            name_or_id (str): ID or name of the dataset.
+            force_refresh (bool): Discard the cached dataset listing before
+                matching by name. Needed to find a dataset created since this
+                object was built.
+
+        Returns:
+            `cirro.sdk.dataset.DataPortalDataset`
+
+        Raises:
+            DataPortalAssetNotFound: if nothing matches by either ID or name.
+            DataPortalInputError: if more than one dataset has this name, in
+                which case use `get_dataset_by_id`.
         """
         if force_refresh:
             self._get_datasets.cache_clear()
@@ -115,7 +142,22 @@ class DataPortalProject(DataPortalAsset):
         return self.get_dataset_by_id(matches[0].id)
 
     def get_dataset_by_name(self, name: str, force_refresh=False) -> DataPortalDataset:
-        """Return the dataset with the specified name."""
+        """
+        Return the dataset with the specified name.
+
+        If several datasets share the name, the first one in the listing is
+        returned. Use `get_dataset` if you would rather that were an error.
+
+        Args:
+            name (str): Name of the dataset.
+            force_refresh (bool): Discard the cached dataset listing first.
+
+        Returns:
+            `cirro.sdk.dataset.DataPortalDataset`
+
+        Raises:
+            DataPortalAssetNotFound: if no dataset in the project has this name.
+        """
         if force_refresh:
             self._get_datasets.cache_clear()
 
@@ -125,7 +167,20 @@ class DataPortalProject(DataPortalAsset):
         return self.get_dataset_by_id(dataset.id)
 
     def get_dataset_by_id(self, _id: str = None) -> DataPortalDataset:
-        """Return the dataset with the specified id."""
+        """
+        Return the dataset with the specified id.
+
+        Fetches the dataset directly, bypassing the cached project listing.
+
+        Args:
+            _id (str): ID of the dataset.
+
+        Returns:
+            `cirro.sdk.dataset.DataPortalDataset`
+
+        Raises:
+            DataPortalAssetNotFound: if the project has no dataset with this ID.
+        """
 
         dataset = self._client.datasets.get(project_id=self.id, dataset_id=_id)
         if dataset is None:
@@ -135,7 +190,18 @@ class DataPortalProject(DataPortalAsset):
     def list_references(self, reference_type: str = None) -> DataPortalReferences:
         """
         List the references available in a project.
-        Optionally filter to references of a particular type (identified by name)
+
+        Args:
+            reference_type (str): Optionally restrict the results to references
+                of one type, identified by name. Call
+                `cirro.sdk.portal.DataPortal.list_reference_types` for the
+                available type names.
+
+        Returns:
+            `cirro.sdk.reference.DataPortalReferences`
+
+        Raises:
+            DataPortalAssetNotFound: if `reference_type` matches no known type.
         """
 
         # Get the complete list of references which are available
@@ -164,7 +230,20 @@ class DataPortalProject(DataPortalAsset):
         )
 
     def get_reference_by_name(self, name: str = None, ref_type: str = None) -> DataPortalReference:
-        """Return the reference of a particular type with the specified name."""
+        """
+        Return the reference of a particular type with the specified name.
+
+        Args:
+            name (str): Name of the reference.
+            ref_type (str): Optionally restrict the search to one reference type.
+
+        Returns:
+            `cirro.sdk.reference.DataPortalReference`
+
+        Raises:
+            DataPortalInputError: if `name` is not provided.
+            DataPortalAssetNotFound: if no matching reference exists.
+        """
 
         if name is None:
             raise DataPortalInputError("Must specify the reference name")
@@ -185,6 +264,13 @@ class DataPortalProject(DataPortalAsset):
 
         If the files parameter is not provided, it will upload all files in the upload folder
 
+        The `process` here is a data type rather than a pipeline: it declares
+        what kind of data is being uploaded and which files the dataset must
+        contain. List the valid options with
+        `portal.list_processes(ingest=True)`. Cirro validates the file names
+        against the data type's requirements before any upload starts, so a
+        mismatch fails fast.
+
         Args:
             name (str): Name of newly created dataset
             description (str): Description of newly created dataset
@@ -192,6 +278,14 @@ class DataPortalProject(DataPortalAsset):
             upload_folder (str): Folder containing files to upload
             files (List[str]): Optional subset of files to upload from the folder
             tags (List[str]): Optional list of tags to apply to the dataset
+
+        Returns:
+            `cirro.sdk.dataset.DataPortalDataset`: the newly created dataset.
+
+        Raises:
+            DataPortalInputError: if `name`, `process`, or `upload_folder` is
+                missing, or if the files do not meet the data type's requirements.
+            RuntimeWarning: if there are no files to upload.
         """
 
         if name is None:
@@ -256,7 +350,12 @@ class DataPortalProject(DataPortalAsset):
         Retrieves a list of samples associated with a project along with their metadata
 
         Args:
-            max_items (int): Maximum number of records to get (default 10,000)
+            max_items (int): Maximum number of records to get (default 10,000).
+                A project with more samples than this is truncated silently.
+
+        Returns:
+            `List[cirro_api_client.v1.models.Sample]` -- each carrying the
+            sample's `id`, `name`, and its `metadata` dict.
         """
         return self._client.metadata.get_project_samples(self.id, max_items)
 

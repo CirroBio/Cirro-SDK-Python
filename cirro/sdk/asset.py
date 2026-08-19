@@ -6,7 +6,12 @@ from cirro.sdk.exceptions import DataPortalAssetNotFound, DataPortalInputError
 
 
 class DataPortalAsset:
-    """Base class used for all Data Portal Assets"""
+    """
+    Base class used for all Data Portal Assets.
+
+    Assets are not constructed directly -- each one is obtained from a method on
+    `cirro.sdk.portal.DataPortal` or on another asset.
+    """
 
     @property
     @abstractmethod
@@ -23,7 +28,22 @@ T = TypeVar('T', bound=DataPortalAsset)
 
 class DataPortalAssets(List[T]):
     """
-    Generic class with helper functions for any group of assets (projects, datasets, etc.)
+    A `list` of assets (projects, datasets, files, ...) with lookup helpers.
+
+    Every `list_*` method in the SDK returns one of these rather than a plain
+    list, so anything you can do with a list works, plus lookup by name or ID
+    and filtering by wildcard:
+
+    ```python
+    projects = portal.list_projects()
+
+    for project in projects:                   # ordinary list iteration
+        print(project.name)
+
+    project = projects.get_by_name("My Project")
+    subset = projects.filter_by_pattern("RNA-seq*")
+    print(projects.description())              # printable summary of them all
+    ```
     """
 
     # Overridden by child classes
@@ -36,7 +56,12 @@ class DataPortalAssets(List[T]):
         return "\n".join([str(i) for i in self])
 
     def description(self):
-        """Render a text summary of the assets."""
+        """
+        Render a text summary of the assets, one block per asset.
+
+        Returns:
+            str
+        """
 
         return '\n\n---\n\n'.join([
             str(i)
@@ -44,7 +69,21 @@ class DataPortalAssets(List[T]):
         ])
 
     def get_by_name(self, name: str) -> T:
-        """Return the item which matches with name attribute."""
+        """
+        Return the single item whose `name` attribute matches exactly.
+
+        Args:
+            name (str): Name to match. Matching is exact and case-sensitive;
+                use `filter_by_pattern` for wildcards.
+
+        Returns:
+            The matching item.
+
+        Raises:
+            DataPortalInputError: if `name` is None, or if several items share
+                the name -- in which case use `get_by_id`.
+            DataPortalAssetNotFound: if nothing matches.
+        """
 
         if name is None:
             raise DataPortalInputError(f"Must provide name to identify {self.asset_name}")
@@ -65,7 +104,21 @@ class DataPortalAssets(List[T]):
         return matching_queries[0]
 
     def get_by_id(self, _id: str) -> T:
-        """Return the item which matches by id attribute."""
+        """
+        Return the single item whose `id` attribute matches exactly.
+
+        For files, the `id` is the relative path within the dataset.
+
+        Args:
+            _id (str): ID to match.
+
+        Returns:
+            The matching item.
+
+        Raises:
+            DataPortalInputError: if `_id` is None.
+            DataPortalAssetNotFound: if nothing matches.
+        """
 
         if _id is None:
             raise DataPortalInputError(f"Must provide id to identify {self.asset_name}")
@@ -81,7 +134,17 @@ class DataPortalAssets(List[T]):
         return matching_queries[0]
 
     def filter_by_pattern(self, pattern: str) -> 'DataPortalAssets[T]':
-        """Filter the items to just those whose name attribute matches the pattern."""
+        """
+        Return the items whose `name` matches a shell-style wildcard pattern.
+
+        Args:
+            pattern (str): Wildcard pattern, matched with `fnmatch` -- `*` for
+                any run of characters, `?` for one, `[seq]` for a character set.
+
+        Returns:
+            A new collection of the same type holding the matching items, empty
+            if none match.
+        """
 
         # Get a list of the names to search against
         all_names = [i.name for i in self]

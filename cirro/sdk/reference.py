@@ -44,6 +44,12 @@ class DataPortalReference(DataPortalAsset):
 
     @property
     def absolute_path(self):
+        """
+        S3 URI of the reference's first file, or `None` if it has no files.
+
+        A reference may contain several files (e.g. a FASTA alongside its index).
+        Use `files` to reach the others.
+        """
         if len(self._files) == 0:
             return None
         return self._files[0].absolute_path
@@ -57,4 +63,10 @@ class DataPortalReferences(DataPortalAssets[DataPortalReference]):
     asset_name = "reference"
 
     def get_by_id(self, _id: str) -> DataPortalReference:
+        """
+        Not supported for references, which are identified by name only.
+
+        Raises:
+            NotImplementedError: always. Use `get_by_name` instead.
+        """
         raise NotImplementedError("Filtering by ID is not supported, use get_by_name")

@@ -9,6 +9,11 @@ from cirro.helpers import PreprocessDataset
 
 
 class Matches(list[FileNameMatch]):
+    """
+    The file name matches produced by
+    `DeveloperHelper.test_file_name_validation`.
+    """
+
     def print(self):
         """
         Prints the file name validation matches in a readable format.
@@ -30,6 +35,15 @@ class DeveloperHelper:
     """
 
     def __init__(self, client: CirroApi):
+        """
+        Obtained from `cirro.sdk.portal.DataPortal.developer_helper`.
+
+        ```python
+        from cirro import DataPortal
+        portal = DataPortal()
+        helper = portal.developer_helper
+        ```
+        """
         self.client = client
 
     def generate_preprocess_for_input_datasets(self,

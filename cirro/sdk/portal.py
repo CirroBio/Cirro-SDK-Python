@@ -85,7 +85,13 @@ class DataPortal:
             self._client = CirroApi(base_url=base_url)
 
     def list_projects(self) -> DataPortalProjects:
-        """List all the projects available in the Data Portal."""
+        """
+        List all the projects available in the Data Portal.
+
+        Returns:
+            `cirro.sdk.project.DataPortalProjects`, a list which also offers
+            `get_by_name`, `get_by_id`, and `filter_by_pattern`.
+        """
 
         return DataPortalProjects(
             [
@@ -95,12 +101,35 @@ class DataPortal:
         )
 
     def get_project_by_name(self, name: str = None) -> DataPortalProject:
-        """Return the project with the specified name."""
+        """
+        Return the project with the specified name.
+
+        Args:
+            name (str): Name of the project.
+
+        Returns:
+            `cirro.sdk.project.DataPortalProject`
+
+        Raises:
+            DataPortalAssetNotFound: if no project has this name.
+            DataPortalInputError: if more than one project has this name.
+        """
 
         return self.list_projects().get_by_name(name)
 
     def get_project_by_id(self, _id: str = None) -> DataPortalProject:
-        """Return the project with the specified id."""
+        """
+        Return the project with the specified id.
+
+        Args:
+            _id (str): ID of the project.
+
+        Returns:
+            `cirro.sdk.project.DataPortalProject`
+
+        Raises:
+            DataPortalAssetNotFound: if no project has this ID.
+        """
 
         return self.list_projects().get_by_id(_id)
 
@@ -289,6 +318,9 @@ class DataPortal:
 
         Args:
             ingest (bool): If True, only list those processes which can be used to ingest datasets directly
+
+        Returns:
+            `cirro.sdk.process.DataPortalProcesses`
         """
 
         return DataPortalProcesses(
@@ -305,23 +337,48 @@ class DataPortal:
 
         Args:
             name (str): Name of process
+            ingest (bool): If True, search only the processes which can be used
+                to ingest datasets directly. A data type used for uploading will
+                not be found unless this is set.
+
+        Returns:
+            `cirro.sdk.process.DataPortalProcess`
+
+        Raises:
+            DataPortalAssetNotFound: if no process has this name.
         """
 
         return self.list_processes(ingest=ingest).get_by_name(name)
 
     def get_process_by_id(self, id: str, ingest=False) -> DataPortalProcess:
         """
-        Return the process with the specified id
+        Return the process with the specified id.
 
         Args:
             id (str): ID of process
+            ingest (bool): If True, search only the processes which can be used
+                to ingest datasets directly.
+
+        Returns:
+            `cirro.sdk.process.DataPortalProcess`
+
+        Raises:
+            DataPortalAssetNotFound: if no process has this ID.
         """
 
         return self.list_processes(ingest=ingest).get_by_id(id)
 
     def list_reference_types(self) -> DataPortalReferenceTypes:
         """
-        Return the list of all available reference types
+        Return the list of all available reference types.
+
+        These are the categories that reference data is organized into, such as
+        `genome_fasta`. Pass a type name to
+        `cirro.sdk.project.DataPortalProject.list_references` to see the
+        references of that type held by a project.
+
+        Returns:
+            `cirro.sdk.reference_type.DataPortalReferenceTypes`
         """
 
         return DataPortalReferenceTypes(
@@ -333,4 +390,11 @@ class DataPortal:
 
     @property
     def developer_helper(self) -> DeveloperHelper:
+        """
+        Helpers for developing Cirro pipelines and data types, rather than for
+        analysing data.
+
+        Returns:
+            `cirro.sdk.developer.DeveloperHelper`
+        """
         return DeveloperHelper(self._client)
