@@ -9,7 +9,13 @@ class DataPortalLogin:
     Start the login process, obtaining the authorization message from Cirro
     needed to confirm the user identity.
 
-    Useful when you need to authenticate a user in a non-blocking way.
+    Use this when a person is available to complete the login but you need to
+    control when your code blocks -- for example to render the authorization
+    message in a web page or notebook before waiting. Constructing the object
+    does not block; only `await_completion` does.
+
+    For automation with no person in the loop, use OAuth client credentials
+    instead -- see `cirro.sdk.portal.DataPortal`.
 
     Usage:
 
@@ -29,6 +35,16 @@ class DataPortalLogin:
     auth_info: DeviceCodeAuth
 
     def __init__(self, base_url: str = None, enable_cache=False):
+        """
+        Begin a device-code login without waiting for it to complete.
+
+        Args:
+            base_url (str): Base URL of the Cirro instance, e.g. `app.cirro.bio`.
+             If omitted, falls back to the `CIRRO_BASE_URL` environment variable,
+             then to the saved configuration.
+            enable_cache (bool): If True, save the resulting token to the system
+             keychain so later sessions can reuse it.
+        """
         app_config = AppConfig(base_url=base_url)
 
         self.base_url = base_url
@@ -52,7 +68,15 @@ class DataPortalLogin:
         return self.auth_info.auth_message_markdown
 
     def await_completion(self) -> DataPortal:
-        """Complete the login process and return an authenticated client"""
+        """
+        Block until the user completes the login in their browser.
+
+        Returns:
+            `cirro.sdk.portal.DataPortal`: an authenticated portal object.
+
+        Raises:
+            RuntimeError: if the device code expires before the login completes.
+        """
 
         # Block until the user completes the login flow
         self.auth_info.await_completion()

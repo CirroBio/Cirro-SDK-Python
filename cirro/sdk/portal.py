@@ -11,18 +11,62 @@ from cirro.sdk.reference_type import DataPortalReferenceType, DataPortalReferenc
 
 class DataPortal:
     """
-    Helper functions for exploring the Projects, Datasets, Samples, and Files
-    available in the Data Portal.
+    The entry point for the SDK: explore the Projects, Datasets, Samples, and
+    Files available in Cirro, and launch analyses on them.
+
+    Projects and datasets can be looked up by either name or ID.
+
+    ```python
+    from cirro import DataPortal
+
+    portal = DataPortal(base_url="app.cirro.bio")
+    dataset = portal.get_dataset(project="Name of Project", dataset="Name of Dataset")
+    ```
     """
 
     def __init__(self, base_url: str = None, client: CirroApi = None):
         """
         Set up the DataPortal object, establishing an authenticated connection.
 
+        **This may block on an interactive login.** With no `client` and no
+        saved configuration, the constructor starts a device-code login: it
+        prints a URL and waits until someone completes the login in a browser.
+        In a script or an automated session there is nobody to click the link,
+        so it will hang until the device code expires.
+
+        To authenticate without prompting, build a `cirro.cirro_client.CirroApi`
+        with OAuth client credentials and pass it as `client`:
+
+        ```python
+        import os
+        from cirro import CirroApi, DataPortal
+        from cirro.auth.client_creds import ClientCredentialsAuth
+        from cirro.config import AppConfig
+
+        config = AppConfig(base_url="app.cirro.bio")
+        auth = ClientCredentialsAuth(
+            os.environ["CIRRO_CLIENT_ID"],
+            os.environ["CIRRO_CLIENT_SECRET"],
+            auth_endpoint=config.auth_endpoint
+        )
+        portal = DataPortal(client=CirroApi(auth_info=auth))
+        ```
+
+        To drive the browser login yourself without blocking in the
+        constructor, use `cirro.sdk.login.DataPortalLogin` instead.
+
         Args:
-            base_url (str): Optional base URL of the Cirro instance
-             (if not provided, it uses the `CIRRO_BASE_URL` environment variable, or the config file)
-            client (`cirro.cirro_client.CirroApi`): Optional pre-configured client
+            base_url (str): Base URL of the Cirro instance, e.g. `app.cirro.bio`.
+             If omitted, falls back to the `CIRRO_BASE_URL` environment variable,
+             then to the `base_url` saved in `~/.cirro/config.ini` by
+             `cirro configure`. Raises `RuntimeError` if none of these is set.
+            client (`cirro.cirro_client.CirroApi`): Pre-configured client. Supply
+             this to control how authentication happens; when given, `base_url`
+             is ignored.
+
+        Raises:
+            RuntimeError: if no base URL can be determined, or the instance
+                cannot be reached.
 
         Example:
         ```python
