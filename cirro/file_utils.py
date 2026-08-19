@@ -140,6 +140,68 @@ def get_files_stats(files: List[PathLike]) -> DirectoryStatistics:
     )
 
 
+def _transfer_with_retry(transfer: Callable[..., None],
+                         description: str,
+                         callback: ProgressPercentage,
+                         progress: tqdm,
+                         attempts: int):
+    """
+    @private
+
+    Runs one transfer, retrying transient failures. Waiting between attempts only
+    occupies the current worker, leaving any workers transferring other files
+    unaffected.
+    """
+    for attempt in range(attempts):
+        try:
+            return transfer(callback=callback)
+        except _RETRYABLE_ERRORS as e:
+            if attempt == attempts - 1:
+                raise
+            delay = min(2 ** attempt, _MAX_RETRY_DELAY) + random.uniform(0, 1)
+            progress.write(f"Encountered error transferring {description}:\n{str(e)}\n"
+                           f"Retrying in {delay:.0f} seconds "
+                           f"({attempts - (attempt + 1)} attempts remaining)")
+            time.sleep(delay)
+
+
+def _run_sequentially(transfers: Dict[str, Callable[..., None]],
+                      run_one: Callable[..., None]) -> Dict[str, Exception]:
+    """
+    @private
+
+    Runs the transfers one at a time in the calling thread, spawning nothing.
+    """
+    errors: Dict[str, Exception] = {}
+    for description, transfer in transfers.items():
+        try:
+            run_one(transfer, description)
+        except Exception as e:
+            errors[description] = e
+    return errors
+
+
+def _run_concurrently(transfers: Dict[str, Callable[..., None]],
+                      run_one: Callable[..., None],
+                      threads: int,
+                      action: str) -> Dict[str, Exception]:
+    """
+    @private
+
+    Runs up to `threads` transfers at a time.
+    """
+    errors: Dict[str, Exception] = {}
+    with ThreadPoolExecutor(max_workers=threads, thread_name_prefix=f'cirro-{action}') as executor:
+        futures = {executor.submit(run_one, transfer, description): description
+                   for description, transfer in transfers.items()}
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                errors[futures[future]] = e
+    return errors
+
+
 def _run_transfers(transfers: Dict[str, Callable[..., None]],
                    progress: tqdm,
                    threads: int,
@@ -149,49 +211,21 @@ def _run_transfers(transfers: Dict[str, Callable[..., None]],
     @private
 
     Runs the given transfers, retrying transient failures and reporting every failure
-    rather than letting the first one hide the rest. A single thread runs them one at
-    a time in the calling thread, spawning nothing.
+    rather than letting the first one hide the rest.
     """
     if threads < 1:
         raise ValueError(f"threads must be at least 1, got {threads}")
 
     # One callback shared by every worker, so its lock serializes bar updates
-    callback = ProgressPercentage(progress)
-    attempts = max(max_retries, 1)
-
-    def transfer_with_retry(transfer: Callable[..., None], description: str):
-        # Waiting between attempts only occupies this worker, leaving any workers
-        # transferring other files unaffected
-        for attempt in range(attempts):
-            try:
-                return transfer(callback=callback)
-            except _RETRYABLE_ERRORS as e:
-                if attempt == attempts - 1:
-                    raise
-                delay = min(2 ** attempt, _MAX_RETRY_DELAY) + random.uniform(0, 1)
-                progress.write(f"Encountered error transferring {description}:\n{str(e)}\n"
-                               f"Retrying in {delay:.0f} seconds "
-                               f"({attempts - (attempt + 1)} attempts remaining)")
-                time.sleep(delay)
-
-    errors: Dict[str, Exception] = {}
+    run_one = partial(_transfer_with_retry,
+                      callback=ProgressPercentage(progress),
+                      progress=progress,
+                      attempts=max(max_retries, 1))
 
     if threads == 1:
-        for description, transfer in transfers.items():
-            try:
-                transfer_with_retry(transfer, description)
-            except Exception as e:
-                errors[description] = e
+        errors = _run_sequentially(transfers, run_one)
     else:
-        with ThreadPoolExecutor(max_workers=threads, thread_name_prefix=f'cirro-{action}') as executor:
-            futures = {executor.submit(transfer_with_retry, transfer, description): description
-                       for description, transfer in transfers.items()}
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as e:
-                    # Collected so one bad file does not hide the outcome of the others
-                    errors[futures[future]] = e
+        errors = _run_concurrently(transfers, run_one, threads, action)
 
     if errors:
         detail = '\n'.join(f'  {description}: {error}' for description, error in errors.items())
