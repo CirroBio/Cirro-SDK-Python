@@ -10,6 +10,7 @@ from cirro_api_client.v1.models import ImportDataRequest, UploadDatasetRequest, 
 from cirro.file_utils import is_hidden_file
 from cirro.models.assets import DatasetAssets, Artifact
 from cirro.models.dataset import DatasetValidationResponse
+from cirro.config import Constants
 from cirro.models.file import FileAccessContext, File, PathLike
 from cirro.services.base import get_all_records
 from cirro.services.file import FileEnabledService
@@ -244,7 +245,8 @@ class DatasetService(FileEnabledService):
                      directory: PathLike,
                      files: List[PathLike] = None,
                      file_path_map: Dict[PathLike, str] = None,
-                     resume: bool = False) -> None:
+                     resume: bool = False,
+                     threads: int = Constants.default_transfer_threads) -> None:
         """
         Uploads files to a given dataset from the specified directory.
 
@@ -262,6 +264,7 @@ class DatasetService(FileEnabledService):
              from source path to destination path, used to "re-write" paths within the dataset.
             resume (bool): If True, skip files already uploaded to the dataset, only uploading
              the files that are still missing. Used to continue an interrupted upload.
+            threads (int): Number of files to upload at once. 1 disables threading.
         ```python
         from cirro.cirro_client import CirroApi
         from cirro.file_utils import generate_flattened_file_map
@@ -305,7 +308,8 @@ class DatasetService(FileEnabledService):
             directory=directory,
             files=files,
             file_path_map=file_path_map,
-            resume=resume
+            resume=resume,
+            threads=threads
         )
 
     def validate_folder(
@@ -372,7 +376,8 @@ class DatasetService(FileEnabledService):
         dataset_id: str,
         download_location: str,
         files: Union[List[File], List[str]] = None,
-        file_limit: int = 100000
+        file_limit: int = 100000,
+        threads: int = Constants.default_transfer_threads
     ) -> None:
         """
         Downloads files from a dataset
@@ -386,6 +391,7 @@ class DatasetService(FileEnabledService):
             download_location (str): Local destination for downloaded files
             files (typing.List[str]): Optional list of files to download
             file_limit (int): Maximum number of files to get (default 100,000)
+            threads (int): Number of files to download at once. 1 disables threading.
         """
         if files is None:
             files = self.get_assets_listing(project_id, dataset_id, file_limit=file_limit).files
@@ -395,7 +401,7 @@ class DatasetService(FileEnabledService):
 
         first_file = files[0]
         if isinstance(first_file, File):
-            files = [file.relative_path for file in files]
+            # Kept as File objects so their known sizes reach the transfer
             access_context = first_file.access_context
         else:
             dataset = self.get(project_id, dataset_id)
@@ -407,7 +413,7 @@ class DatasetService(FileEnabledService):
                 access_context = FileAccessContext.download(project_id=project_id,
                                                             base_url=dataset.s3)
 
-        self._file_service.download_files(access_context, download_location, files)
+        self._file_service.download_files(access_context, download_location, files, threads=threads)
 
     def update_samplesheet(
         self,

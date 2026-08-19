@@ -1,16 +1,22 @@
 import threading
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Optional
 
 from boto3 import Session
+from boto3.s3.transfer import S3Transfer, TransferConfig
 from botocore.config import Config
 from botocore.credentials import RefreshableCredentials
 from botocore.session import get_session
 from cirro_api_client.v1.models import AWSCredentials
 from tqdm import tqdm
 
+from cirro.config import Constants
 from cirro.models.s3_path import S3Path
-from cirro.utils import convert_size
+
+# boto3 defaults to 10 concurrent requests per transfer; the pool needs headroom
+# above that for the transfer manager's submission threads and credential refresh.
+# Undersizing it makes urllib3 discard connections and serializes the transfers.
+_MAX_POOL_CONNECTIONS = 20
 
 
 def format_creds_for_session(creds: AWSCredentials):
@@ -33,42 +39,69 @@ class ProgressPercentage:
 
 
 class S3Client:
-    def __init__(self, creds_getter: Callable[[], AWSCredentials] = None, checksum_method: str = None):
+    def __init__(self, creds_getter: Callable[[], AWSCredentials] = None, checksum_method: str = None,
+                 threads: int = Constants.default_transfer_threads):
         self._creds_getter = creds_getter
+        # A single thread means no threading anywhere, so boto3 runs the transfer
+        # inline rather than handing parts to its own worker pool
+        self._transfer_config = TransferConfig(use_threads=threads > 1)
         self._client = self._build_session_client()
+        self._transfer: Optional[S3Transfer] = None
+        self._transfer_lock = threading.Lock()
         self._upload_args = dict(ChecksumAlgorithm=checksum_method)
         self._download_args = dict(ChecksumMode='ENABLED') if checksum_method else dict()
 
     def get_aws_client(self):
         return self._client
 
-    def upload_file(self, file_path: Path, bucket: str, key: str):
-        file_size = file_path.stat().st_size
-        file_name = file_path.name
+    def upload_file(self, file_path: Path, bucket: str, key: str,
+                    callback: Callable[[int], None] = None):
+        """
+        Uploads a file to S3, reporting transferred bytes to `callback`.
+        """
+        # Pass the path rather than an open file object: s3transfer only reads parts
+        # in parallel when it can open the file itself.
+        self._get_transfer().upload_file(
+            filename=str(file_path),
+            bucket=bucket,
+            key=key,
+            callback=callback,
+            extra_args=self._upload_args
+        )
 
-        with tqdm(total=file_size,
-                  desc=f'Uploading file {file_name} ({convert_size(file_size)})',
-                  bar_format="{desc} | {percentage:.1f}%|{bar:25} | {rate_fmt}",
-                  unit='B', unit_scale=True,
-                  unit_divisor=1024) as progress:
-            with file_path.open('rb') as file:
-                self._client.upload_fileobj(file, bucket, key,
-                                            Callback=ProgressPercentage(progress),
-                                            ExtraArgs=self._upload_args)
+    def download_file(self, local_path: Path, bucket: str, key: str,
+                      callback: Callable[[int], None] = None):
+        """
+        Downloads a file from S3, reporting transferred bytes to `callback`.
+        """
+        self._get_transfer().download_file(
+            bucket=bucket,
+            key=key,
+            filename=str(local_path.absolute()),
+            callback=callback,
+            extra_args=self._download_args
+        )
 
-    def download_file(self, local_path: Path, bucket: str, key: str):
-        file_size = self.get_file_stats(bucket, key)['ContentLength']
-        file_name = local_path.name
+    def _get_transfer(self) -> S3Transfer:
+        """
+        A single transfer manager, and the thread pools it owns, is shared by every
+        transfer on this client rather than rebuilt for each file.
+        """
+        with self._transfer_lock:
+            if self._transfer is None:
+                self._transfer = S3Transfer(self._client, self._transfer_config)
+            return self._transfer
 
-        with tqdm(total=file_size,
-                  desc=f'Downloading file {file_name} ({convert_size(file_size)})',
-                  bar_format="{desc} | {percentage:.1f}%|{bar:25} | {rate_fmt}",
-                  unit='B', unit_scale=True,
-                  unit_divisor=1024) as progress:
-            absolute_path = str(local_path.absolute())
-            self._client.download_file(bucket, key, absolute_path,
-                                       Callback=ProgressPercentage(progress),
-                                       ExtraArgs=self._download_args)
+    def close(self):
+        """
+        Shuts down the transfer manager's thread pools. Their threads are not
+        daemons and are only partly reclaimed by garbage collection, so a
+        long-lived process needs this to avoid accumulating them.
+        """
+        with self._transfer_lock:
+            if self._transfer is not None:
+                self._transfer.__exit__(None, None, None)
+                self._transfer = None
 
     def create_object(self, bucket: str, key: str, contents: str, content_type: str):
         self._client.put_object(
@@ -134,7 +167,8 @@ class S3Client:
                 aws_session_token=creds.session_token
             )
         s3_config = Config(
-            use_dualstack_endpoint=True
+            use_dualstack_endpoint=True,
+            max_pool_connections=_MAX_POOL_CONNECTIONS
         )
         return session.client('s3', region_name=creds.region, config=s3_config)
 

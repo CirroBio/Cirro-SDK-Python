@@ -364,15 +364,18 @@ class TestDatasetDownloadFiles(unittest.TestCase):
             self.tsv_file,
             self.txt_file,
         ])
-        for f in [self.csv_file, self.tsv_file, self.txt_file]:
-            f.download = Mock(return_value=None)
 
     def _downloaded_paths(self):
-        return [
-            f.relative_path
-            for f in [self.csv_file, self.tsv_file, self.txt_file]
-            if f.download.called
-        ]
+        """
+        Relative paths from the single batched download call. Which file's client
+        receives it depends on which files survive the glob.
+        """
+        for f in [self.csv_file, self.tsv_file, self.txt_file]:
+            download_files = f._client.file.download_files
+            if download_files.called:
+                _, _, files = download_files.call_args.args
+                return [file.relative_path for file in files]
+        return []
 
     def test_no_glob_downloads_all(self):
         self.dataset.download_files(download_location='/tmp')
@@ -398,6 +401,14 @@ class TestDatasetDownloadFiles(unittest.TestCase):
         self.dataset.download_files(download_location='/tmp', glob='logs/**')
         downloaded = self._downloaded_paths()
         self.assertEqual(downloaded, ['logs/run.log'])
+
+    def test_downloads_in_one_batched_call(self):
+        self.dataset.download_files(download_location='/tmp')
+
+        # The whole collection goes out in one call, rather than one call per file
+        self.assertEqual(self.csv_file._client.file.download_files.call_count, 1)
+        self.assertEqual(self.tsv_file._client.file.download_files.call_count, 0)
+        self.assertEqual(self.txt_file._client.file.download_files.call_count, 0)
 
 
 class TestPatternToRegex(unittest.TestCase):
