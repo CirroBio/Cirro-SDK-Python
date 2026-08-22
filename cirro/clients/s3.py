@@ -1,3 +1,4 @@
+import os
 import threading
 from pathlib import Path
 from typing import Callable, Optional
@@ -17,6 +18,22 @@ from cirro.models.s3_path import S3Path
 # above that for the transfer manager's submission threads and credential refresh.
 # Undersizing it makes urllib3 discard connections and serializes the transfers.
 _MAX_POOL_CONNECTIONS = 20
+
+
+def local_filename(file_path) -> Optional[str]:
+    """
+    Returns the local filesystem path named by `file_path`, or None if it does not
+    name a local file.
+
+    boto3's managed transfer has to open the file itself, so it only works for real
+    filesystem paths. Path-like objects backed by something else, such as an s3fs
+    path, have to be streamed through their own open() instead.
+    """
+    try:
+        filename = os.fspath(file_path)
+    except TypeError:
+        return None
+    return filename if os.path.isfile(filename) else None
 
 
 def format_creds_for_session(creds: AWSCredentials):
@@ -58,11 +75,22 @@ class S3Client:
                     callback: Callable[[int], None] = None):
         """
         Uploads a file to S3, reporting transferred bytes to `callback`.
+
+        Local files are handed to the shared transfer manager by name, which lets
+        s3transfer read their parts in parallel. Any other Path-like object is
+        streamed through its own open().
         """
-        # Pass the path rather than an open file object: s3transfer only reads parts
-        # in parallel when it can open the file itself.
+        filename = local_filename(file_path)
+
+        if filename is None:
+            with file_path.open('rb') as file_obj:
+                self._client.upload_fileobj(file_obj, bucket, key,
+                                            Callback=callback,
+                                            ExtraArgs=self._upload_args)
+            return
+
         self._get_transfer().upload_file(
-            filename=str(file_path),
+            filename=filename,
             bucket=bucket,
             key=key,
             callback=callback,
