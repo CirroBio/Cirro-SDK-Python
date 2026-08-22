@@ -4,8 +4,10 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from boto3 import Session
-from boto3.s3.transfer import S3Transfer, TransferConfig
+from boto3.exceptions import S3UploadFailedError
+from boto3.s3.transfer import ProgressCallbackInvoker, S3Transfer, TransferConfig, create_transfer_manager
 from botocore.config import Config
+from botocore.exceptions import ClientError
 from botocore.credentials import RefreshableCredentials
 from botocore.session import get_session
 from cirro_api_client.v1.models import AWSCredentials
@@ -63,7 +65,7 @@ class S3Client:
         # inline rather than handing parts to its own worker pool
         self._transfer_config = TransferConfig(use_threads=threads > 1)
         self._client = self._build_session_client()
-        self._transfer: Optional[S3Transfer] = None
+        self._manager = None
         self._transfer_lock = threading.Lock()
         self._upload_args = dict(ChecksumAlgorithm=checksum_method)
         self._download_args = dict(ChecksumMode='ENABLED') if checksum_method else dict()
@@ -82,20 +84,31 @@ class S3Client:
         """
         filename = local_filename(file_path)
 
-        if filename is None:
-            with file_path.open('rb') as file_obj:
-                self._client.upload_fileobj(file_obj, bucket, key,
-                                            Callback=callback,
-                                            ExtraArgs=self._upload_args)
+        if filename is not None:
+            self._get_transfer().upload_file(
+                filename=filename,
+                bucket=bucket,
+                key=key,
+                callback=callback,
+                extra_args=self._upload_args
+            )
             return
 
-        self._get_transfer().upload_file(
-            filename=filename,
-            bucket=bucket,
-            key=key,
-            callback=callback,
-            extra_args=self._upload_args
-        )
+        with file_path.open('rb') as file_obj:
+            self._upload_fileobj(file_obj, bucket, key, callback)
+
+    def _upload_fileobj(self, file_obj, bucket: str, key: str,
+                        callback: Callable[[int], None] = None):
+        """
+        S3Transfer only accepts filenames, so a file object goes to the shared manager
+        directly, mirroring the error translation S3Transfer would have applied.
+        """
+        subscribers = [ProgressCallbackInvoker(callback)] if callback else None
+        future = self._get_manager().upload(file_obj, bucket, key, self._upload_args, subscribers)
+        try:
+            future.result()
+        except ClientError as e:
+            raise S3UploadFailedError(f"Failed to upload {key} to {bucket}: {e}")
 
     def download_file(self, local_path: Path, bucket: str, key: str,
                       callback: Callable[[int], None] = None):
@@ -110,15 +123,20 @@ class S3Client:
             extra_args=self._download_args
         )
 
-    def _get_transfer(self) -> S3Transfer:
+    def _get_manager(self):
         """
         A single transfer manager, and the thread pools it owns, is shared by every
-        transfer on this client rather than rebuilt for each file.
+        transfer on this client rather than rebuilt for each file. It accepts both
+        filenames and file objects, so both upload paths share these pools.
         """
         with self._transfer_lock:
-            if self._transfer is None:
-                self._transfer = S3Transfer(self._client, self._transfer_config)
-            return self._transfer
+            if self._manager is None:
+                self._manager = create_transfer_manager(self._client, self._transfer_config)
+            return self._manager
+
+    def _get_transfer(self) -> S3Transfer:
+        # Wrapping the shared manager costs nothing and adds boto3's error translation
+        return S3Transfer(manager=self._get_manager())
 
     def close(self):
         """
@@ -127,9 +145,9 @@ class S3Client:
         long-lived process needs this to avoid accumulating them.
         """
         with self._transfer_lock:
-            if self._transfer is not None:
-                self._transfer.__exit__(None, None, None)
-                self._transfer = None
+            if self._manager is not None:
+                self._manager.shutdown()
+                self._manager = None
 
     def create_object(self, bucket: str, key: str, contents: str, content_type: str):
         self._client.put_object(
