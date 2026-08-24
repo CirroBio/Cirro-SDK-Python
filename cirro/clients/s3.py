@@ -82,11 +82,11 @@ class S3Client:
         s3transfer read their parts in parallel. Any other Path-like object is
         streamed through its own open().
         """
-        filename = local_filename(file_path)
+        local_file_path = local_filename(file_path)
 
-        if filename is not None:
+        if local_file_path is not None:
             self._get_transfer().upload_file(
-                filename=filename,
+                filename=local_file_path,
                 bucket=bucket,
                 key=key,
                 callback=callback,
