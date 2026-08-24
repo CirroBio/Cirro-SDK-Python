@@ -6,6 +6,7 @@ from cirro_api_client.v1.errors import CirroException
 
 from cirro.cli import run_create_pipeline_config, run_validate_folder
 from cirro.cli import run_ingest, run_download, run_configure, run_list_datasets
+from cirro.config import Constants
 from cirro.cli.controller import handle_error, run_upload_reference, run_list_projects, run_list_files, \
     run_resume_upload
 from cirro.cli.debug import run_debug
@@ -73,6 +74,9 @@ def list_datasets(**kwargs):
 @click.option('--file-limit',
               help='Maximum number of files to enumerate from the dataset',
               default=100000, show_default=True)
+@click.option('--threads',
+              help='Number of files to transfer at once (1 disables threading)',
+              default=Constants.default_transfer_threads, show_default=True, type=int)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
@@ -100,6 +104,9 @@ def download(**kwargs):
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
+@click.option('--threads',
+              help='Number of files to transfer at once (1 disables threading)',
+              default=Constants.default_transfer_threads, show_default=True, type=int)
 @click.option('--include-hidden',
               help='Include hidden files in the upload (e.g., files starting with .)',
               is_flag=True, default=False)
@@ -122,6 +129,9 @@ def upload(**kwargs):
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)
+@click.option('--threads',
+              help='Number of files to transfer at once (1 disables threading)',
+              default=Constants.default_transfer_threads, show_default=True, type=int)
 @click.option('--include-hidden',
               help='Include hidden files in the upload (e.g., files starting with .)',
               is_flag=True, default=False)

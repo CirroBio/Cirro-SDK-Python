@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List
 
 from cirro.cirro_client import CirroApi
+from cirro.config import Constants
 from cirro.models.file import File, PathLike
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.exceptions import DataPortalInputError
@@ -96,7 +97,7 @@ class DataPortalFile(DataPortalAsset, FileReadMixin):
         return self._client.file.download_files(
             self._file.access_context,
             download_location,
-            [self.relative_path]
+            [self._file]
         )[0]
 
     def validate(self, local_path: PathLike):
@@ -133,15 +134,31 @@ class DataPortalFiles(DataPortalAssets[DataPortalFile]):
 
     asset_name = "file"
 
-    def download(self, download_location: str = None) -> List[Path]:
+    def download(self, download_location: str = None,
+                 threads: int = Constants.default_transfer_threads) -> List[Path]:
         """
         Download the collection of files to a local directory.
+
+        Args:
+            download_location (str): Path to local directory
+            threads (int): Number of files to download at once. 1 disables threading.
 
         Returns:
             List of paths to downloaded files.
         """
 
-        local_paths = []
-        for f in self:
-            local_paths.append(f.download(download_location))
-        return local_paths
+        if len(self) == 0:
+            return []
+
+        if download_location is None:
+            raise DataPortalInputError("Must provide download location")
+
+        # Downloaded in one call so the S3 client is built once and the files
+        # transfer concurrently. Every file in a collection shares an access context.
+        first_file = self[0]
+        return first_file._client.file.download_files(
+            first_file._file.access_context,
+            download_location,
+            [f._file for f in self],
+            threads=threads
+        )

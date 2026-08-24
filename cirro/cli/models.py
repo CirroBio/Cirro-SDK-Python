@@ -8,6 +8,7 @@ class DownloadArguments(TypedDict):
     interactive: bool
     file: Optional[list[str]]
     file_limit: int
+    threads: int
 
 
 class UploadArguments(TypedDict):
@@ -19,6 +20,7 @@ class UploadArguments(TypedDict):
     include_hidden: bool
     interactive: bool
     file: Optional[list[str]]
+    threads: int
 
 
 class ResumeUploadArguments(TypedDict):
@@ -28,6 +30,7 @@ class ResumeUploadArguments(TypedDict):
     include_hidden: bool
     interactive: bool
     file: Optional[list[str]]
+    threads: int
 
 
 class ValidateArguments(TypedDict):

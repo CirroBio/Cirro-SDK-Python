@@ -1,9 +1,10 @@
 import logging
 import threading
+from contextlib import closing
 from datetime import datetime, timezone
 from functools import partial
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Union
 
 from botocore.client import BaseClient
 from cirro_api_client import CirroApiClient
@@ -11,6 +12,7 @@ from cirro_api_client.v1.api.file import generate_project_file_access_token
 from cirro_api_client.v1.models import AWSCredentials, ProjectAccessType
 
 from cirro.clients.s3 import S3Client
+from cirro.config import Constants
 from cirro.file_utils import upload_directory, download_directory, get_checksum
 from cirro.models.file import FileAccessContext, File, PathLike
 from cirro.services.base import BaseService
@@ -160,7 +162,8 @@ class FileService(BaseService):
                      directory: PathLike,
                      files: List[PathLike],
                      file_path_map: Dict[PathLike, str],
-                     resume: bool = False) -> None:
+                     resume: bool = False,
+                     threads: int = Constants.default_transfer_threads) -> None:
         """
         Uploads a list of files from the specified directory
 
@@ -172,40 +175,45 @@ class FileService(BaseService):
             file_path_map (typing.Dict[str|Path, str]): Optional mapping of file paths to upload
              from source path to destination path, used to "re-write" paths within the dataset.
             resume (bool): If True, skip files already present in S3 under the destination prefix.
+            threads (int): Number of files to upload at once. 1 disables threading.
         """
-        s3_client = self._generate_s3_client(access_context)
+        with closing(self._generate_s3_client(access_context, threads)) as s3_client:
+            upload_directory(
+                directory=directory,
+                files=files,
+                file_path_map=file_path_map,
+                s3_client=s3_client,
+                bucket=access_context.bucket,
+                prefix=access_context.prefix,
+                max_retries=self.transfer_retries,
+                resume=resume,
+                threads=threads
+            )
 
-        upload_directory(
-            directory=directory,
-            files=files,
-            file_path_map=file_path_map,
-            s3_client=s3_client,
-            bucket=access_context.bucket,
-            prefix=access_context.prefix,
-            max_retries=self.transfer_retries,
-            resume=resume
-        )
-
-    def download_files(self, access_context: FileAccessContext, directory: str, files: List[str]) -> List[Path]:
+    def download_files(self, access_context: FileAccessContext, directory: str,
+                       files: Union[List[File], List[str]],
+                       threads: int = Constants.default_transfer_threads) -> List[Path]:
         """
         Download a list of files to the specified directory
 
         Args:
             access_context (cirro.models.file.FileAccessContext): File access context, use class methods to generate
             directory (str): download location
-            files (List[str]): relative path of files to download
+            files (typing.List[File]|typing.List[str]): File objects, or paths relative to
+             the access context prefix. File objects carry their size, saving a request per file.
+            threads (int): Number of files to download at once. 1 disables threading.
         Returns:
             List of paths to downloaded files
         """
-        s3_client = self._generate_s3_client(access_context)
-
-        return download_directory(
-            directory,
-            files,
-            s3_client,
-            access_context.bucket,
-            access_context.prefix
-        )
+        with closing(self._generate_s3_client(access_context, threads)) as s3_client:
+            return download_directory(
+                directory,
+                files,
+                s3_client,
+                access_context.bucket,
+                access_context.prefix,
+                threads=threads
+            )
 
     def is_valid_file(self, file: File, local_file: Path) -> bool:
         """
@@ -284,13 +292,15 @@ class FileService(BaseService):
         logger.debug(f"File stats for file {file.relative_path} is {stats}")
         return stats
 
-    def _generate_s3_client(self, access_context: FileAccessContext):
+    def _generate_s3_client(self, access_context: FileAccessContext,
+                            threads: int = Constants.default_transfer_threads):
         """
         Generates the Cirro-S3 client to perform operations on files
         """
         return S3Client(
             partial(self.get_access_credentials, access_context),
-            self.checksum_method
+            self.checksum_method,
+            threads
         )
 
 

@@ -104,7 +104,8 @@ def run_ingest(input_params: UploadArguments, interactive=False):
     cirro.datasets.upload_files(project_id=project_id,
                                 dataset_id=create_resp.id,
                                 directory=directory,
-                                files=files)
+                                files=files,
+                                threads=input_params['threads'])
     logger.info(f"File content validated by {cirro.configuration.checksum_method_display}")
 
 
@@ -157,7 +158,8 @@ def run_resume_upload(input_params: ResumeUploadArguments, interactive=False):
                                 dataset_id=dataset_id,
                                 directory=directory,
                                 files=files,
-                                resume=True)
+                                resume=True,
+                                threads=input_params['threads'])
     logger.info(f"File content validated by {cirro.configuration.checksum_method_display}")
 
 
@@ -262,7 +264,8 @@ def run_download(input_params: DownloadArguments, interactive=False):
                                   dataset_id=dataset_id,
                                   download_location=input_params['data_directory'],
                                   files=files_to_download,
-                                  file_limit=input_params['file_limit'])
+                                  file_limit=input_params['file_limit'],
+                                  threads=input_params['threads'])
 
 
 def run_list_projects():
