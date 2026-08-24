@@ -13,6 +13,9 @@ class Constants:
     config_path = Path(home, 'config.ini').expanduser()
     default_base_url = 'cirro.bio'
     default_max_retries = 10
+    # Files transferred at once. 1 disables threading entirely, including within
+    # a single file, which is required in environments without thread support.
+    default_transfer_threads = 8
 
 
 class UserConfig(NamedTuple):

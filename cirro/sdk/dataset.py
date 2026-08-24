@@ -10,6 +10,7 @@ from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisReques
     Status, RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
 
 from cirro.cirro_client import CirroApi
+from cirro.config import Constants
 from cirro.file_utils import bytes_to_human_readable, filter_files_by_pattern
 from cirro.models.assets import DatasetAssets
 from cirro.models.file import PathLike
@@ -635,7 +636,8 @@ class DataPortalDataset(DataPortalAsset):
             ]
         )
 
-    def download_files(self, download_location: str = None, glob: str = None) -> None:
+    def download_files(self, download_location: str = None, glob: str = None,
+                       threads: int = Constants.default_transfer_threads) -> None:
         """
         Download all the files from the dataset to a local directory.
 
@@ -644,12 +646,13 @@ class DataPortalDataset(DataPortalAsset):
             glob (str): Optional wildcard expression to filter which files are downloaded
                 (e.g., ``'*.csv'``, ``'data/**/*.tsv.gz'``).
                 If omitted, all files are downloaded.
+            threads (int): Number of files to download at once. 1 disables threading.
         """
 
         files = self.list_files()
         if glob is not None:
             files = DataPortalFiles(filter_files_by_pattern(list(files), glob))
-        files.download(download_location)
+        files.download(download_location, threads=threads)
 
     def run_analysis(
             self,
