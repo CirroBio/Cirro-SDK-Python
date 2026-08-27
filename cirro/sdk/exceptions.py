@@ -4,5 +4,5 @@ class DataPortalAssetNotFound(Exception):
 
 
 class DataPortalInputError(Exception):
-    """Exception raised invalid inputs are provided to the Data Portal."""
+    """Exception raised when invalid inputs are provided to the Data Portal."""
     pass

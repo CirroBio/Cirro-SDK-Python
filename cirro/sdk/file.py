@@ -87,8 +87,15 @@ class DataPortalFile(DataPortalAsset, FileReadMixin):
         """
         Download the file to a local directory.
 
+        Args:
+            download_location (str): Local directory to write the file into. The
+                file keeps its relative path within that directory.
+
         Returns:
-            Path to download file
+            `pathlib.Path`: path to the downloaded file.
+
+        Raises:
+            DataPortalInputError: if `download_location` is not provided.
         """
 
         if download_location is None:
@@ -139,12 +146,19 @@ class DataPortalFiles(DataPortalAssets[DataPortalFile]):
         """
         Download the collection of files to a local directory.
 
+        Each file keeps its relative path within the dataset, and the files
+        transfer concurrently.
+
         Args:
-            download_location (str): Path to local directory
-            threads (int): Number of files to download at once. 1 disables threading.
+            download_location (str): Local directory to write the files into.
+            threads (int): Number of files to download at once (default 8).
+                1 disables threading.
 
         Returns:
-            List of paths to downloaded files.
+            `List[pathlib.Path]`: paths to the downloaded files.
+
+        Raises:
+            DataPortalInputError: if `download_location` is not provided.
         """
 
         if len(self) == 0:

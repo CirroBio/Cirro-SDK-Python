@@ -173,7 +173,14 @@ class DataPortalDataset(DataPortalAsset):
     @property
     def status(self) -> Status:
         """
-        Status of the dataset
+        Status of the dataset, as a `cirro_api_client.v1.models.Status` -- see
+        that enum for the full set of values. An analysis moves through
+        `PENDING`, `STARTING` and `RUNNING` before reaching `COMPLETED` or
+        `FAILED`.
+
+        This is a snapshot taken when the object was built, and it does not
+        update. To watch a running analysis, call `portal.get_dataset(...)`
+        again each time round the loop rather than re-reading this property.
         """
         return self._data.status
 
@@ -225,14 +232,27 @@ class DataPortalDataset(DataPortalAsset):
 
     @property
     def file_count(self) -> int:
+        """
+        Number of files in the dataset.
+
+        Fetches the full dataset detail from the API on first access if this
+        object was built from a listing.
+        """
         return self._get_detail().file_count
 
     @property
     def total_size_bytes(self) -> int:
+        """
+        Combined size of every file in the dataset, in bytes.
+
+        Fetches the full dataset detail from the API on first access if this
+        object was built from a listing.
+        """
         return self._get_detail().total_size_bytes
 
     @property
     def total_size(self) -> str:
+        """Combined size of every file in the dataset, human-readable (e.g. 4.50 GB)."""
         return bytes_to_human_readable(self.total_size_bytes)
 
     @property
@@ -250,7 +270,17 @@ class DataPortalDataset(DataPortalAsset):
         """
         Return the top-level execution log for this dataset.
 
+        This is the log from the head node driving the workflow -- the output of
+        Nextflow or Cromwell itself, depending on the process executor,
+        including which tasks it submitted and why the run stopped. For the
+        stdout/stderr of one task, use `cirro.sdk.task.DataPortalTask.logs`; for
+        the log file archived once the run finishes, use `get_logs`.
+
         Returns an empty string if no log events are available (e.g. the job has not started yet).
+
+        Cached after the first access. Reading this while the analysis is still
+        starting up returns `''` and will keep returning `''` for the lifetime
+        of this object -- re-fetch the dataset to try again.
 
         Returns:
             str: Execution log text, or an empty string if unavailable.
@@ -268,8 +298,12 @@ class DataPortalDataset(DataPortalAsset):
         """
         List of tasks from the workflow execution, fetched via the execution API.
 
+        Cached after the first access, so a list read while the analysis is
+        still running will not pick up tasks that start later -- re-fetch the
+        dataset for an up-to-date list.
+
         Returns:
-            `List[DataPortalTask]`
+            `List[cirro.sdk.task.DataPortalTask]`
         """
         return self._load_tasks_from_api()
 
@@ -341,11 +375,17 @@ class DataPortalDataset(DataPortalAsset):
         """
         Get a file from the dataset using its relative path.
 
+        The leading `data/` prefix is optional -- it is tried automatically if
+        the path is not found as given.
+
         Args:
             relative_path (str): Relative path of file within the dataset
 
         Returns:
-            `from cirro.sdk.file import DataPortalFile`
+            `cirro.sdk.file.DataPortalFile`
+
+        Raises:
+            DataPortalAssetNotFound: if no file in the dataset has this path.
         """
 
         # Get the list of files in this dataset
@@ -369,8 +409,17 @@ class DataPortalDataset(DataPortalAsset):
         """
         Return the list of files which make up the dataset.
 
+        The result is a `cirro.sdk.asset.DataPortalAssets` list, so it also
+        offers `get_by_name`, `get_by_id`, and `filter_by_pattern`. Files are
+        listed by their relative path within the dataset, most of which sit
+        under a `data/` prefix.
+
         Args:
-            file_limit (int): Maximum number of files to return (default 100,000)
+            file_limit (int): Maximum number of files to return (default 100,000).
+                A dataset with more files than this is truncated silently.
+
+        Returns:
+            `cirro.sdk.file.DataPortalFiles`
         """
         assets = self._client.datasets.get_assets_listing(
             project_id=self.project_id,
@@ -394,10 +443,40 @@ class DataPortalDataset(DataPortalAsset):
             **kwargs
     ):
         """
-        Read the contents of files in the dataset.
+        Read the contents of files in the dataset, without downloading them.
 
-        See :meth:`~cirro.sdk.portal.DataPortal.read_files` for full details
-        on ``glob``/``pattern`` matching and filetype options.
+        Exactly one of ``glob`` or ``pattern`` must be provided.
+
+        **glob** -- standard wildcard matching; yields the file content for each
+        matching file:
+
+        - ``*`` matches any characters within a single path segment
+        - ``**`` matches zero or more path segments
+        - Matching is suffix-anchored (``*.csv`` matches at any depth)
+
+        **pattern** -- like ``glob`` but ``{name}`` placeholders capture portions of
+        the path automatically; yields ``(content, meta)`` pairs where *meta* is a
+        ``dict`` of extracted values:
+
+        - ``{name}`` captures one path segment (no ``/``)
+        - ``*`` and ``**`` wildcards work as in ``glob``
+
+        See :meth:`cirro.sdk.portal.DataPortal.read_files` for the full list of
+        ``filetype`` values and the extensions each one is inferred from.
+
+        ```python
+        # Every CSV in the dataset, as DataFrames
+        for df in dataset.read_files(glob='*.csv'):
+            print(df.shape)
+
+        # Capture the sample name from each filename
+        for df, meta in dataset.read_files(pattern='{sample}.csv'):
+            print(meta['sample'], df.shape)
+
+        # Gzipped TSVs at any depth
+        for df in dataset.read_files(glob='**/*.tsv.gz', filetype='csv', sep='\\t'):
+            print(df.shape)
+        ```
 
         Args:
             glob (str): Wildcard expression to match files.
@@ -407,11 +486,15 @@ class DataPortalDataset(DataPortalAsset):
             filetype (str): File format used to parse each file
                 (or ``None`` to infer from extension).
             **kwargs: Additional keyword arguments forwarded to the
-                file-parsing function.
+                file-parsing function (e.g. ``sep='\\t'`` for TSV files).
 
         Yields:
             - When using ``glob``: *content* for each matching file
             - When using ``pattern``: ``(content, meta)`` for each matching file
+
+        Raises:
+            DataPortalInputError: if both ``glob`` and ``pattern`` are provided, or
+                if neither is.
         """
         if glob is not None and pattern is not None:
             raise DataPortalInputError("Cannot specify both 'glob' and 'pattern' — use one or the other")
@@ -436,20 +519,33 @@ class DataPortalDataset(DataPortalAsset):
             **kwargs
     ) -> Any:
         """
-        Read the contents of a single file from the dataset.
+        Read the contents of a single file from the dataset, without
+        downloading it.
 
-        See :meth:`~cirro.sdk.portal.DataPortal.read_file` for full details.
+        Provide either ``path`` (the exact relative path) or ``glob`` (a wildcard
+        expression, which must match exactly one file).
+
+        ```python
+        df = dataset.read_file(path='data/counts.csv')
+        df = dataset.read_file(glob='**/counts.csv')
+        ```
 
         Args:
             path (str): Exact relative path of the file within the dataset.
             glob (str): Wildcard expression matching exactly one file.
             filetype (str): File format used to parse the file. Supported values
-                are the same as :meth:`~cirro.sdk.portal.DataPortal.read_files`.
+                are the same as :meth:`cirro.sdk.portal.DataPortal.read_files`.
             **kwargs: Additional keyword arguments forwarded to the file-parsing
                 function.
 
         Returns:
-            Parsed file content.
+            Parsed file content -- a ``pandas.DataFrame`` for tabular formats, a
+            ``str`` for text, and so on depending on ``filetype``.
+
+        Raises:
+            DataPortalInputError: if both or neither of ``path``/``glob`` are given,
+                or if ``glob`` matches more than one file.
+            DataPortalAssetNotFound: if nothing matches.
         """
         if path is not None and glob is not None:
             raise DataPortalInputError("Cannot specify both 'path' and 'glob' — use one or the other")
@@ -474,23 +570,49 @@ class DataPortalDataset(DataPortalAsset):
         """
         Read the Nextflow workflow trace file for this dataset as a DataFrame.
 
+        One row per task, with timing, resource usage, and exit status. Written
+        when the run finishes. This artifact is specific to Nextflow -- a
+        Cromwell (WDL) analysis does not produce one.
+
         Returns:
             `pandas.DataFrame`
+
+        Raises:
+            DataPortalAssetNotFound: if the dataset has no workflow trace
+                artifact -- true for uploaded datasets, for Cromwell analyses,
+                and for runs that have not finished.
         """
         return self.get_artifact(ArtifactType.WORKFLOW_TRACE).read_csv(sep='\t')
 
     def get_logs(self) -> str:
         """
-        Read the Nextflow workflow logs for this dataset as a string.
+        Read the archived workflow log for this dataset as a string.
+
+        This reads the `WORKFLOW_LOGS` artifact, written when the run finishes.
+        For the live head-node log of a run in progress, use `logs` instead.
 
         Returns:
             str
+
+        Raises:
+            DataPortalAssetNotFound: if the dataset has no workflow log
+                artifact yet.
         """
         return self.get_artifact(ArtifactType.WORKFLOW_LOGS).read()
 
     def get_artifact(self, artifact_type: ArtifactType) -> DataPortalFile:
         """
-        Get the artifact of a particular type from the dataset
+        Get the artifact of a particular type from the dataset.
+
+        Args:
+            artifact_type (`cirro_api_client.v1.models.ArtifactType`): Type of
+                artifact to return, e.g. `ArtifactType.WORKFLOW_TRACE`.
+
+        Returns:
+            `cirro.sdk.file.DataPortalFile`
+
+        Raises:
+            DataPortalAssetNotFound: if the dataset has no artifact of this type.
         """
         artifacts = self._get_assets().artifacts
         artifact = next((a for a in artifacts if a.artifact_type == artifact_type), None)
@@ -548,6 +670,35 @@ class DataPortalDataset(DataPortalAsset):
 
         The process can be provided as either a DataPortalProcess object,
         or a string which corresponds to the name or ID of the process.
+
+        The analysis runs asynchronously. The output dataset is registered
+        immediately in a `PENDING` state and this method returns as soon as the
+        job is submitted -- it does not wait for the analysis to finish.
+
+        To find out which `params` a process accepts, ask the process itself:
+
+        ```python
+        process = portal.get_process_by_name("Name of process")
+        spec = process.get_parameter_spec()
+        spec.print()               # human-readable listing of every parameter
+        spec.validate_params(params)   # raises if params do not fit the schema
+        ```
+
+        To follow the analysis, re-fetch the dataset each time round the loop.
+        `status` on a dataset object you already hold reflects the moment that
+        object was built and will never change:
+
+        ```python
+        from time import sleep
+        from cirro_api_client.v1.models import Status
+
+        dataset_id = dataset.run_analysis(name="Output", process="Name of process")
+        while True:
+            result = portal.get_dataset(project=dataset.project_id, dataset=dataset_id)
+            if result.status in (Status.COMPLETED, Status.FAILED):
+                break
+            sleep(30)
+        ```
 
         Args:
             name (str): Name of newly created dataset

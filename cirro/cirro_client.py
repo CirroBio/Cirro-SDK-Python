@@ -17,9 +17,15 @@ class CirroApi:
         Instantiates the Cirro API object
 
         Args:
-            auth_info (cirro.auth.base.AuthInfo):
+            auth_info (`cirro.auth.base.AuthInfo`): How to authenticate. If
+             omitted, this is read from the saved configuration, which falls back
+             to an interactive device-code login that blocks on a browser flow.
+             Pass `cirro.auth.client_creds.ClientCredentialsAuth` to authenticate
+             without prompting.
             base_url (str): Optional base URL of the Cirro instance
              (if not provided, it uses the `CIRRO_BASE_URL` environment variable, or the config file)
+            user_agent (str): Name reported to the API for this client, which
+             shows up in Cirro's audit logs.
 
         Returns:
             Authenticated Cirro API object, which can be used to call endpoint functions.

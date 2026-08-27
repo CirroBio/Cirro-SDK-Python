@@ -13,18 +13,62 @@ from cirro.sdk.reference_type import DataPortalReferenceType, DataPortalReferenc
 
 class DataPortal:
     """
-    Helper functions for exploring the Projects, Datasets, Samples, and Files
-    available in the Data Portal.
+    The entry point for the SDK: explore the Projects, Datasets, Samples, and
+    Files available in Cirro, and launch analyses on them.
+
+    Projects and datasets can be looked up by either name or ID.
+
+    ```python
+    from cirro import DataPortal
+
+    portal = DataPortal(base_url="app.cirro.bio")
+    dataset = portal.get_dataset(project="Name of Project", dataset="Name of Dataset")
+    ```
     """
 
     def __init__(self, base_url: str = None, client: CirroApi = None):
         """
         Set up the DataPortal object, establishing an authenticated connection.
 
+        **This may block on an interactive login.** With no `client` and no
+        saved configuration, the constructor starts a device-code login: it
+        prints a URL and waits until someone completes the login in a browser.
+        In a script or an automated session there is nobody to click the link,
+        so it will hang until the device code expires.
+
+        To authenticate without prompting, build a `cirro.cirro_client.CirroApi`
+        with OAuth client credentials and pass it as `client`:
+
+        ```python
+        import os
+        from cirro import CirroApi, DataPortal
+        from cirro.auth.client_creds import ClientCredentialsAuth
+        from cirro.config import AppConfig
+
+        config = AppConfig(base_url="app.cirro.bio")
+        auth = ClientCredentialsAuth(
+            os.environ["CIRRO_CLIENT_ID"],
+            os.environ["CIRRO_CLIENT_SECRET"],
+            auth_endpoint=config.auth_endpoint
+        )
+        portal = DataPortal(client=CirroApi(auth_info=auth))
+        ```
+
+        To drive the browser login yourself without blocking in the
+        constructor, use `cirro.sdk.login.DataPortalLogin` instead.
+
         Args:
-            base_url (str): Optional base URL of the Cirro instance
-             (if not provided, it uses the `CIRRO_BASE_URL` environment variable, or the config file)
-            client (`cirro.cirro_client.CirroApi`): Optional pre-configured client
+            base_url (str): Base URL of the Cirro instance, e.g. `app.cirro.bio`.
+             If omitted, falls back to the `CIRRO_BASE_URL` environment variable,
+             then to the `base_url` saved in `~/.cirro/config.ini` by
+             `cirro configure`. Raises `RuntimeError` if none of these is set.
+            client (`cirro.cirro_client.CirroApi`): Pre-configured client. Supply
+             this to control how authentication happens; when given, `base_url`
+             is ignored.
+
+        Raises:
+            RuntimeError: if no base URL can be determined, or the instance
+                cannot be reached.
 
         Example:
         ```python
@@ -77,7 +121,13 @@ class DataPortal:
         return cls(client=client)
 
     def list_projects(self) -> DataPortalProjects:
-        """List all the projects available in the Data Portal."""
+        """
+        List all the projects available in the Data Portal.
+
+        Returns:
+            `cirro.sdk.project.DataPortalProjects`, a list which also offers
+            `get_by_name`, `get_by_id`, and `filter_by_pattern`.
+        """
 
         return DataPortalProjects(
             [
@@ -87,12 +137,35 @@ class DataPortal:
         )
 
     def get_project_by_name(self, name: str = None) -> DataPortalProject:
-        """Return the project with the specified name."""
+        """
+        Return the project with the specified name.
+
+        Args:
+            name (str): Name of the project.
+
+        Returns:
+            `cirro.sdk.project.DataPortalProject`
+
+        Raises:
+            DataPortalAssetNotFound: if no project has this name.
+            DataPortalInputError: if more than one project has this name.
+        """
 
         return self.list_projects().get_by_name(name)
 
     def get_project_by_id(self, _id: str = None) -> DataPortalProject:
-        """Return the project with the specified id."""
+        """
+        Return the project with the specified id.
+
+        Args:
+            _id (str): ID of the project.
+
+        Returns:
+            `cirro.sdk.project.DataPortalProject`
+
+        Raises:
+            DataPortalAssetNotFound: if no project has this ID.
+        """
 
         return self.list_projects().get_by_id(_id)
 
@@ -100,11 +173,17 @@ class DataPortal:
         """
         Return a project identified by ID or name.
 
+        Tries to match by ID first, then falls back to matching by name.
+
         Args:
             project (str): ID or name of project
 
         Returns:
-            `from cirro.sdk.project import DataPortalProject`
+            `cirro.sdk.project.DataPortalProject`
+
+        Raises:
+            DataPortalAssetNotFound: if no project matches by either ID or name.
+            DataPortalInputError: if more than one project has this name.
         """
         try:
             return self.get_project_by_id(project)
@@ -123,7 +202,7 @@ class DataPortal:
             `cirro.sdk.dataset.DataPortalDataset`
 
             ```python
-            from cirro import DataPortal()
+            from cirro import DataPortal
             portal = DataPortal()
             dataset = portal.get_dataset(
                 project="id-or-name-of-project",
@@ -275,6 +354,9 @@ class DataPortal:
 
         Args:
             ingest (bool): If True, only list those processes which can be used to ingest datasets directly
+
+        Returns:
+            `cirro.sdk.process.DataPortalProcesses`
         """
 
         return DataPortalProcesses(
@@ -291,23 +373,48 @@ class DataPortal:
 
         Args:
             name (str): Name of process
+            ingest (bool): If True, search only the processes which can be used
+                to ingest datasets directly. A data type used for uploading will
+                not be found unless this is set.
+
+        Returns:
+            `cirro.sdk.process.DataPortalProcess`
+
+        Raises:
+            DataPortalAssetNotFound: if no process has this name.
         """
 
         return self.list_processes(ingest=ingest).get_by_name(name)
 
     def get_process_by_id(self, id: str, ingest=False) -> DataPortalProcess:
         """
-        Return the process with the specified id
+        Return the process with the specified id.
 
         Args:
             id (str): ID of process
+            ingest (bool): If True, search only the processes which can be used
+                to ingest datasets directly.
+
+        Returns:
+            `cirro.sdk.process.DataPortalProcess`
+
+        Raises:
+            DataPortalAssetNotFound: if no process has this ID.
         """
 
         return self.list_processes(ingest=ingest).get_by_id(id)
 
     def list_reference_types(self) -> DataPortalReferenceTypes:
         """
-        Return the list of all available reference types
+        Return the list of all available reference types.
+
+        These are the categories that reference data is organized into, such as
+        `genome_fasta`. Pass a type name to
+        `cirro.sdk.project.DataPortalProject.list_references` to see the
+        references of that type held by a project.
+
+        Returns:
+            `cirro.sdk.reference_type.DataPortalReferenceTypes`
         """
 
         return DataPortalReferenceTypes(
@@ -319,4 +426,11 @@ class DataPortal:
 
     @property
     def developer_helper(self) -> DeveloperHelper:
+        """
+        Helpers for developing Cirro pipelines and data types, rather than for
+        analysing data.
+
+        Returns:
+            `cirro.sdk.developer.DeveloperHelper`
+        """
         return DeveloperHelper(self._client)

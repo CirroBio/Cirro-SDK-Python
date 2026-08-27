@@ -10,7 +10,19 @@ from cirro.sdk.process import DataPortalProcess
 
 def parse_process_name_or_id(process: Union[DataPortalProcess, str], client: CirroApi):
     """
-    If the process is a string, try to parse it as a process name or ID.
+    Resolve a process given as a name, an ID, or an already-built object.
+
+    Args:
+        process (str | `cirro.sdk.process.DataPortalProcess`): Name or ID of the
+            process, or the process object itself (returned unchanged).
+        client (`cirro.cirro_client.CirroApi`): Client to look the process up with.
+
+    Returns:
+        `cirro.sdk.process.DataPortalProcess`
+
+    Raises:
+        DataPortalInputError: if `process` is not a string, or if no process
+            matches it by either ID or name.
     """
 
     # If the process object is already a DataPortalProcess object
