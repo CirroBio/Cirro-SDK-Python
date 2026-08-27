@@ -55,12 +55,9 @@ class DataPortalAssets(List[T]):
     def __str__(self):
         return "\n".join([str(i) for i in self])
 
-    def description(self):
+    def description(self) -> str:
         """
         Render a text summary of the assets, one block per asset.
-
-        Returns:
-            str
         """
 
         return '\n\n---\n\n'.join([
