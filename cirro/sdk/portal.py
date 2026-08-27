@@ -1,6 +1,8 @@
 from cirro_api_client.v1.models import Executor
 
+from cirro.auth.client_creds import ClientCredentialsAuth
 from cirro.cirro_client import CirroApi
+from cirro.config import AppConfig
 from cirro.sdk.dataset import DataPortalDataset
 from cirro.sdk.developer import DeveloperHelper
 from cirro.sdk.exceptions import DataPortalAssetNotFound
@@ -83,6 +85,40 @@ class DataPortal:
         # Set up default client if not provided
         else:
             self._client = CirroApi(base_url=base_url)
+
+    @classmethod
+    def from_client_credentials(cls, client_id: str, client_secret: str, base_url: str = None) -> 'DataPortal':
+        """
+        Set up the DataPortal object, authenticating using an OAuth client credentials pair
+        (e.g., a service account or automated integration), rather than an interactive user login.
+
+        Args:
+            client_id (str): OAuth Client ID
+            client_secret (str): OAuth Client Secret
+            base_url (str): Optional base URL of the Cirro instance
+             (if not provided, it uses the `CIRRO_BASE_URL` environment variable, or the config file)
+
+        Example:
+        ```python
+        import os
+        from cirro import DataPortal
+
+        portal = DataPortal.from_client_credentials(
+            client_id=os.environ['CIRRO_CLIENT_ID'],
+            client_secret=os.environ['CIRRO_CLIENT_SECRET'],
+            base_url="app.cirro.bio"
+        )
+        portal.list_projects()
+        ```
+        """
+        app_config = AppConfig(base_url=base_url)
+        auth_info = ClientCredentialsAuth(
+            client_id=client_id,
+            client_secret=client_secret,
+            auth_endpoint=app_config.auth_endpoint
+        )
+        client = CirroApi(auth_info=auth_info, base_url=base_url)
+        return cls(client=client)
 
     def list_projects(self) -> DataPortalProjects:
         """
