@@ -7,7 +7,8 @@ from typing import Union, List, Optional, Any
 from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.errors import CirroException, UnexpectedStatus
 from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, \
-    Status, RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest
+    Status, RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest, \
+    CostResponse
 
 from cirro.cirro_client import CirroApi
 from cirro.config import Constants
@@ -264,6 +265,26 @@ class DataPortalDataset(DataPortalAsset):
     def created_at(self) -> datetime.datetime:
         """Timestamp of dataset creation"""
         return self._data.created_at
+
+    @property
+    def cost(self) -> Optional[CostResponse]:
+        """
+        Compute cost of the analysis which produced this dataset, as a
+        `cirro_api_client.v1.models.CostResponse` -- `total_cost` alongside a
+        breakdown by task (`tasks`) and by task status group (`groups`), plus an
+        `is_estimate` flag for whether the figure is estimated or measured.
+
+        Not cached: the cost of a running analysis grows as tasks complete, so
+        each access re-fetches.
+
+        Returns:
+            `cirro_api_client.v1.models.CostResponse`, or ``None`` for datasets
+            which were uploaded rather than produced by an analysis.
+        """
+        return self._client.execution.get_cost(
+            project_id=self.project_id,
+            dataset_id=self.id
+        )
 
     @cached_property
     def logs(self) -> str:
