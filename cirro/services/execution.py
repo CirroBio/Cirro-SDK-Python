@@ -1,9 +1,10 @@
 from typing import List, Optional, Dict
 
 from cirro_api_client.v1.api.execution import run_analysis, stop_analysis, get_project_summary, \
-    get_tasks_for_execution, get_task_logs, get_execution_logs, get_task, get_task_files
+    get_tasks_for_execution, get_task_logs, get_execution_logs, get_task, get_task_files, calculate_cost
 from cirro_api_client.v1.api.processes import get_process_parameters
-from cirro_api_client.v1.models import RunAnalysisRequest, CreateResponse, Task, GetTaskFilesResponse
+from cirro_api_client.v1.models import RunAnalysisRequest, CreateResponse, Task, GetTaskFilesResponse, \
+    CostResponse
 
 from cirro.models.form_specification import ParameterSpecification
 from cirro.services.base import BaseService
@@ -192,5 +193,24 @@ class ExecutionService(BaseService):
             project_id=project_id,
             dataset_id=dataset_id,
             task_id=task_id,
+            client=self._api_client
+        )
+
+    def get_cost(self, project_id: str, dataset_id: str) -> Optional[CostResponse]:
+        """
+        Gets the compute cost of the analysis which produced a dataset,
+        broken down by task and by task status group.
+
+        While the analysis is running, and for a period afterwards until the
+        cloud provider reports settled billing data, the returned
+        `cirro_api_client.v1.models.CostResponse` has `is_estimate` set to True.
+
+        Args:
+            project_id (str): ID of the Project
+            dataset_id (str): ID of the Dataset
+        """
+        return calculate_cost.sync(
+            project_id=project_id,
+            dataset_id=dataset_id,
             client=self._api_client
         )
