@@ -271,11 +271,11 @@ class DataPortalDataset(DataPortalAsset):
         """
         Compute cost of the analysis which produced this dataset, as a
         `cirro_api_client.v1.models.CostResponse` -- `total_cost` alongside a
-        breakdown by task (`tasks`) and by task status group (`groups`).
+        breakdown by task (`tasks`) and by task status group (`groups`), plus an
+        `is_estimate` flag for whether the figure is estimated or measured.
 
-        Not cached: the cost of a running analysis grows as tasks complete, and
-        `is_estimate` stays True until the cloud provider reports settled
-        billing data, so each access re-fetches.
+        Not cached: the cost of a running analysis grows as tasks complete, so
+        each access re-fetches.
 
         Returns:
             `cirro_api_client.v1.models.CostResponse`, or ``None`` for datasets

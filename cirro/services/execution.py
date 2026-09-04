@@ -201,9 +201,8 @@ class ExecutionService(BaseService):
         Gets the compute cost of the analysis which produced a dataset,
         broken down by task and by task status group.
 
-        While the analysis is running, and for a period afterwards until the
-        cloud provider reports settled billing data, the returned
-        `cirro_api_client.v1.models.CostResponse` has `is_estimate` set to True.
+        The returned `cirro_api_client.v1.models.CostResponse` carries an
+        `is_estimate` flag for whether the figure is estimated or measured.
 
         Args:
             project_id (str): ID of the Project
