@@ -114,7 +114,6 @@ class PreprocessDataset:
     """
 
     _PARAMS_FILE = "params.json"
-    _REFERENCES_BASE = "s3://pubweb-references"
 
     def __init__(self,
                  samplesheet: Union['DataFrame', str, Path],
@@ -193,7 +192,7 @@ class PreprocessDataset:
         Returns the base URL for references.
         This is used to access public references in the Cirro system.
         """
-        return self._REFERENCES_BASE
+        return self.metadata.get('referencesBucketUri')
 
     def log(self):
         """Print logging messages about the dataset."""
