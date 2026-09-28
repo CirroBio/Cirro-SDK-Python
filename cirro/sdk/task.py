@@ -1,3 +1,5 @@
+import difflib
+import json
 from functools import cached_property
 from pathlib import PurePath
 import re
@@ -175,6 +177,11 @@ class DataPortalTask:
     def task_id(self) -> int:
         """Sequential task identifier — the 0-based index of this task in the execution's task list."""
         return self._task_id
+
+    @property
+    def hash(self) -> str:
+        """Nextflow task hash, e.g. ``ab/123456``."""
+        return self._task.hash_
 
     @property
     def name(self) -> str:
@@ -400,6 +407,62 @@ class DataPortalTask:
             return task_files
         except Exception:  # NOSONAR
             return None
+
+    @cached_property
+    def lineage(self) -> Optional[dict]:
+        """
+        Returns the lineage from the nf-lineage plugin
+        https://docs.seqera.io/nextflow/tutorials/data-lineage
+
+        This can be used to debug pipeline cache misses.
+
+        Note, only works for Nextflow executions and analysis completed after Oct 2026.
+        :return: Lineage record for the task
+        """
+        if not self._dataset_id or not self.native_id:
+            return None
+        try:
+            task_lineage = self._client.execution.get_task_lineage(
+                project_id=self._project_id,
+                dataset_id=self._dataset_id,
+                task_id=self.native_id
+            )
+            if task_lineage is None or isinstance(task_lineage.lineage, Unset) or task_lineage.lineage is None:
+                raise DataPortalAssetNotFound
+            return task_lineage.lineage.additional_properties
+        except Exception:  # NOSONAR
+            return None
+
+    def lineage_diff(self, other: 'DataPortalTask'):
+        """
+        Print a unified diff between this task and another.
+
+        This can be used to debug pipeline cache misses.
+
+        See :meth:`lineage` for more details.
+        """
+        get_task_label = lambda t: f"[{t.hash}] {t.name}"
+        format_lineage = lambda l: json.dumps(lineage, indent=2, sort_keys=True, default=str).splitlines()
+
+        lineage, other_lineage = self.task_lineage, other.task_lineage
+        if not lineage or not other_lineage:
+            missing = self if not lineage else other
+            print(f"{get_task_label(missing)}: No Lineage Available")
+            return
+
+        diff = list(difflib.unified_diff(
+            format_lineage(other_lineage),
+            format_lineage(lineage),
+            fromfile=get_task_label(other),
+            tofile=get_task_label(self),
+            lineterm=''
+        ))
+        if not diff:
+            print("(no differences)")
+            return
+
+        print(diff)
+
 
     def _build_inputs(self) -> List[WorkDirFile]:
         """Return input files from the cached task files API response."""
