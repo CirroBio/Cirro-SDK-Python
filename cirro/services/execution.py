@@ -197,7 +197,6 @@ class ExecutionService(BaseService):
             client=self._api_client
         )
 
-
     def get_task_files(self, project_id: str, dataset_id: str, task_id: str) -> Optional[GetTaskFilesResponse]:
         """
         Gets the input and output files for an individual task.
