@@ -441,10 +441,13 @@ class DataPortalTask:
 
         See :meth:`lineage` for more details.
         """
-        get_task_label = lambda t: f"[{t.hash}] {t.name}"
-        format_lineage = lambda l: json.dumps(lineage, indent=2, sort_keys=True, default=str).splitlines()
+        def get_task_label(t: 'DataPortalTask') -> str:
+            return f"[{t.hash}] {t.name}"
 
-        lineage, other_lineage = self.task_lineage, other.task_lineage
+        def format_lineage(record: dict) -> List[str]:
+            return json.dumps(record, indent=2, sort_keys=True, default=str).splitlines()
+
+        lineage, other_lineage = self.lineage, other.lineage
         if not lineage or not other_lineage:
             missing = self if not lineage else other
             print(f"{get_task_label(missing)}: No Lineage Available")
@@ -461,8 +464,7 @@ class DataPortalTask:
             print("(no differences)")
             return
 
-        print(diff)
-
+        print('\n'.join(diff))
 
     def _build_inputs(self) -> List[WorkDirFile]:
         """Return input files from the cached task files API response."""
