@@ -500,10 +500,29 @@ class DataPortalProject(DataPortalAsset):
             DataPortalInputError: if more than one dashboard has this name.
         """
         dashboards = self.list_dashboards(include_other=True)
-        by_id = [d for d in dashboards if d.id == name_or_id]
-        dashboard = by_id[0] if by_id else dashboards.get_by_name(name_or_id)
-        dashboard.refresh()
-        return dashboard
+        match = next((d for d in dashboards if d.id == name_or_id), None) \
+            or dashboards.get_by_name(name_or_id)
+        return self.get_dashboard_by_id(match.id)
+
+    def get_dashboard_by_id(self, _id: str) -> DataPortalDashboard:
+        """
+        Return the dashboard with the specified ID, with its document loaded.
+
+        Fetches the dashboard directly, without listing the project's dashboards.
+
+        Args:
+            _id (str): ID of the dashboard.
+
+        Returns:
+            `cirro.sdk.dashboard.DataPortalDashboard`
+
+        Raises:
+            DataPortalAssetNotFound: if the project has no dashboard with this ID.
+        """
+        dashboard = self._client.dashboards.get(project_id=self.id, dashboard_id=_id)
+        if dashboard is None:
+            raise DataPortalAssetNotFound(f'Dashboard with ID {_id} not found')
+        return DataPortalDashboard(dashboard, project_id=self.id, client=self._client)
 
     def create_dashboard(self, name: str, document: dict, description: str = "") -> DataPortalDashboard:
         """
@@ -521,7 +540,7 @@ class DataPortalProject(DataPortalAsset):
             "name": name, "description": description, "dashboardData": document,
             "criteria": {"type": DATA_STUDIO_TYPE, "scope": "project", "revision": str(uuid.uuid4())},
             "tags": [], "schemaVersion": RECORD_SCHEMA_VERSION}))
-        return self.get_dashboard(created.id)
+        return self.get_dashboard_by_id(created.id)
 
 
 class DataPortalProjects(DataPortalAssets[DataPortalProject]):

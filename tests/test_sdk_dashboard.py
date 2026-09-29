@@ -34,8 +34,10 @@ class FakeDashboards:
             "d-other": record("d-other", "Other feature", "2026-09-04T00:00:00+00:00",
                               criteria_type="something-else"),
         }
+        self.paths = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.paths.append(request.url.path)
         parts = request.url.path.strip("/").split("/")
         if request.method == "GET" and len(parts) == 3:
             return httpx.Response(200, json=[{k: v for k, v in r.items() if k != "dashboardData"}
@@ -79,6 +81,13 @@ class TestDataPortalDashboard(unittest.TestCase):
         self.assertEqual(self.project.get_dashboard("d-new").name, "Newer")
         with self.assertRaises(DataPortalAssetNotFound):
             self.project.get_dashboard("nope")
+
+    def test_get_by_id_fetches_the_one_record(self):
+        dashboard = self.project.get_dashboard_by_id("d-old")
+        self.assertEqual([n["id"] for n in dashboard.nodes], ["src1"])
+        self.assertEqual(self.api.paths, ["/projects/p1/dashboards/d-old"])
+        with self.assertRaises(DataPortalAssetNotFound):
+            self.project.get_dashboard_by_id("gone")
 
     def test_create_makes_a_data_studio_dashboard(self):
         document = copy.deepcopy(self.api.store["d-old"]["dashboardData"])
