@@ -11,7 +11,8 @@ DataPortal
 │   ├── list_datasets()    -> DataPortalDataset
 │   │   ├── list_files()   -> DataPortalFile
 │   │   └── tasks          -> DataPortalTask
-│   └── list_references()  -> DataPortalReference
+│   ├── list_references()  -> DataPortalReference
+│   └── list_dashboards()  -> DataPortalDashboard
 ├── list_processes()       -> DataPortalProcess
 └── list_reference_types() -> DataPortalReferenceType
 ```

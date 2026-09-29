@@ -1,12 +1,16 @@
+import uuid
 from functools import cache
 from time import sleep
 from typing import List, Union
 
-from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag, Status
+from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag, Status, \
+    DashboardInput
 
 from cirro.cirro_client import CirroApi
 from cirro.file_utils import get_files_in_directory
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
+from cirro.sdk.dashboard import DataPortalDashboard, DataPortalDashboards, DATA_STUDIO_TYPE, \
+    RECORD_SCHEMA_VERSION, empty_document
 from cirro.sdk.dataset import DataPortalDataset, DataPortalDatasets
 from cirro.sdk.exceptions import DataPortalAssetNotFound, DataPortalInputError
 from cirro.sdk.helpers import parse_process_name_or_id
@@ -358,6 +362,64 @@ class DataPortalProject(DataPortalAsset):
             sample's `id`, `name`, and its `metadata` dict.
         """
         return self._client.metadata.get_project_samples(self.id, max_items)
+
+    def list_dashboards(self, include_other: bool = False) -> DataPortalDashboards:
+        """
+        List the project's Data Studio dashboards, most recently saved first.
+
+        Args:
+            include_other (bool): Also list dashboard records kept by other
+                features, which the Data Studio does not show.
+
+        Returns:
+            `cirro.sdk.dashboard.DataPortalDashboards`
+        """
+        dashboards = [DataPortalDashboard(d, project_id=self.id, client=self._client)
+                      for d in self._client.dashboards.list(project_id=self.id)]
+        return DataPortalDashboards(sorted(
+            (d for d in dashboards if include_other or d.in_data_studio),
+            key=lambda d: d.updated_at, reverse=True))
+
+    def get_dashboard(self, name_or_id: str) -> DataPortalDashboard:
+        """
+        Return the dashboard matching the given ID or name, with its document loaded.
+
+        Args:
+            name_or_id (str): ID or name of the dashboard.
+
+        Returns:
+            `cirro.sdk.dashboard.DataPortalDashboard`
+
+        Raises:
+            DataPortalAssetNotFound: if nothing matches by either ID or name.
+            DataPortalInputError: if more than one dashboard has this name.
+        """
+        dashboards = self.list_dashboards(include_other=True)
+        by_id = [d for d in dashboards if d.id == name_or_id]
+        dashboard = by_id[0] if by_id else dashboards.get_by_name(name_or_id)
+        dashboard.refresh()
+        return dashboard
+
+    def create_dashboard(self, name: str, description: str = "",
+                         document: dict = None) -> DataPortalDashboard:
+        """
+        Create a Data Studio dashboard.
+
+        Args:
+            name (str): Name shown in the Data Studio.
+            description (str): Longer description.
+            document (dict): The dashboard's contents in the portal's format; an
+                empty dashboard if omitted, which opens on the Add data wizard.
+
+        Returns:
+            `cirro.sdk.dashboard.DataPortalDashboard`
+        """
+        created = self._client.dashboards.create(project_id=self.id, dashboard=DashboardInput.from_dict({
+            "name": name, "description": description,
+            "dashboardData": document if document is not None else empty_document(),
+            "criteria": {"type": DATA_STUDIO_TYPE, "scope": "project", "revision": str(uuid.uuid4())},
+            "tags": [], "schemaVersion": RECORD_SCHEMA_VERSION}))
+        return self.get_dashboard(created.id)
 
 
 class DataPortalProjects(DataPortalAssets[DataPortalProject]):
