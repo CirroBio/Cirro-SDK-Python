@@ -111,18 +111,19 @@ class DataPortalSheet(DataPortalAsset):
         ])
 
     def to_dataframe(self,
-                     max_rows: int = 10000,
+                     max_rows: int = None,
                      order_by: str = None,
                      order: SqlSortOrder = None) -> 'DataFrame':
         """
         Read the sheet's rows into a Pandas DataFrame.
 
-        Pages through the sheet until it has every row or `max_rows`,
-        whichever comes first. The `_row_id` column identifies each row for
-        `update_rows` and `delete_rows`.
+        Pages through the whole sheet, or stops early at `max_rows` if one is
+        given. The `_row_id` column identifies each row for `update_rows` and
+        `delete_rows`.
 
         Args:
-            max_rows (int): Maximum number of rows to read (default 10,000)
+            max_rows (int): Stop after this many rows; reads the whole sheet
+                if omitted
             order_by (str): Column to sort by
             order (SqlSortOrder): Sort direction
 
@@ -133,12 +134,12 @@ class DataPortalSheet(DataPortalAsset):
 
         # Held constant across requests: the API pages by number, so a page
         # size that changed mid-read would skip or repeat rows.
-        page_size = min(ROWS_PER_PAGE, max_rows)
+        page_size = ROWS_PER_PAGE if max_rows is None else min(ROWS_PER_PAGE, max_rows)
         rows = []
         columns = []
         page = 1
 
-        while len(rows) < max_rows:
+        while max_rows is None or len(rows) < max_rows:
             results = self._client.sheets.get_data(
                 project_id=self.project_id,
                 sheet_id=self.id,
@@ -157,7 +158,7 @@ class DataPortalSheet(DataPortalAsset):
             page += 1
 
         return pandas.DataFrame(
-            rows[:max_rows],
+            rows if max_rows is None else rows[:max_rows],
             columns=[column.name for column in columns]
         )
 
