@@ -1,10 +1,13 @@
 import uuid
 from functools import cache
 from time import sleep
-from typing import List, Union
+from typing import List, TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag, Status, \
-    DashboardInput
+    TableSheetInput, ViewSheetInput, DashboardInput
 
 from cirro.cirro_client import CirroApi
 from cirro.file_utils import get_files_in_directory
@@ -17,6 +20,7 @@ from cirro.sdk.helpers import parse_process_name_or_id
 from cirro.sdk.process import DataPortalProcess
 from cirro.sdk.reference import DataPortalReference, DataPortalReferences
 from cirro.sdk.reference_type import DataPortalReferenceType, DataPortalReferenceTypes
+from cirro.sdk.sheet import DataPortalSheet, DataPortalSheets, query_to_dataframe
 from cirro.services.service_helpers import list_all_datasets
 
 
@@ -253,6 +257,107 @@ class DataPortalProject(DataPortalAsset):
             raise DataPortalInputError("Must specify the reference name")
 
         return self.list_references(ref_type).get_by_name(name)
+
+    def list_sheets(self) -> DataPortalSheets:
+        """
+        List the sheets available in a project.
+
+        Returns:
+            `cirro.sdk.sheet.DataPortalSheets`
+        """
+
+        return DataPortalSheets(
+            [
+                DataPortalSheet(sheet, client=self._client)
+                for sheet in self._client.sheets.list(self.id)
+            ]
+        )
+
+    def create_sheet(self, sheet: Union[TableSheetInput, ViewSheetInput]) -> DataPortalSheet:
+        """
+        Create a sheet in the project, either a TABLE or a VIEW.
+
+        Args:
+            sheet (TableSheetInput | ViewSheetInput): Sheet to create
+
+        Returns:
+            `cirro.sdk.sheet.DataPortalSheet` for the sheet just created
+
+        ```python
+        from cirro_api_client.v1.models import ColumnDef, ColumnDataType, SheetCreationMode, TableSheetInput
+
+        diagnoses = project.create_sheet(
+            TableSheetInput(
+                name="Diagnoses",
+                namespace_name="default",
+                table_name="diagnoses",
+                sheet_creation_mode=SheetCreationMode.STANDARD,
+                columns=[ColumnDef(name="icd_code", data_type=ColumnDataType.STRING)]
+            )
+        )
+        ```
+        """
+
+        created = self._client.sheets.create(project_id=self.id, sheet=sheet)
+        return DataPortalSheet(
+            self._client.sheets.get(project_id=self.id, sheet_id=created.id),
+            client=self._client
+        )
+
+    def get_sheet_by_name(self, name: str = None) -> DataPortalSheet:
+        """
+        Return the sheet with the specified name.
+
+        Args:
+            name (str): Name of the sheet.
+
+        Returns:
+            `cirro.sdk.sheet.DataPortalSheet`
+
+        Raises:
+            DataPortalInputError: if `name` is not provided.
+            DataPortalAssetNotFound: if no matching sheet exists.
+        """
+
+        if name is None:
+            raise DataPortalInputError("Must specify the sheet name")
+
+        return self.list_sheets().get_by_name(name)
+
+    def query_sheets(self,
+                     query: str,
+                     max_rows: int = None) -> 'DataFrame':
+        """
+        Run a raw SQL query across the project's sheets.
+
+        Pages through the whole result, or stops early at `max_rows` if one is
+        given. Sheets are reached by name; every namespace is on the engine's
+        search path, so they do not need qualifying.
+
+        Args:
+            query (str): SQL to run
+            max_rows (int): Stop after this many rows; reads the whole result
+                if omitted
+
+        Returns:
+            `pandas.DataFrame`
+
+        ```python
+        counts = project.query_sheets(
+            "SELECT icd_code, COUNT(*) FROM diagnoses GROUP BY icd_code"
+        )
+        ```
+        """
+
+        return query_to_dataframe(
+            lambda limit, page: self._client.sheets.raw_query(
+                project_id=self.id,
+                query=query,
+                limit=limit,
+                page=page
+            ),
+            max_rows=max_rows
+        )
 
     def upload_dataset(
         self,

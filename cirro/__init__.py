@@ -119,6 +119,7 @@ from cirro.sdk.portal import DataPortal
 from cirro.sdk.process import DataPortalProcess
 from cirro.sdk.project import DataPortalProject
 from cirro.sdk.reference import DataPortalReference
+from cirro.sdk.sheet import DataPortalSheet
 
 __all__ = [
     'DataPortal',
@@ -129,6 +130,7 @@ __all__ = [
     'DataPortalReference',
     'DataPortalDashboard',
     'DataPortalFile',
+    'DataPortalSheet',
     'CirroApi',
     'file_utils'
 ]

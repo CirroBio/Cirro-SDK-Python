@@ -10,6 +10,7 @@ from .process import ProcessService
 from .projects import ProjectService
 from .references import ReferenceService
 from .share import ShareService
+from .sheet import SheetService
 from .user import UserService
 from .workspace import WorkspaceService
 
@@ -27,6 +28,7 @@ __all__ = [
     'ProjectService',
     'ReferenceService',
     'ShareService',
+    'SheetService',
     'UserService',
     'WorkspaceService',
 ]
