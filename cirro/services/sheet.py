@@ -229,10 +229,23 @@ class SheetService(BaseService):
         """
         Ingest a file that has been staged to the sheet's upload path
 
+        The file must already sit under `s3://project-<project id>/sheets/`,
+        which is the only prefix the sheets IAM role can read. `staging_upload_path`
+        on the sheet's detail gives the location to write to; put the file there
+        with `cirro.file.upload_files` before calling this.
+
         Args:
             project_id (str): ID of the Project
             sheet_id (str): ID of the Sheet
             request (cirro_api_client.v1.models.SheetIngestRequest): File to ingest and its column mapping
+
+        ```python
+        from cirro.cirro_client import CirroApi
+
+        cirro = CirroApi()
+        sheet = cirro.sheets.get(project_id="project-id", sheet_id="sheet-id")
+        print(sheet.staging_upload_path)  # where the file has to land
+        ```
         """
         trigger_ingest.sync_detailed(project_id=project_id,
                                      sheet_id=sheet_id,

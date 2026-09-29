@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import Mock
 
-from cirro_api_client.v1.models import ColumnDataType, ColumnDef, Project, QueryColumn, Sheet, \
-    SheetDataUpdateResponse, SheetDetail, SheetQueryResponse, SqlSortOrder
+from cirro_api_client.v1.models import ColumnDataType, ColumnDef, CreateResponse, Project, QueryColumn, Sheet, \
+    SheetCreationMode, SheetDataUpdateResponse, SheetDetail, SheetQueryResponse, SqlSortOrder, TableSheetInput
 
 from cirro.sdk.exceptions import DataPortalInputError
 from cirro.sdk.project import DataPortalProject
@@ -185,6 +185,28 @@ class NamespaceQueryTest(unittest.TestCase):
         _, kwargs = project._client.sheets.raw_query.call_args
         self.assertEqual("project-1", kwargs["project_id"])
         self.assertEqual("SELECT icd_code FROM diagnoses", kwargs["query"])
+
+
+class CreateSheetTest(unittest.TestCase):
+    def test_create_sheet_returns_the_new_sheet(self):
+        client = Mock()
+        client.sheets.create.return_value = CreateResponse(id="sheet-1", message="created")
+        client.sheets.get.return_value = SheetDetail.from_dict({**_SHEET, "auditReadAccess": False})
+        project = DataPortalProject(Project.from_dict(_PROJECT), client)
+
+        sheet_input = TableSheetInput(
+            name="Diagnoses",
+            namespace_name="default",
+            table_name="diagnoses",
+            sheet_creation_mode=SheetCreationMode.STANDARD,
+            columns=[ColumnDef(name="icd_code", data_type=ColumnDataType.STRING)]
+        )
+        sheet = project.create_sheet(sheet_input)
+
+        self.assertIsInstance(sheet, DataPortalSheet)
+        self.assertEqual("sheet-1", sheet.id)
+        client.sheets.create.assert_called_once_with(project_id="project-1", sheet=sheet_input)
+        client.sheets.get.assert_called_once_with(project_id="project-1", sheet_id="sheet-1")
 
 
 class SheetRowWriteTest(unittest.TestCase):

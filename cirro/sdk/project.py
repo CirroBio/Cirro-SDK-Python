@@ -5,7 +5,8 @@ from typing import List, TYPE_CHECKING, Union
 if TYPE_CHECKING:
     from pandas import DataFrame
 
-from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag, Status
+from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag, Status, \
+    TableSheetInput, ViewSheetInput
 
 from cirro.cirro_client import CirroApi
 from cirro.file_utils import get_files_in_directory
@@ -267,6 +268,37 @@ class DataPortalProject(DataPortalAsset):
                 DataPortalSheet(sheet, client=self._client)
                 for sheet in self._client.sheets.list(self.id)
             ]
+        )
+
+    def create_sheet(self, sheet: Union[TableSheetInput, ViewSheetInput]) -> DataPortalSheet:
+        """
+        Create a sheet in the project, either a TABLE or a VIEW.
+
+        Args:
+            sheet (TableSheetInput | ViewSheetInput): Sheet to create
+
+        Returns:
+            `cirro.sdk.sheet.DataPortalSheet` for the sheet just created
+
+        ```python
+        from cirro_api_client.v1.models import ColumnDef, ColumnDataType, SheetCreationMode, TableSheetInput
+
+        diagnoses = project.create_sheet(
+            TableSheetInput(
+                name="Diagnoses",
+                namespace_name="default",
+                table_name="diagnoses",
+                sheet_creation_mode=SheetCreationMode.STANDARD,
+                columns=[ColumnDef(name="icd_code", data_type=ColumnDataType.STRING)]
+            )
+        )
+        ```
+        """
+
+        created = self._client.sheets.create(project_id=self.id, sheet=sheet)
+        return DataPortalSheet(
+            self._client.sheets.get(project_id=self.id, sheet_id=created.id),
+            client=self._client
         )
 
     def get_sheet_by_name(self, name: str = None) -> DataPortalSheet:
