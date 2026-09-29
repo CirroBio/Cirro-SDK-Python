@@ -1,10 +1,10 @@
-from typing import Dict, List, Optional, TYPE_CHECKING, Union
+from typing import Callable, Dict, List, Optional, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from pandas import DataFrame
 
 from cirro_api_client.v1.models import ColumnDef, RowInsert, RowInsertValues, RowUpdate, RowUpdateValues, Sheet, \
-    SheetDetail, SheetJob, SheetType, SqlSortOrder, Status
+    SheetDetail, SheetJob, SheetQueryResponse, SheetType, SqlSortOrder, Status
 from cirro_api_client.v1.types import Unset
 
 from cirro.cirro_client import CirroApi
@@ -14,6 +14,44 @@ from cirro.sdk.exceptions import DataPortalInputError
 # The API limits the size of a response rather than its row count, so a page
 # much wider than this can come back as a 502.
 ROWS_PER_PAGE = 1000
+
+
+def query_to_dataframe(fetch_page: Callable[[int, int], SheetQueryResponse],
+                       max_rows: int = None) -> 'DataFrame':
+    """
+    Page a sheet query into a Pandas DataFrame.
+
+    Args:
+        fetch_page: Called with (limit, page), returns one page of results
+        max_rows (int): Stop after this many rows; reads everything if omitted
+
+    Returns:
+        `pandas.DataFrame`
+    """
+    import pandas
+
+    # Held constant across requests: the API pages by number, so a page size
+    # that changed mid-read would skip or repeat rows.
+    page_size = ROWS_PER_PAGE if max_rows is None else min(ROWS_PER_PAGE, max_rows)
+    rows = []
+    columns = []
+    page = 1
+
+    while max_rows is None or len(rows) < max_rows:
+        results = fetch_page(page_size, page)
+        columns = results.columns
+        if not results.rows:
+            break
+
+        rows.extend(results.rows)
+        if len(rows) >= results.total_row_count:
+            break
+        page += 1
+
+    return pandas.DataFrame(
+        rows if max_rows is None else rows[:max_rows],
+        columns=[column.name for column in columns]
+    )
 
 
 class DataPortalSheet(DataPortalAsset):
@@ -130,36 +168,16 @@ class DataPortalSheet(DataPortalAsset):
         Returns:
             `pandas.DataFrame`
         """
-        import pandas
-
-        # Held constant across requests: the API pages by number, so a page
-        # size that changed mid-read would skip or repeat rows.
-        page_size = ROWS_PER_PAGE if max_rows is None else min(ROWS_PER_PAGE, max_rows)
-        rows = []
-        columns = []
-        page = 1
-
-        while max_rows is None or len(rows) < max_rows:
-            results = self._client.sheets.get_data(
+        return query_to_dataframe(
+            lambda limit, page: self._client.sheets.get_data(
                 project_id=self.project_id,
                 sheet_id=self.id,
-                limit=page_size,
+                limit=limit,
                 page=page,
                 order_by=order_by,
                 order=order
-            )
-            columns = results.columns
-            if not results.rows:
-                break
-
-            rows.extend(results.rows)
-            if len(rows) >= results.total_row_count:
-                break
-            page += 1
-
-        return pandas.DataFrame(
-            rows if max_rows is None else rows[:max_rows],
-            columns=[column.name for column in columns]
+            ),
+            max_rows=max_rows
         )
 
     def insert_rows(self, rows: List[dict]) -> int:

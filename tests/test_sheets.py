@@ -1,11 +1,23 @@
 import unittest
 from unittest.mock import Mock
 
-from cirro_api_client.v1.models import ColumnDataType, ColumnDef, QueryColumn, Sheet, SheetDataUpdateResponse, \
-    SheetDetail, SheetQueryResponse, SqlSortOrder
+from cirro_api_client.v1.models import ColumnDataType, ColumnDef, Project, QueryColumn, Sheet, \
+    SheetDataUpdateResponse, SheetDetail, SheetQueryResponse, SqlSortOrder
 
 from cirro.sdk.exceptions import DataPortalInputError
+from cirro.sdk.project import DataPortalProject
 from cirro.sdk.sheet import ROWS_PER_PAGE, DataPortalSheet
+
+_PROJECT = {
+    "id": "project-1",
+    "name": "Test Project",
+    "description": "",
+    "status": "COMPLETED",
+    "tags": [],
+    "organization": "org-1",
+    "classificationIds": [],
+    "billingAccountId": "billing-1"
+}
 
 _SHEET = {
     "id": "sheet-1",
@@ -131,6 +143,49 @@ class SheetPagingTest(unittest.TestCase):
         _, kwargs = client.sheets.get_data.call_args
         self.assertEqual("icd_code", kwargs["order_by"])
         self.assertEqual(SqlSortOrder.DESC, kwargs["order"])
+
+
+class NamespaceQueryTest(unittest.TestCase):
+    """project.query_sheets pages a raw SQL result the same way."""
+
+    @staticmethod
+    def _project(total_rows: int):
+        requests = []
+
+        def query_namespace(project_id, namespace_name, query, limit, page):
+            requests.append((page, limit))
+            start = (page - 1) * limit
+            rows = [[i, f"code-{i}"] for i in range(start, min(start + limit, total_rows))]
+            return SheetQueryResponse(columns=_COLUMNS, rows=rows, total_row_count=total_rows)
+
+        client = Mock()
+        client.sheets.query_namespace.side_effect = query_namespace
+        project = DataPortalProject(Project.from_dict(_PROJECT), client)
+        return project, requests
+
+    def test_reads_every_page(self):
+        project, requests = self._project(2500)
+        df = project.query_sheets(namespace_name="default", query="SELECT 1")
+
+        self.assertEqual(2500, len(df))
+        self.assertEqual(["_row_id", "icd_code"], list(df.columns))
+        self.assertEqual(3, len(requests))
+
+    def test_max_rows_truncates(self):
+        project, requests = self._project(5000)
+        df = project.query_sheets(namespace_name="default", query="SELECT 1", max_rows=1500)
+
+        self.assertEqual(1500, len(df))
+        self.assertEqual(2, len(requests))
+
+    def test_namespace_and_query_are_passed_through(self):
+        project, _ = self._project(10)
+        project.query_sheets(namespace_name="clinical", query="SELECT icd_code FROM diagnoses")
+
+        _, kwargs = project._client.sheets.query_namespace.call_args
+        self.assertEqual("project-1", kwargs["project_id"])
+        self.assertEqual("clinical", kwargs["namespace_name"])
+        self.assertEqual("SELECT icd_code FROM diagnoses", kwargs["query"])
 
 
 class SheetRowWriteTest(unittest.TestCase):

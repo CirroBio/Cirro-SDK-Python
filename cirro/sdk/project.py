@@ -1,6 +1,9 @@
 from functools import cache
 from time import sleep
-from typing import List, Union
+from typing import List, TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from pandas import DataFrame
 
 from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag, Status
 
@@ -13,7 +16,7 @@ from cirro.sdk.helpers import parse_process_name_or_id
 from cirro.sdk.process import DataPortalProcess
 from cirro.sdk.reference import DataPortalReference, DataPortalReferences
 from cirro.sdk.reference_type import DataPortalReferenceType, DataPortalReferenceTypes
-from cirro.sdk.sheet import DataPortalSheet, DataPortalSheets
+from cirro.sdk.sheet import DataPortalSheet, DataPortalSheets, query_to_dataframe
 from cirro.services.service_helpers import list_all_datasets
 
 
@@ -285,6 +288,46 @@ class DataPortalProject(DataPortalAsset):
             raise DataPortalInputError("Must specify the sheet name")
 
         return self.list_sheets().get_by_name(name)
+
+    def query_sheets(self,
+                     namespace_name: str,
+                     query: str,
+                     max_rows: int = None) -> 'DataFrame':
+        """
+        Run a raw SQL query across the sheets in a namespace.
+
+        Pages through the whole result, or stops early at `max_rows` if one is
+        given. A project may hold sheets in more than one namespace, so the
+        namespace is named explicitly -- `DataPortalSheet.namespace_name`
+        gives the one a particular sheet lives in.
+
+        Args:
+            namespace_name (str): Namespace holding the sheets to query
+            query (str): SQL to run
+            max_rows (int): Stop after this many rows; reads the whole result
+                if omitted
+
+        Returns:
+            `pandas.DataFrame`
+
+        ```python
+        counts = project.query_sheets(
+            namespace_name="default",
+            query="SELECT icd_code, COUNT(*) FROM diagnoses GROUP BY icd_code"
+        )
+        ```
+        """
+
+        return query_to_dataframe(
+            lambda limit, page: self._client.sheets.query_namespace(
+                project_id=self.id,
+                namespace_name=namespace_name,
+                query=query,
+                limit=limit,
+                page=page
+            ),
+            max_rows=max_rows
+        )
 
     def upload_dataset(
         self,
