@@ -82,6 +82,8 @@ new_dataset_id = dataset.run_analysis(
   for debugging failed analyses.
 - `cirro.sdk.reference.DataPortalReference` -- reference data (genomes,
   annotations) available to a project.
+- `cirro.sdk.dashboard.DataPortalDashboard` -- a Data Studio dashboard in a
+  project; read its contents, rename it, save a changed document, or delete it.
 - `cirro.cirro_client.CirroApi` -- the lower-level typed API client; use it
   when the classes above do not cover what you need.
 
@@ -109,6 +111,7 @@ debugging analyses, managing reference data, and integrating pipelines.
 
 import cirro.file_utils  # noqa
 from cirro.cirro_client import CirroApi
+from cirro.sdk.dashboard import DataPortalDashboard
 from cirro.sdk.dataset import DataPortalDataset
 from cirro.sdk.file import DataPortalFile
 from cirro.sdk.login import DataPortalLogin
@@ -125,6 +128,7 @@ __all__ = [
     'DataPortalProcess',
     'DataPortalDataset',
     'DataPortalReference',
+    'DataPortalDashboard',
     'DataPortalFile',
     'DataPortalSheet',
     'CirroApi',

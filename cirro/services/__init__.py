@@ -1,5 +1,6 @@
 from .billing import BillingService
 from .compute_environment import ComputeEnvironmentService
+from .dashboard import DashboardService
 from .dataset import DatasetService
 from .execution import ExecutionService
 from .file import FileService
@@ -16,6 +17,7 @@ from .workspace import WorkspaceService
 
 __all__ = [
     'BillingService',
+    'DashboardService',
     'DatasetService',
     'ExecutionService',
     'ComputeEnvironmentService',
