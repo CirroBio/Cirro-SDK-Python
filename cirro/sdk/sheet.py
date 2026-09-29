@@ -11,6 +11,10 @@ from cirro.cirro_client import CirroApi
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.exceptions import DataPortalInputError
 
+# The API limits the size of a response rather than its row count, so a page
+# much wider than this can come back as a 502.
+ROWS_PER_PAGE = 1000
+
 
 class DataPortalSheet(DataPortalAsset):
     """
@@ -107,19 +111,18 @@ class DataPortalSheet(DataPortalAsset):
         ])
 
     def to_dataframe(self,
-                     limit: int = 1000,
-                     page: int = 1,
+                     max_rows: int = 10000,
                      order_by: str = None,
                      order: SqlSortOrder = None) -> 'DataFrame':
         """
-        Read a page of the sheet's rows into a Pandas DataFrame.
+        Read the sheet's rows into a Pandas DataFrame.
 
-        The `_row_id` column identifies each row for `update_rows` and
-        `delete_rows`.
+        Pages through the sheet until it has every row or `max_rows`,
+        whichever comes first. The `_row_id` column identifies each row for
+        `update_rows` and `delete_rows`.
 
         Args:
-            limit (int): Maximum number of rows to return (default 1,000)
-            page (int): Page to return (default 1)
+            max_rows (int): Maximum number of rows to read (default 10,000)
             order_by (str): Column to sort by
             order (SqlSortOrder): Sort direction
 
@@ -128,17 +131,34 @@ class DataPortalSheet(DataPortalAsset):
         """
         import pandas
 
-        results = self._client.sheets.get_data(
-            project_id=self.project_id,
-            sheet_id=self.id,
-            limit=limit,
-            page=page,
-            order_by=order_by,
-            order=order
-        )
+        # Held constant across requests: the API pages by number, so a page
+        # size that changed mid-read would skip or repeat rows.
+        page_size = min(ROWS_PER_PAGE, max_rows)
+        rows = []
+        columns = []
+        page = 1
+
+        while len(rows) < max_rows:
+            results = self._client.sheets.get_data(
+                project_id=self.project_id,
+                sheet_id=self.id,
+                limit=page_size,
+                page=page,
+                order_by=order_by,
+                order=order
+            )
+            columns = results.columns
+            if not results.rows:
+                break
+
+            rows.extend(results.rows)
+            if len(rows) >= results.total_row_count:
+                break
+            page += 1
+
         return pandas.DataFrame(
-            results.rows,
-            columns=[column.name for column in results.columns]
+            rows[:max_rows],
+            columns=[column.name for column in columns]
         )
 
     def insert_rows(self, rows: List[dict]) -> int:
