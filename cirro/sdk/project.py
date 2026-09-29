@@ -290,19 +290,16 @@ class DataPortalProject(DataPortalAsset):
         return self.list_sheets().get_by_name(name)
 
     def query_sheets(self,
-                     namespace_name: str,
                      query: str,
                      max_rows: int = None) -> 'DataFrame':
         """
-        Run a raw SQL query across the sheets in a namespace.
+        Run a raw SQL query across the project's sheets.
 
         Pages through the whole result, or stops early at `max_rows` if one is
-        given. A project may hold sheets in more than one namespace, so the
-        namespace is named explicitly -- `DataPortalSheet.namespace_name`
-        gives the one a particular sheet lives in.
+        given. Sheets are reached by name; every namespace is on the engine's
+        search path, so they do not need qualifying.
 
         Args:
-            namespace_name (str): Namespace holding the sheets to query
             query (str): SQL to run
             max_rows (int): Stop after this many rows; reads the whole result
                 if omitted
@@ -312,16 +309,14 @@ class DataPortalProject(DataPortalAsset):
 
         ```python
         counts = project.query_sheets(
-            namespace_name="default",
-            query="SELECT icd_code, COUNT(*) FROM diagnoses GROUP BY icd_code"
+            "SELECT icd_code, COUNT(*) FROM diagnoses GROUP BY icd_code"
         )
         ```
         """
 
         return query_to_dataframe(
-            lambda limit, page: self._client.sheets.query_namespace(
+            lambda limit, page: self._client.sheets.raw_query(
                 project_id=self.id,
-                namespace_name=namespace_name,
                 query=query,
                 limit=limit,
                 page=page

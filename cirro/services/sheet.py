@@ -125,18 +125,19 @@ class SheetService(BaseService):
                                      body=request,
                                      client=self._api_client)
 
-    def query_namespace(self,
-                        project_id: str,
-                        namespace_name: str,
-                        query: str,
-                        limit: int = 1000,
-                        page: int = 1) -> SheetQueryResponse:
+    def raw_query(self,
+                  project_id: str,
+                  query: str,
+                  limit: int = 1000,
+                  page: int = 1) -> SheetQueryResponse:
         """
-        Run a raw SQL query against the sheets in a namespace
+        Run a raw SQL query against the project's sheets
+
+        Every namespace is on the engine's search path, so sheets are reached
+        by name without qualifying them.
 
         Args:
             project_id (str): ID of the Project
-            namespace_name (str): Namespace containing the sheets to query
             query (str): Raw SQL query to run
             limit (int): Maximum number of rows to return (default 1,000)
             page (int): Page to return (default 1)
@@ -145,15 +146,13 @@ class SheetService(BaseService):
         from cirro.cirro_client import CirroApi
 
         cirro = CirroApi()
-        results = cirro.sheets.query_namespace(
+        results = cirro.sheets.raw_query(
             project_id="project-id",
-            namespace_name="default",
             query="SELECT icd_code, COUNT(*) FROM diagnoses GROUP BY icd_code"
         )
         ```
         """
         request = SheetQueryRequest(
-            namespace_name=namespace_name,
             query=query,
             limit=limit,
             page=page

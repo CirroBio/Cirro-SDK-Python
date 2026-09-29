@@ -152,20 +152,20 @@ class NamespaceQueryTest(unittest.TestCase):
     def _project(total_rows: int):
         requests = []
 
-        def query_namespace(project_id, namespace_name, query, limit, page):
+        def raw_query(project_id, query, limit, page):
             requests.append((page, limit))
             start = (page - 1) * limit
             rows = [[i, f"code-{i}"] for i in range(start, min(start + limit, total_rows))]
             return SheetQueryResponse(columns=_COLUMNS, rows=rows, total_row_count=total_rows)
 
         client = Mock()
-        client.sheets.query_namespace.side_effect = query_namespace
+        client.sheets.raw_query.side_effect = raw_query
         project = DataPortalProject(Project.from_dict(_PROJECT), client)
         return project, requests
 
     def test_reads_every_page(self):
         project, requests = self._project(2500)
-        df = project.query_sheets(namespace_name="default", query="SELECT 1")
+        df = project.query_sheets("SELECT 1")
 
         self.assertEqual(2500, len(df))
         self.assertEqual(["_row_id", "icd_code"], list(df.columns))
@@ -173,18 +173,17 @@ class NamespaceQueryTest(unittest.TestCase):
 
     def test_max_rows_truncates(self):
         project, requests = self._project(5000)
-        df = project.query_sheets(namespace_name="default", query="SELECT 1", max_rows=1500)
+        df = project.query_sheets("SELECT 1", max_rows=1500)
 
         self.assertEqual(1500, len(df))
         self.assertEqual(2, len(requests))
 
-    def test_namespace_and_query_are_passed_through(self):
+    def test_query_is_passed_through(self):
         project, _ = self._project(10)
-        project.query_sheets(namespace_name="clinical", query="SELECT icd_code FROM diagnoses")
+        project.query_sheets("SELECT icd_code FROM diagnoses")
 
-        _, kwargs = project._client.sheets.query_namespace.call_args
+        _, kwargs = project._client.sheets.raw_query.call_args
         self.assertEqual("project-1", kwargs["project_id"])
-        self.assertEqual("clinical", kwargs["namespace_name"])
         self.assertEqual("SELECT icd_code FROM diagnoses", kwargs["query"])
 
 
