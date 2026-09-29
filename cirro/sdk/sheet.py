@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from pandas import DataFrame
 
 from cirro_api_client.v1.models import ColumnDef, RowInsert, RowInsertValues, RowUpdate, RowUpdateValues, Sheet, \
-    SheetDetail, SheetJob, SheetQueryResponse, SheetType, SqlSortOrder, Status
+    SheetDetail, SheetJob, SheetQueryResponse, SheetType, SqlSortOrder, Status, TableSheetInput, Tag, ViewSheetInput
 from cirro_api_client.v1.types import Unset
 
 from cirro.cirro_client import CirroApi
@@ -256,6 +256,59 @@ class DataPortalSheet(DataPortalAsset):
             row_ids=row_ids
         )
         return response.rows_affected
+
+    def update(self,
+               name: str = None,
+               description: str = None,
+               tags: List[Tag] = None) -> None:
+        """
+        Rename or re-describe the sheet.
+
+        The API takes the sheet's full target state rather than a patch, so
+        this reads the current state and sends it back with the given fields
+        changed. Column and view-definition changes are schema migrations --
+        make those through `cirro.sheets.update`, which reports the SQL it
+        would run.
+
+        Args:
+            name (str): New name for the sheet
+            description (str): New description
+            tags (List[Tag]): Tags to set, replacing the current ones
+        """
+        detail = self._get_detail()
+        shared = {
+            "name": self.name if name is None else name,
+            "namespace_name": detail.namespace_name,
+            "table_name": detail.table_name,
+            "description": self.description if description is None else description,
+            "audit_read_access": detail.audit_read_access,
+            "tags": detail.tags if tags is None else tags
+        }
+
+        if detail.sheet_type == SheetType.VIEW:
+            target = ViewSheetInput(view_definition=detail.view_definition, **shared)
+        else:
+            target = TableSheetInput(
+                sheet_creation_mode=detail.sheet_creation_mode,
+                columns=detail.columns,
+                schema_version_id=detail.schema_version_id,
+                **shared
+            )
+
+        response = self._client.sheets.update(
+            project_id=self.project_id,
+            sheet_id=self.id,
+            sheet=target
+        )
+        # Keep the object in step with the rename, rather than reporting the old name
+        if not isinstance(response.sheet, Unset):
+            self._data = response.sheet
+
+    def delete(self) -> None:
+        """
+        Delete the sheet, along with the rows it holds.
+        """
+        self._client.sheets.delete(project_id=self.project_id, sheet_id=self.id)
 
     def refresh(self) -> None:
         """

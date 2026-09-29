@@ -2,7 +2,8 @@ import unittest
 from unittest.mock import Mock
 
 from cirro_api_client.v1.models import ColumnDataType, ColumnDef, CreateResponse, Project, QueryColumn, Sheet, \
-    SheetCreationMode, SheetDataUpdateResponse, SheetDetail, SheetQueryResponse, SqlSortOrder, TableSheetInput
+    SheetCreationMode, SheetDataUpdateResponse, SheetDetail, SheetQueryResponse, SheetUpdateResponse, \
+    SqlSortOrder, TableSheetInput, ViewSheetInput
 
 from cirro.sdk.exceptions import DataPortalInputError
 from cirro.sdk.project import DataPortalProject
@@ -247,6 +248,66 @@ class SheetRowWriteTest(unittest.TestCase):
                       lambda: self.sheet.delete_rows([])):
             with self.assertRaises(DataPortalInputError):
                 write()
+
+
+class SheetLifecycleTest(unittest.TestCase):
+    """update sends the full target state; delete removes the sheet."""
+
+    @staticmethod
+    def _sheet_with_detail(**detail_overrides):
+        client = Mock()
+        client.sheets.get.return_value = SheetDetail.from_dict({
+            **_SHEET,
+            "auditReadAccess": False,
+            "columns": [ColumnDef(name="icd_code", data_type=ColumnDataType.STRING).to_dict()],
+            **detail_overrides
+        })
+        return _make_sheet(client), client
+
+    def test_update_sends_the_whole_table_state(self):
+        sheet, client = self._sheet_with_detail()
+        client.sheets.update.return_value = SheetUpdateResponse()
+
+        sheet.update(name="Renamed")
+
+        _, kwargs = client.sheets.update.call_args
+        target = kwargs["sheet"]
+        self.assertIsInstance(target, TableSheetInput)
+        self.assertEqual("Renamed", target.name)
+        # untouched fields are carried over rather than dropped
+        self.assertEqual("ICD codes", target.description)
+        self.assertEqual("default", target.namespace_name)
+        self.assertEqual(["icd_code"], [column.name for column in target.columns])
+
+    def test_update_sends_the_whole_view_state(self):
+        sheet, client = self._sheet_with_detail(sheetType="VIEW", columns=None,
+                                                viewDefinition={"viewType": "RAW", "query": "SELECT 1"})
+        client.sheets.update.return_value = SheetUpdateResponse()
+
+        sheet.update(description="Rolled up")
+
+        _, kwargs = client.sheets.update.call_args
+        self.assertIsInstance(kwargs["sheet"], ViewSheetInput)
+        self.assertEqual("Rolled up", kwargs["sheet"].description)
+        self.assertEqual("Diagnoses", kwargs["sheet"].name)
+
+    def test_update_reflects_the_rename_locally(self):
+        sheet, client = self._sheet_with_detail()
+        client.sheets.update.return_value = SheetUpdateResponse(
+            sheet=SheetDetail.from_dict({**_SHEET, "name": "Renamed", "auditReadAccess": False})
+        )
+
+        sheet.update(name="Renamed")
+
+        self.assertEqual("Renamed", sheet.name)
+
+    def test_delete_removes_the_sheet(self):
+        client = Mock()
+        sheet = _make_sheet(client)
+
+        sheet.delete()
+
+        client.sheets.delete.assert_called_once_with(project_id="project-1", sheet_id="sheet-1")
 
 
 class SheetPropertyTest(unittest.TestCase):
