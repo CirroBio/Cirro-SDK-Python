@@ -13,6 +13,7 @@ from cirro.sdk.helpers import parse_process_name_or_id
 from cirro.sdk.process import DataPortalProcess
 from cirro.sdk.reference import DataPortalReference, DataPortalReferences
 from cirro.sdk.reference_type import DataPortalReferenceType, DataPortalReferenceTypes
+from cirro.sdk.sheet import DataPortalSheet, DataPortalSheets
 from cirro.services.service_helpers import list_all_datasets
 
 
@@ -249,6 +250,41 @@ class DataPortalProject(DataPortalAsset):
             raise DataPortalInputError("Must specify the reference name")
 
         return self.list_references(ref_type).get_by_name(name)
+
+    def list_sheets(self) -> DataPortalSheets:
+        """
+        List the sheets available in a project.
+
+        Returns:
+            `cirro.sdk.sheet.DataPortalSheets`
+        """
+
+        return DataPortalSheets(
+            [
+                DataPortalSheet(sheet, client=self._client)
+                for sheet in self._client.sheets.list(self.id)
+            ]
+        )
+
+    def get_sheet_by_name(self, name: str = None) -> DataPortalSheet:
+        """
+        Return the sheet with the specified name.
+
+        Args:
+            name (str): Name of the sheet.
+
+        Returns:
+            `cirro.sdk.sheet.DataPortalSheet`
+
+        Raises:
+            DataPortalInputError: if `name` is not provided.
+            DataPortalAssetNotFound: if no matching sheet exists.
+        """
+
+        if name is None:
+            raise DataPortalInputError("Must specify the sheet name")
+
+        return self.list_sheets().get_by_name(name)
 
     def upload_dataset(
         self,
