@@ -10,7 +10,7 @@ from cirro.cirro_client import CirroApi
 from cirro.file_utils import get_files_in_directory
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.dashboard import DataPortalDashboard, DataPortalDashboards, DATA_STUDIO_TYPE, \
-    RECORD_SCHEMA_VERSION, empty_document
+    RECORD_SCHEMA_VERSION
 from cirro.sdk.dataset import DataPortalDataset, DataPortalDatasets
 from cirro.sdk.exceptions import DataPortalAssetNotFound, DataPortalInputError
 from cirro.sdk.helpers import parse_process_name_or_id
@@ -400,23 +400,20 @@ class DataPortalProject(DataPortalAsset):
         dashboard.refresh()
         return dashboard
 
-    def create_dashboard(self, name: str, description: str = "",
-                         document: dict = None) -> DataPortalDashboard:
+    def create_dashboard(self, name: str, document: dict, description: str = "") -> DataPortalDashboard:
         """
         Create a Data Studio dashboard.
 
         Args:
             name (str): Name shown in the Data Studio.
+            document (dict): The dashboard's contents in the portal's format.
             description (str): Longer description.
-            document (dict): The dashboard's contents in the portal's format; an
-                empty dashboard if omitted, which opens on the Add data wizard.
 
         Returns:
             `cirro.sdk.dashboard.DataPortalDashboard`
         """
         created = self._client.dashboards.create(project_id=self.id, dashboard=DashboardInput.from_dict({
-            "name": name, "description": description,
-            "dashboardData": document if document is not None else empty_document(),
+            "name": name, "description": description, "dashboardData": document,
             "criteria": {"type": DATA_STUDIO_TYPE, "scope": "project", "revision": str(uuid.uuid4())},
             "tags": [], "schemaVersion": RECORD_SCHEMA_VERSION}))
         return self.get_dashboard(created.id)

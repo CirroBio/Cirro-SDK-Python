@@ -80,11 +80,11 @@ class TestDataPortalDashboard(unittest.TestCase):
         with self.assertRaises(DataPortalAssetNotFound):
             self.project.get_dashboard("nope")
 
-    def test_create_makes_an_empty_data_studio_dashboard(self):
-        created = self.project.create_dashboard("Fresh", description="d")
+    def test_create_makes_a_data_studio_dashboard(self):
+        document = copy.deepcopy(self.api.store["d-old"]["dashboardData"])
+        created = self.project.create_dashboard("Fresh", document, description="d")
         self.assertTrue(created.in_data_studio)
-        self.assertEqual(created.tiles, [])
-        self.assertEqual(created.document["activeDashboardId"], "default")
+        self.assertEqual(created.document, document)
         self.assertTrue(self.api.store["d-created"]["criteria"]["revision"])
 
     def test_save_writes_the_document_and_a_new_revision(self):

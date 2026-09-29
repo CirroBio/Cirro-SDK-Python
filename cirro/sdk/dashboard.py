@@ -14,13 +14,6 @@ DATA_STUDIO_TYPE = "sql-room"
 RECORD_SCHEMA_VERSION = 1
 
 
-def empty_document() -> dict:
-    """The document the portal saves for a dashboard with nothing on it yet."""
-    return {"version": 1, "ir": {"nodes": [], "edges": []}, "positions": {},
-            "dashboards": [{"id": "default", "name": "Default", "tiles": []}],
-            "activeDashboardId": "default"}
-
-
 class DataPortalDashboard(DataPortalAsset):
     """
     A dashboard in a project's Data Studio: charts, tables and filter controls over
