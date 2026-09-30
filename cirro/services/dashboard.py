@@ -1,6 +1,5 @@
 from typing import List
 
-from cirro_api_client.v1 import errors
 from cirro_api_client.v1.api.dashboards import get_dashboards, get_dashboard, create_dashboard, \
     update_dashboard, delete_dashboard, get_dashboard_templates, get_dashboard_template
 from cirro_api_client.v1.models import Dashboard, DashboardInput, CreateResponse
