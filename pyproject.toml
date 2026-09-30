@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cirro"
-version = "1.15.0"
+version = "1.15.1"
 description = "CLI tool and SDK for interacting with the Cirro platform"
 authors = ["Cirro Bio <support@cirro.bio>"]
 license = "MIT"
@@ -11,7 +11,7 @@ packages = [{include = "cirro"}]
 [tool.poetry.dependencies]
 python = ">3.11.0,<4.0"
 attrs = ">=21.3.0"
-cirro_api_client = "~1.7.1"
+cirro_api_client = "~1.7.2"
 click = "^8.5.0"
 boto3 = "~=1.43"
 questionary = "^2.0.1"
