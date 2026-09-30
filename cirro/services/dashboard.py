@@ -77,7 +77,7 @@ class DashboardService(BaseService):
             project_id (str): ID of the Project
             dashboard_id (str): ID of the Dashboard
         """
-        delete_dashboard.sync(project_id=project_id, dashboard_id=dashboard_id, client=self._api_client)
+        delete_dashboard.sync_detailed(project_id=project_id, dashboard_id=dashboard_id, client=self._api_client)
 
     def list_templates(self) -> List[Dashboard]:
         """
