@@ -1,7 +1,7 @@
 from typing import List
 
 from cirro_api_client.v1.api.sheets import get_sheets, get_sheet, create_sheet, update_sheet, delete_sheet, \
-    get_sheet_data, query_sheet_data, query_namespace_data, insert_sheet_data, update_sheet_data, delete_sheet_data, \
+    get_sheet_data, query_sheet_data, query_data, insert_sheet_data, update_sheet_data, delete_sheet_data, \
     refresh_view, trigger_ingest, get_jobs
 from cirro_api_client.v1.models import Sheet, SheetDetail, TableSheetInput, ViewSheetInput, CreateResponse, \
     SheetUpdateResponse, SheetDataRequest, SheetQueryRequest, SheetQueryResponse, SheetDataUpdateResponse, \
@@ -157,7 +157,7 @@ class SheetService(BaseService):
             limit=limit,
             page=page
         )
-        return query_namespace_data.sync(project_id=project_id, body=request, client=self._api_client)
+        return query_data.sync(project_id=project_id, body=request, client=self._api_client)
 
     def insert_rows(self, project_id: str, sheet_id: str, rows: List[RowInsert]) -> SheetDataUpdateResponse:
         """

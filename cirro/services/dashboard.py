@@ -78,13 +78,7 @@ class DashboardService(BaseService):
             project_id (str): ID of the Project
             dashboard_id (str): ID of the Dashboard
         """
-        # The generated route parses the empty 204 body as a Dashboard and raises, in
-        # sync_detailed too, so the request is sent here and only its status is read.
-        response = self._api_client.get_httpx_client().request(
-            auth=self._api_client.get_auth(),
-            **delete_dashboard._get_kwargs(project_id=project_id, dashboard_id=dashboard_id))
-        if response.status_code >= 400:
-            errors.handle_error_response(response, True)
+        delete_dashboard.sync(project_id=project_id, dashboard_id=dashboard_id, client=self._api_client)
 
     def list_templates(self) -> List[Dashboard]:
         """
