@@ -5,9 +5,7 @@ Only workspaces can query Sheets directly: the read permission belongs to the wo
 Everywhere else, use `cirro.sdk.project.DataPortalProject.query_sheets` or `cirro.sdk.sheet.DataPortalSheet`,
 which go through the Cirro API and also cover virtual views, column display names and writes.
 
-Sheets are Iceberg tables in the project's Amazon S3 Tables bucket. `connect_sheets` attaches that bucket
-to DuckDB as the `sheets` catalog, using the project, account and region Cirro sets on the workspace, so
-no Cirro login is needed. Refer to a sheet as `sheets.<namespace>.<table>`.
+No Cirro login is needed. Refer to a sheet as `sheets.<namespace>.<table>`.
 
 Requires the `sheets` extra: `pip install "cirro[sheets]"`.
 
