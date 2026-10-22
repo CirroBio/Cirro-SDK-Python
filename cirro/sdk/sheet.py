@@ -281,7 +281,6 @@ class DataPortalSheet(DataPortalAsset):
             "namespace_name": detail.namespace_name,
             "table_name": detail.table_name,
             "description": self.description if description is None else description,
-            "audit_read_access": detail.audit_read_access,
             "tags": detail.tags if tags is None else tags
         }
 

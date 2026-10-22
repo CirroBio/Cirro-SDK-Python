@@ -11,7 +11,7 @@ packages = [{include = "cirro"}]
 [tool.poetry.dependencies]
 python = ">3.11.0,<4.0"
 attrs = ">=21.3.0"
-cirro_api_client = "~1.7.2"
+cirro_api_client = "~1.8.0"
 click = "^8.5.0"
 boto3 = "~=1.43"
 questionary = "^2.0.1"

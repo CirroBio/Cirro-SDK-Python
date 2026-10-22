@@ -36,7 +36,8 @@ _SHEET = {
     "updatedAt": "2026-01-01T00:00:00Z",
     "totalRowCount": 0,
     "tags": [],
-    "columnRelationships": []
+    "columnRelationships": [],
+    "mappingTargets": []
 }
 
 _COLUMNS = [
@@ -192,7 +193,7 @@ class CreateSheetTest(unittest.TestCase):
     def test_create_sheet_returns_the_new_sheet(self):
         client = Mock()
         client.sheets.create.return_value = CreateResponse(id="sheet-1", message="created")
-        client.sheets.get.return_value = SheetDetail.from_dict({**_SHEET, "auditReadAccess": False})
+        client.sheets.get.return_value = SheetDetail.from_dict(_SHEET)
         project = DataPortalProject(Project.from_dict(_PROJECT), client)
 
         sheet_input = TableSheetInput(
@@ -258,7 +259,6 @@ class SheetLifecycleTest(unittest.TestCase):
         client = Mock()
         client.sheets.get.return_value = SheetDetail.from_dict({
             **_SHEET,
-            "auditReadAccess": False,
             "columns": [ColumnDef(name="icd_code", data_type=ColumnDataType.STRING).to_dict()],
             **detail_overrides
         })
@@ -294,7 +294,7 @@ class SheetLifecycleTest(unittest.TestCase):
     def test_update_reflects_the_rename_locally(self):
         sheet, client = self._sheet_with_detail()
         client.sheets.update.return_value = SheetUpdateResponse(
-            sheet=SheetDetail.from_dict({**_SHEET, "name": "Renamed", "auditReadAccess": False})
+            sheet=SheetDetail.from_dict({**_SHEET, "name": "Renamed"})
         )
 
         sheet.update(name="Renamed")
@@ -336,7 +336,6 @@ class SheetPropertyTest(unittest.TestCase):
         client = Mock()
         client.sheets.get.return_value = SheetDetail.from_dict({
             **_SHEET,
-            "auditReadAccess": False,
             "columns": [ColumnDef(name="icd_code", data_type=ColumnDataType.STRING).to_dict()]
         })
         sheet = _make_sheet(client)
