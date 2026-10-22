@@ -52,7 +52,7 @@ def _make_sheet(client: Mock, **overrides) -> DataPortalSheet:
 
 def _paging_client(total_rows: int):
     """
-    Mock client whose sheets.get_data pages the way the API does, reading the
+    Mock client whose sheets.query_data pages the way the API does, reading the
     slice at offset (page - 1) * limit.
 
     Returns the client alongside the list of (page, limit) pairs it was asked
@@ -60,14 +60,14 @@ def _paging_client(total_rows: int):
     """
     requests = []
 
-    def get_data(project_id, sheet_id, limit, page, order_by, order):
-        requests.append((page, limit))
-        start = (page - 1) * limit
-        rows = [[i, f"code-{i}"] for i in range(start, min(start + limit, total_rows))]
+    def query_data(project_id, sheet_id, request):
+        requests.append((request.page, request.limit))
+        start = (request.page - 1) * request.limit
+        rows = [[i, f"code-{i}"] for i in range(start, min(start + request.limit, total_rows))]
         return SheetQueryResponse(columns=_COLUMNS, rows=rows, total_row_count=total_rows)
 
     client = Mock()
-    client.sheets.get_data.side_effect = get_data
+    client.sheets.query_data.side_effect = query_data
     return client, requests
 
 
@@ -141,9 +141,9 @@ class SheetPagingTest(unittest.TestCase):
         client, _ = _paging_client(10)
         _make_sheet(client).to_dataframe(order_by="icd_code", order=SqlSortOrder.DESC)
 
-        _, kwargs = client.sheets.get_data.call_args
-        self.assertEqual("icd_code", kwargs["order_by"])
-        self.assertEqual(SqlSortOrder.DESC, kwargs["order"])
+        _, kwargs = client.sheets.query_data.call_args
+        self.assertEqual("icd_code", kwargs["request"].sort.order_by)
+        self.assertEqual(SqlSortOrder.DESC, kwargs["request"].sort.order)
 
 
 class NamespaceQueryTest(unittest.TestCase):
