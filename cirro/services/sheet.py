@@ -1,12 +1,12 @@
 from typing import List
 
 from cirro_api_client.v1.api.sheets import get_sheets, get_sheet, create_sheet, update_sheet, delete_sheet, \
-    get_sheet_data, query_sheet_data, query_data, insert_sheet_data, update_sheet_data, delete_sheet_data, \
+    query_sheet_data, query_data, insert_sheet_data, update_sheet_data, delete_sheet_data, \
     refresh_view, trigger_ingest, get_jobs
 from cirro_api_client.v1.models import Sheet, SheetDetail, TableSheetInput, ViewSheetInput, CreateResponse, \
     SheetUpdateResponse, SheetDataRequest, SheetQueryRequest, SheetQueryResponse, SheetDataUpdateResponse, \
     RowInsert, RowUpdate, InsertRowsRequest, UpdateRowsRequest, DeleteRowsRequest, SheetIngestRequest, SheetJob, \
-    SqlSortOrder
+    SheetSort, SqlSortOrder
 from cirro_api_client.v1.types import UNSET
 
 from cirro.services.base import BaseService
@@ -103,13 +103,12 @@ class SheetService(BaseService):
             order_by (str): Column to sort by
             order (SqlSortOrder): Sort direction
         """
-        return get_sheet_data.sync(project_id=project_id,
-                                   sheet_id=sheet_id,
-                                   limit=limit,
-                                   page=page,
-                                   order_by=order_by if order_by is not None else UNSET,
-                                   order=order if order is not None else UNSET,
-                                   client=self._api_client)
+        sort = SheetSort(order_by=order_by if order_by is not None else UNSET,
+                         order=order if order is not None else UNSET)
+        return query_sheet_data.sync(project_id=project_id,
+                                     sheet_id=sheet_id,
+                                     body=SheetDataRequest(limit=limit, page=page, sort=sort),
+                                     client=self._api_client)
 
     def query_data(self, project_id: str, sheet_id: str, request: SheetDataRequest) -> SheetQueryResponse:
         """
