@@ -36,7 +36,8 @@ _SHEET = {
     "updatedAt": "2026-01-01T00:00:00Z",
     "totalRowCount": 0,
     "tags": [],
-    "columnRelationships": []
+    "columnRelationships": [],
+    "mappingTargets": []
 }
 
 _COLUMNS = [
@@ -52,7 +53,7 @@ def _make_sheet(client: Mock, **overrides) -> DataPortalSheet:
 
 def _paging_client(total_rows: int):
     """
-    Mock client whose sheets.get_data pages the way the API does, reading the
+    Mock client whose sheets.query_data pages the way the API does, reading the
     slice at offset (page - 1) * limit.
 
     Returns the client alongside the list of (page, limit) pairs it was asked
@@ -60,14 +61,14 @@ def _paging_client(total_rows: int):
     """
     requests = []
 
-    def get_data(project_id, sheet_id, limit, page, order_by, order):
-        requests.append((page, limit))
-        start = (page - 1) * limit
-        rows = [[i, f"code-{i}"] for i in range(start, min(start + limit, total_rows))]
+    def query_data(project_id, sheet_id, request):
+        requests.append((request.page, request.limit))
+        start = (request.page - 1) * request.limit
+        rows = [[i, f"code-{i}"] for i in range(start, min(start + request.limit, total_rows))]
         return SheetQueryResponse(columns=_COLUMNS, rows=rows, total_row_count=total_rows)
 
     client = Mock()
-    client.sheets.get_data.side_effect = get_data
+    client.sheets.query_data.side_effect = query_data
     return client, requests
 
 
@@ -141,9 +142,9 @@ class SheetPagingTest(unittest.TestCase):
         client, _ = _paging_client(10)
         _make_sheet(client).to_dataframe(order_by="icd_code", order=SqlSortOrder.DESC)
 
-        _, kwargs = client.sheets.get_data.call_args
-        self.assertEqual("icd_code", kwargs["order_by"])
-        self.assertEqual(SqlSortOrder.DESC, kwargs["order"])
+        _, kwargs = client.sheets.query_data.call_args
+        self.assertEqual("icd_code", kwargs["request"].sort.order_by)
+        self.assertEqual(SqlSortOrder.DESC, kwargs["request"].sort.order)
 
 
 class NamespaceQueryTest(unittest.TestCase):
@@ -192,7 +193,7 @@ class CreateSheetTest(unittest.TestCase):
     def test_create_sheet_returns_the_new_sheet(self):
         client = Mock()
         client.sheets.create.return_value = CreateResponse(id="sheet-1", message="created")
-        client.sheets.get.return_value = SheetDetail.from_dict({**_SHEET, "auditReadAccess": False})
+        client.sheets.get.return_value = SheetDetail.from_dict(_SHEET)
         project = DataPortalProject(Project.from_dict(_PROJECT), client)
 
         sheet_input = TableSheetInput(
@@ -258,7 +259,6 @@ class SheetLifecycleTest(unittest.TestCase):
         client = Mock()
         client.sheets.get.return_value = SheetDetail.from_dict({
             **_SHEET,
-            "auditReadAccess": False,
             "columns": [ColumnDef(name="icd_code", data_type=ColumnDataType.STRING).to_dict()],
             **detail_overrides
         })
@@ -273,6 +273,8 @@ class SheetLifecycleTest(unittest.TestCase):
         _, kwargs = client.sheets.update.call_args
         target = kwargs["sheet"]
         self.assertIsInstance(target, TableSheetInput)
+        # the API tells a table from a view by sheetType, so it must be sent
+        self.assertEqual("TABLE", target.sheet_type)
         self.assertEqual("Renamed", target.name)
         # untouched fields are carried over rather than dropped
         self.assertEqual("ICD codes", target.description)
@@ -288,13 +290,14 @@ class SheetLifecycleTest(unittest.TestCase):
 
         _, kwargs = client.sheets.update.call_args
         self.assertIsInstance(kwargs["sheet"], ViewSheetInput)
+        self.assertEqual("VIEW", kwargs["sheet"].sheet_type)
         self.assertEqual("Rolled up", kwargs["sheet"].description)
         self.assertEqual("Diagnoses", kwargs["sheet"].name)
 
     def test_update_reflects_the_rename_locally(self):
         sheet, client = self._sheet_with_detail()
         client.sheets.update.return_value = SheetUpdateResponse(
-            sheet=SheetDetail.from_dict({**_SHEET, "name": "Renamed", "auditReadAccess": False})
+            sheet=SheetDetail.from_dict({**_SHEET, "name": "Renamed"})
         )
 
         sheet.update(name="Renamed")
@@ -336,7 +339,6 @@ class SheetPropertyTest(unittest.TestCase):
         client = Mock()
         client.sheets.get.return_value = SheetDetail.from_dict({
             **_SHEET,
-            "auditReadAccess": False,
             "columns": [ColumnDef(name="icd_code", data_type=ColumnDataType.STRING).to_dict()]
         })
         sheet = _make_sheet(client)

@@ -4,8 +4,9 @@ if TYPE_CHECKING:
     from pandas import DataFrame
 
 from cirro_api_client.v1.models import ColumnDef, RowInsert, RowInsertValues, RowUpdate, RowUpdateValues, Sheet, \
-    SheetDetail, SheetJob, SheetQueryResponse, SheetType, SqlSortOrder, Status, TableSheetInput, Tag, ViewSheetInput
-from cirro_api_client.v1.types import Unset
+    SheetDataRequest, SheetDetail, SheetJob, SheetQueryResponse, SheetSort, SheetType, SqlSortOrder, Status, \
+    TableSheetInput, Tag, ViewSheetInput
+from cirro_api_client.v1.types import UNSET, Unset
 
 from cirro.cirro_client import CirroApi
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
@@ -168,14 +169,13 @@ class DataPortalSheet(DataPortalAsset):
         Returns:
             `pandas.DataFrame`
         """
+        sort = SheetSort(order_by=order_by if order_by is not None else UNSET,
+                         order=order if order is not None else UNSET)
         return query_to_dataframe(
-            lambda limit, page: self._client.sheets.get_data(
+            lambda limit, page: self._client.sheets.query_data(
                 project_id=self.project_id,
                 sheet_id=self.id,
-                limit=limit,
-                page=page,
-                order_by=order_by,
-                order=order
+                request=SheetDataRequest(limit=limit, page=page, sort=sort)
             ),
             max_rows=max_rows
         )
@@ -277,11 +277,11 @@ class DataPortalSheet(DataPortalAsset):
         """
         detail = self._get_detail()
         shared = {
+            "sheet_type": detail.sheet_type.value,
             "name": self.name if name is None else name,
             "namespace_name": detail.namespace_name,
             "table_name": detail.table_name,
             "description": self.description if description is None else description,
-            "audit_read_access": detail.audit_read_access,
             "tags": detail.tags if tags is None else tags
         }
 

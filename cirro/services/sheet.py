@@ -1,13 +1,11 @@
 from typing import List
 
 from cirro_api_client.v1.api.sheets import get_sheets, get_sheet, create_sheet, update_sheet, delete_sheet, \
-    get_sheet_data, query_sheet_data, query_data, insert_sheet_data, update_sheet_data, delete_sheet_data, \
+    query_sheet_data, query_data, insert_sheet_data, update_sheet_data, delete_sheet_data, \
     refresh_view, trigger_ingest, get_jobs
 from cirro_api_client.v1.models import Sheet, SheetDetail, TableSheetInput, ViewSheetInput, CreateResponse, \
     SheetUpdateResponse, SheetDataRequest, SheetQueryRequest, SheetQueryResponse, SheetDataUpdateResponse, \
-    RowInsert, RowUpdate, InsertRowsRequest, UpdateRowsRequest, DeleteRowsRequest, SheetIngestRequest, SheetJob, \
-    SqlSortOrder
-from cirro_api_client.v1.types import UNSET
+    RowInsert, RowUpdate, InsertRowsRequest, UpdateRowsRequest, DeleteRowsRequest, SheetIngestRequest, SheetJob
 
 from cirro.services.base import BaseService
 
@@ -83,46 +81,21 @@ class SheetService(BaseService):
         """
         delete_sheet.sync_detailed(project_id=project_id, sheet_id=sheet_id, client=self._api_client)
 
-    def get_data(self,
-                 project_id: str,
-                 sheet_id: str,
-                 limit: int = 1000,
-                 page: int = 1,
-                 order_by: str = None,
-                 order: SqlSortOrder = None) -> SheetQueryResponse:
+    def query_data(self, project_id: str, sheet_id: str, request: SheetDataRequest = None) -> SheetQueryResponse:
         """
-        Retrieve a page of rows from a sheet
+        Retrieve a page of rows from a sheet, with an optional sort and filter
 
         The first column is always `_row_id`, which identifies the row for `update_rows` and `delete_rows`.
 
         Args:
             project_id (str): ID of the Project
             sheet_id (str): ID of the Sheet
-            limit (int): Maximum number of rows to return (default 1,000)
-            page (int): Page to return (default 1)
-            order_by (str): Column to sort by
-            order (SqlSortOrder): Sort direction
-        """
-        return get_sheet_data.sync(project_id=project_id,
-                                   sheet_id=sheet_id,
-                                   limit=limit,
-                                   page=page,
-                                   order_by=order_by if order_by is not None else UNSET,
-                                   order=order if order is not None else UNSET,
-                                   client=self._api_client)
-
-    def query_data(self, project_id: str, sheet_id: str, request: SheetDataRequest) -> SheetQueryResponse:
-        """
-        Retrieve a page of rows from a sheet, with an optional sort and filter
-
-        Args:
-            project_id (str): ID of the Project
-            sheet_id (str): ID of the Sheet
-            request (cirro_api_client.v1.models.SheetDataRequest): Page, sort, and filter to apply
+            request (cirro_api_client.v1.models.SheetDataRequest): Page, sort, and filter to apply;
+                defaults to the first 1,000 rows, unsorted and unfiltered
         """
         return query_sheet_data.sync(project_id=project_id,
                                      sheet_id=sheet_id,
-                                     body=request,
+                                     body=request if request is not None else SheetDataRequest(),
                                      client=self._api_client)
 
     def raw_query(self,
