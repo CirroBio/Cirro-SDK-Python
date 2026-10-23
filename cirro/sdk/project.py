@@ -288,6 +288,7 @@ class DataPortalProject(DataPortalAsset):
 
         diagnoses = project.create_sheet(
             TableSheetInput(
+                sheet_type="TABLE",
                 name="Diagnoses",
                 namespace_name="default",
                 table_name="diagnoses",

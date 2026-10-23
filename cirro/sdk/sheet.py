@@ -277,6 +277,7 @@ class DataPortalSheet(DataPortalAsset):
         """
         detail = self._get_detail()
         shared = {
+            "sheet_type": detail.sheet_type.value,
             "name": self.name if name is None else name,
             "namespace_name": detail.namespace_name,
             "table_name": detail.table_name,

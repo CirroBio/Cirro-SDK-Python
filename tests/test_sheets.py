@@ -273,6 +273,8 @@ class SheetLifecycleTest(unittest.TestCase):
         _, kwargs = client.sheets.update.call_args
         target = kwargs["sheet"]
         self.assertIsInstance(target, TableSheetInput)
+        # the API tells a table from a view by sheetType, so it must be sent
+        self.assertEqual("TABLE", target.sheet_type)
         self.assertEqual("Renamed", target.name)
         # untouched fields are carried over rather than dropped
         self.assertEqual("ICD codes", target.description)
@@ -288,6 +290,7 @@ class SheetLifecycleTest(unittest.TestCase):
 
         _, kwargs = client.sheets.update.call_args
         self.assertIsInstance(kwargs["sheet"], ViewSheetInput)
+        self.assertEqual("VIEW", kwargs["sheet"].sheet_type)
         self.assertEqual("Rolled up", kwargs["sheet"].description)
         self.assertEqual("Diagnoses", kwargs["sheet"].name)
 
