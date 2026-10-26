@@ -1,4 +1,5 @@
 import os
+import tempfile
 import unittest
 from pathlib import Path
 from typing import NamedTuple, Optional
@@ -96,6 +97,19 @@ class TestPreprocess(unittest.TestCase):
 
         df = ds.pivot_samplesheet()
         self.assertGreater(df.shape[0], 0)
+
+    def test_load_missing_samplesheet_and_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_dir = Path(tmp, 'config')
+            config_dir.mkdir()
+            Path(config_dir, 'params.json').write_text('{"a": 1}')
+            Path(config_dir, 'metadata.json').write_text('{}')
+
+            ds = PreprocessDataset.from_path(dataset_root=tmp)
+
+        self.assertEqual(ds.params, {"a": 1})
+        self.assertEqual(ds.samplesheet.shape[0], 0)
+        self.assertEqual(ds.files.shape[0], 0)
 
 
 if __name__ == '__main__':

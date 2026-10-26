@@ -49,6 +49,16 @@ def read_csv(path: str, required_columns=None) -> 'DataFrame':
     return df
 
 
+def _read_optional_csv(path: str, required_columns: list[str]) -> 'DataFrame':
+    """Read a CSV, returning an empty DataFrame (with the required columns) if the file doesn't exist."""
+    try:
+        return read_csv(path, required_columns=required_columns)
+    except FileNotFoundError:
+        import pandas as pd
+        logger.warning(f"File not found: {path}, using an empty table")
+        return pd.DataFrame(columns=required_columns)
+
+
 def read_json(path: str):
     """Read a JSON object from a local file or S3 path."""
     path = _fix_s3_path(path)
@@ -83,12 +93,16 @@ class PreprocessDataset:
     A pandas DataFrame containing all of the metadata assigned to the samples present
     in the input datasets (at the time of analysis).
 
+    Deprecated: this will be removed in a future release.
+
     More info: https://docs.cirro.bio/pipelines/preprocess-script/#dssamplesheet
     """
     files: 'DataFrame'
     """
     A DataFrame containing information on the files that are associated with
     a sample within the input datasets.
+
+    Deprecated: this will be removed in a future release.
 
     More info: https://docs.cirro.bio/pipelines/preprocess-script/#dsfiles
     """
@@ -151,12 +165,12 @@ class PreprocessDataset:
         """
         config_directory = Path(dataset_root, config_directory)
 
-        files = read_csv(
+        files = _read_optional_csv(
             str(Path(config_directory, "files.csv")),
             required_columns=["sample", "file"]
         )
 
-        samplesheet = read_csv(
+        samplesheet = _read_optional_csv(
             str(Path(config_directory, "samplesheet.csv")),
             required_columns=["sample"]
         )
