@@ -279,6 +279,8 @@ class PreprocessDataset:
         and the `samplesheet` has columns `sample`, `status`, and `group`, the output
         will have columns `sample`, `fastq_1`, `fastq_2`, `status`, and `group`.
 
+        Deprecated: this will be removed in a future release.
+
         Args:
             index: List[str], used to make the frames new index, defaults to
              `["sampleIndex", "sample", "lane"]`
@@ -332,6 +334,8 @@ class PreprocessDataset:
         from the `read` column, but can be customized. This is useful for
         paired-end sequencing data where you want to have the columns
         `sample`, `fastq_1`, and `fastq_2` as the output.
+
+        Deprecated: this will be removed in a future release.
 
         Args:
             index: List[str], used to make the frames new index, defaults to
@@ -407,9 +411,9 @@ class PreprocessDataset:
         """
         Format the samplesheet into a wide format with each sample on a row
 
-        This is a legacy method, please use `pivot_samplesheet` instead.
+        Deprecated: this will be removed in a future release.
         """
-        warnings.warn("`wide_samplesheet` is deprecated, use `pivot_samplesheet` instead.",
+        warnings.warn("`wide_samplesheet` is deprecated and will be removed in a future release.",
                       DeprecationWarning, stacklevel=2)
         if values != "file":
             raise ValueError("The only supported value for `values` is 'file'")
