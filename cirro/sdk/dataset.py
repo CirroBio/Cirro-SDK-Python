@@ -2,12 +2,12 @@ import datetime
 from functools import cached_property
 import re
 from pathlib import Path
-from typing import Union, List, Optional, Any
+from typing import Union, List, Optional, Any, Dict
 
 from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.errors import CirroException, UnexpectedStatus
-from cirro_api_client.v1.models import Dataset, DatasetDetail, RunAnalysisRequest, ProcessDetail, \
-    Status, RunAnalysisRequestParams, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest, \
+from cirro_api_client.v1.models import Dataset, DatasetDetail, ProcessDetail, \
+    Status, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest, \
     CostResponse
 
 from cirro.cirro_client import CirroApi
@@ -15,6 +15,7 @@ from cirro.config import Constants
 from cirro.file_utils import bytes_to_human_readable, filter_files_by_pattern
 from cirro.models.assets import DatasetAssets
 from cirro.models.file import PathLike
+from cirro.models.form_specification import StructuredInputRows
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.task import DataPortalTask
 from cirro.sdk.exceptions import DataPortalAssetNotFound
@@ -684,7 +685,8 @@ class DataPortalDataset(DataPortalAsset):
             notifications_emails: List[str] = None,
             compute_environment: str = None,
             resume_dataset_id: str = None,
-            source_sample_ids: List[str] = None
+            source_sample_ids: List[str] = None,
+            structured_inputs: Dict[str, StructuredInputRows] = None
     ) -> str:
         """
         Runs an analysis on a dataset, returns the ID of the newly created dataset.
@@ -703,6 +705,7 @@ class DataPortalDataset(DataPortalAsset):
         spec = process.get_parameter_spec()
         spec.print()               # human-readable listing of every parameter
         spec.validate_params(params)   # raises if params do not fit the schema
+        spec.structured_inputs     # tables of rows (e.g., a samplesheet) the process takes
         ```
 
         To follow the analysis, re-fetch the dataset each time round the loop.
@@ -732,6 +735,8 @@ class DataPortalDataset(DataPortalAsset):
             resume_dataset_id (str): ID of dataset to resume from, used for caching task execution.
              It will attempt to re-use the previous output to minimize duplicate work
             source_sample_ids (List[str]): List of sample IDs to use as input for the analysis.
+            structured_inputs (Dict[str, List[dict] or DataFrame]): Rows for each structured input
+             the process takes, keyed by its name. See `cirro.sdk.process.DataPortalProcess.run_analysis`.
 
         Returns:
             dataset_id (str): ID of newly created dataset
@@ -740,42 +745,22 @@ class DataPortalDataset(DataPortalAsset):
             raise DataPortalInputError("Must specify 'name' for run_analysis")
         if process is None:
             raise DataPortalInputError("Must specify 'process' for run_analysis")
-        if notifications_emails is None:
-            notifications_emails = []
-        if params is None:
-            params = {}
 
         # If the process is a string, try to parse it as a process name or ID
         process = parse_process_name_or_id(process, self._client)
 
-        if compute_environment:
-            compute_environment_name = compute_environment
-            compute_environments = self._client.compute_environments.list_environments_for_project(
-                project_id=self.project_id
-            )
-            compute_environment = next(
-                (env for env in compute_environments
-                 if env.name == compute_environment or env.id == compute_environment),
-                None
-            )
-            if compute_environment is None:
-                raise DataPortalInputError(f"Compute environment '{compute_environment_name}' not found")
-
-        resp = self._client.execution.run_analysis(
+        return process.run_analysis(
+            name=name,
             project_id=self.project_id,
-            request=RunAnalysisRequest(
-                name=name,
-                description=description,
-                process_id=process.id,
-                source_dataset_ids=[self.id],
-                params=RunAnalysisRequestParams.from_dict(params),
-                notification_emails=notifications_emails,
-                resume_dataset_id=resume_dataset_id,
-                source_sample_ids=source_sample_ids,
-                compute_environment_id=compute_environment.id if compute_environment else None
-            )
+            datasets=[self.id],
+            description=description,
+            params=params,
+            notifications_emails=notifications_emails,
+            compute_environment=compute_environment,
+            resume_dataset_id=resume_dataset_id,
+            source_sample_ids=source_sample_ids,
+            structured_inputs=structured_inputs
         )
-        return resp.id
 
     def update_samplesheet(self,
                            contents: str = None,

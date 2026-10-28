@@ -1,10 +1,12 @@
-from typing import List, Union
+from typing import Dict, List, Union
 
 from cirro_api_client.v1.models import Process, Executor, ProcessDetail, CustomPipelineSettings, PipelineCode, \
     RunAnalysisRequest, RunAnalysisRequestParams
+from cirro_api_client.v1.types import UNSET
 
 from cirro.cirro_client import CirroApi
-from cirro.models.form_specification import ParameterSpecification
+from cirro.models.cirro_uri import find_dataset_ids
+from cirro.models.form_specification import ParameterSpecification, StructuredInputRows
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.exceptions import DataPortalInputError
 
@@ -100,6 +102,18 @@ class DataPortalProcess(DataPortalAsset):
         Call `print()` on the result for a readable listing, or
         `validate_params()` to check a `params` dict before submitting it.
 
+        Some processes take structured inputs (e.g., a samplesheet): tables of rows
+        validated against their own schema, listed in `structured_inputs` on the result.
+        Their rows are passed to `run_analysis` with `structured_inputs` rather than `params`.
+
+        ```python
+        spec = process.get_parameter_spec()
+        spec.print()
+        samplesheet = spec.structured_inputs["samplesheet"]
+        samplesheet.print()         # the columns each row takes
+        samplesheet.examples        # example rows
+        ```
+
         Returns:
             `cirro.models.form_specification.ParameterSpecification`
         """
@@ -115,7 +129,8 @@ class DataPortalProcess(DataPortalAsset):
             notifications_emails: List[str] = None,
             compute_environment: str = None,
             resume_dataset_id: str = None,
-            source_sample_ids: List[str] = None
+            source_sample_ids: List[str] = None,
+            structured_inputs: Dict[str, StructuredInputRows] = None
     ) -> str:
         """
         Runs this process on one or more input datasets, returns the ID of the newly created dataset.
@@ -130,7 +145,9 @@ class DataPortalProcess(DataPortalAsset):
             name (str): Name of newly created dataset
             project_id (str): ID of the project to run the analysis in
             datasets (List[DataPortalDataset or str]): One or more input datasets
-             (as DataPortalDataset objects or dataset ID strings)
+             (as DataPortalDataset objects or dataset ID strings).
+             Datasets referenced by Cirro URIs in `params` or `structured_inputs` are added automatically,
+             so this may be omitted when those reference all the inputs.
             description (str): Description of newly created dataset
             params (dict): Analysis parameters
             notifications_emails (List[str]): Notification email address(es)
@@ -141,26 +158,55 @@ class DataPortalProcess(DataPortalAsset):
             Note that Nextflow does not require this parameter, as it will automatically resume
              from any previous attempts using a global cache.
             source_sample_ids (List[str]): List of sample IDs to use as input for the analysis.
+            structured_inputs (Dict[str, List[dict] or DataFrame]): Rows for each structured input
+             the process takes (see `get_parameter_spec`), keyed by its name.
+             Files and folders are referenced with Cirro URIs (see `cirro.models.cirro_uri.format_cirro_uri`).
 
         Returns:
             dataset_id (str): ID of newly created dataset
+
+        ```python
+        from cirro.models.cirro_uri import format_cirro_uri
+
+        process.run_analysis(
+            name="Output",
+            project_id=project_id,
+            structured_inputs={
+                "samplesheet": [
+                    {
+                        "sample": "sample1",
+                        "fastq_1": format_cirro_uri(project_id, dataset_id, "sample1_R1.fastq.gz"),
+                        "fastq_2": format_cirro_uri(project_id, dataset_id, "sample1_R2.fastq.gz"),
+                    },
+                ]
+            }
+        )
+        ```
         """
         if name is None:
             raise DataPortalInputError("Must specify 'name' for run_analysis")
         if project_id is None:
             raise DataPortalInputError("Must specify 'project_id' for run_analysis")
-        if not datasets:
-            raise DataPortalInputError("Must specify 'datasets' for run_analysis")
         if notifications_emails is None:
             notifications_emails = []
         if params is None:
             params = {}
 
-        # Accept DataPortalDataset objects or raw ID strings
-        source_dataset_ids = [
-            ds if isinstance(ds, str) else ds.id
-            for ds in datasets
-        ]
+        spec = self.get_parameter_spec()
+        try:
+            request_structured_inputs = spec.build_structured_inputs(structured_inputs)
+        except RuntimeError as e:
+            raise DataPortalInputError(str(e)) from e
+
+        # Accept DataPortalDataset objects or raw ID strings, along with
+        # any dataset the parameters or structured inputs reference
+        source_dataset_ids = list(dict.fromkeys([
+            *(ds if isinstance(ds, str) else ds.id for ds in datasets or []),
+            *find_dataset_ids(params, project_id),
+            *find_dataset_ids(request_structured_inputs.to_dict(), project_id)
+        ]))
+        if not source_dataset_ids:
+            raise DataPortalInputError("Must specify 'datasets' for run_analysis")
 
         if compute_environment:
             compute_environment_name = compute_environment
@@ -186,6 +232,7 @@ class DataPortalProcess(DataPortalAsset):
                 notification_emails=notifications_emails,
                 resume_dataset_id=resume_dataset_id,
                 source_sample_ids=source_sample_ids,
+                structured_inputs=request_structured_inputs if structured_inputs else UNSET,
                 compute_environment_id=compute_environment.id if compute_environment else None
             )
         )
