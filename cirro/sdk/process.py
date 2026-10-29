@@ -160,25 +160,41 @@ class DataPortalProcess(DataPortalAsset):
             source_sample_ids (List[str]): List of sample IDs to use as input for the analysis.
             structured_inputs (Dict[str, List[dict] or DataFrame]): Rows for each structured input
              the process takes (see `get_parameter_spec`), keyed by its name.
-             Files and folders are referenced with Cirro URIs (see `cirro.models.cirro_uri.format_cirro_uri`).
+             Files and folders are referenced with Cirro URIs (see `cirro.sdk.file.DataPortalFile.cirro_uri`
+             and `cirro.models.cirro_uri.format_cirro_uri`).
 
         Returns:
             dataset_id (str): ID of newly created dataset
 
         ```python
-        from cirro.models.cirro_uri import format_cirro_uri
+        files = dataset.list_files()
 
         process.run_analysis(
             name="Output",
-            project_id=project_id,
+            project_id=dataset.project_id,
             structured_inputs={
                 "samplesheet": [
                     {
                         "sample": "sample1",
-                        "fastq_1": format_cirro_uri(project_id, dataset_id, "sample1_R1.fastq.gz"),
-                        "fastq_2": format_cirro_uri(project_id, dataset_id, "sample1_R2.fastq.gz"),
+                        "fastq_1": files.get_by_id("data/sample1_R1.fastq.gz").cirro_uri,
+                        "fastq_2": files.get_by_id("data/sample1_R2.fastq.gz").cirro_uri,
                     },
                 ]
+            }
+        )
+        ```
+
+        Rows can also come from a sheet, whose file columns hold Cirro URIs:
+
+        ```python
+        samplesheet = project.get_sheet_by_name("Samplesheet").to_dataframe()
+
+        process.run_analysis(
+            name="Output",
+            project_id=project.id,
+            structured_inputs={
+                # Drop the sheet's row identifier, which isn't a samplesheet column
+                "samplesheet": samplesheet.drop(columns="_row_id")
             }
         )
         ```

@@ -1,8 +1,9 @@
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from cirro.cirro_client import CirroApi
 from cirro.config import Constants
+from cirro.models.cirro_uri import format_cirro_uri
 from cirro.models.file import File, PathLike
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.exceptions import DataPortalInputError
@@ -15,7 +16,7 @@ class DataPortalFile(DataPortalAsset, FileReadMixin):
     Datasets are made up of a collection of File objects in the Data Portal.
     """
 
-    def __init__(self, file: File, client: CirroApi):
+    def __init__(self, file: File, client: CirroApi, dataset_id: Optional[str] = None):
         """
         Instantiate by listing files from a dataset.
 
@@ -32,6 +33,7 @@ class DataPortalFile(DataPortalAsset, FileReadMixin):
         # Attach the file object
         self._file = file
         self._client = client
+        self._dataset_id = dataset_id
 
     # Note that the 'name' and 'id' attributes are set to the relative path
     # The purpose of this is to support the DataPortalAssets class functions
@@ -59,6 +61,19 @@ class DataPortalFile(DataPortalAsset, FileReadMixin):
     def absolute_path(self) -> str:
         """Fully URI to file object in AWS S3"""
         return self._file.absolute_path
+
+    @property
+    def cirro_uri(self) -> str:
+        """
+        Cirro URI referencing this file, for use in analysis parameters
+        and structured inputs (see `cirro.models.cirro_uri.format_cirro_uri`).
+
+        Only available for files under the `data/` directory of a dataset
+        listed with `cirro.sdk.dataset.DataPortalDataset.list_files`.
+        """
+        if self._dataset_id is None or not self.relative_path.startswith("data/"):
+            raise DataPortalInputError(f"{self.relative_path} is not a dataset data file")
+        return format_cirro_uri(self._file.access_context.project_id, self._dataset_id, self.relative_path)
 
     @property
     def metadata(self) -> dict:

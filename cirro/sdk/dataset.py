@@ -452,7 +452,7 @@ class DataPortalDataset(DataPortalAsset):
 
         return DataPortalFiles(
             [
-                DataPortalFile(file=file, client=self._client)
+                DataPortalFile(file=file, client=self._client, dataset_id=self.id)
                 for file in files
             ]
         )

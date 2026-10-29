@@ -2,8 +2,6 @@ from typing import Any, List, NamedTuple, Optional
 
 _SCHEME = 'cirro:'
 _DATASET_TYPE = 'dataset'
-# The type segment the backend emitted before it adopted entity type names
-_LEGACY_DATASET_TYPE = 'data'
 
 
 class CirroUri(NamedTuple):
@@ -54,7 +52,7 @@ def parse_cirro_uri(value: Any) -> Optional[CirroUri]:
     if len(parts) != 4:
         return None
     tenant_id, project_id, uri_type, resource_id = parts
-    if uri_type not in (_DATASET_TYPE, _LEGACY_DATASET_TYPE) or not resource_id:
+    if uri_type not in _DATASET_TYPE or not resource_id:
         return None
     return CirroUri(tenant_id, project_id, uri_type, resource_id, path if slash else None)
 
