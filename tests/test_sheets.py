@@ -148,6 +148,30 @@ class SheetPagingTest(unittest.TestCase):
         self.assertEqual("icd_code", kwargs["request"].sort.order_by)
         self.assertEqual(SqlSortOrder.DESC, kwargs["request"].sort.order)
 
+    @staticmethod
+    def _client_with_system_columns():
+        columns = _COLUMNS + [
+            QueryColumn(name="sys_created_at", data_type=ColumnDataType.STRING),
+            QueryColumn(name="sys_updated_at", data_type=ColumnDataType.STRING)
+        ]
+        client = Mock()
+        client.sheets.query_data.return_value = SheetQueryResponse(
+            columns=columns,
+            rows=[[0, "G65", "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"]],
+            total_row_count=1
+        )
+        return client
+
+    def test_system_columns_are_left_out(self):
+        df = _make_sheet(self._client_with_system_columns()).to_dataframe()
+
+        self.assertEqual(["icd_code"], list(df.columns))
+
+    def test_system_columns_can_be_kept(self):
+        df = _make_sheet(self._client_with_system_columns()).to_dataframe(include_system_columns=True)
+
+        self.assertEqual(["icd_code", "sys_created_at", "sys_updated_at"], list(df.columns))
+
 
 class NamespaceQueryTest(unittest.TestCase):
     """project.query_sheets pages a raw SQL result the same way."""
