@@ -157,8 +157,8 @@ class DataPortalSheet(DataPortalAsset):
         Read the sheet's rows into a Pandas DataFrame.
 
         Pages through the whole sheet, or stops early at `max_rows` if one is
-        given. The `_row_id` column identifies each row for `update_rows` and
-        `delete_rows`.
+        given. The frame is indexed by `_row_id`, which identifies each row for
+        `update_rows` and `delete_rows`.
 
         Args:
             max_rows (int): Stop after this many rows; reads the whole sheet
@@ -167,7 +167,7 @@ class DataPortalSheet(DataPortalAsset):
             order (SqlSortOrder): Sort direction
 
         Returns:
-            `pandas.DataFrame`
+            `pandas.DataFrame` indexed by `_row_id`
         """
         sort = SheetSort(order_by=order_by if order_by is not None else UNSET,
                          order=order if order is not None else UNSET)
@@ -178,7 +178,7 @@ class DataPortalSheet(DataPortalAsset):
                 request=SheetDataRequest(limit=limit, page=page, sort=sort)
             ),
             max_rows=max_rows
-        )
+        ).set_index("_row_id")
 
     def insert_rows(self, rows: List[dict]) -> int:
         """

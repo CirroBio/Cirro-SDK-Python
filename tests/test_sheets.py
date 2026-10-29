@@ -80,7 +80,8 @@ class SheetPagingTest(unittest.TestCase):
         df = _make_sheet(client).to_dataframe()
 
         self.assertEqual(250, len(df))
-        self.assertEqual(["_row_id", "icd_code"], list(df.columns))
+        self.assertEqual(["icd_code"], list(df.columns))
+        self.assertEqual("_row_id", df.index.name)
         self.assertEqual([(1, ROWS_PER_PAGE)], requests)
 
     def test_full_page_does_not_fetch_another(self):
@@ -96,7 +97,7 @@ class SheetPagingTest(unittest.TestCase):
         df = _make_sheet(client).to_dataframe()
 
         self.assertEqual(2500, len(df))
-        self.assertEqual(list(range(2500)), list(df["_row_id"]))
+        self.assertEqual(list(range(2500)), list(df.index))
         self.assertEqual([(1, ROWS_PER_PAGE), (2, ROWS_PER_PAGE), (3, ROWS_PER_PAGE)], requests)
 
     def test_reads_the_whole_sheet_when_uncapped(self):
@@ -120,7 +121,7 @@ class SheetPagingTest(unittest.TestCase):
         df = _make_sheet(client).to_dataframe(max_rows=1500)
 
         self.assertEqual(1500, len(df))
-        self.assertEqual(list(range(1500)), list(df["_row_id"]))
+        self.assertEqual(list(range(1500)), list(df.index))
         self.assertEqual(2, len(requests))
 
     def test_max_rows_below_page_size_shrinks_the_page(self):
@@ -135,7 +136,8 @@ class SheetPagingTest(unittest.TestCase):
         df = _make_sheet(client).to_dataframe()
 
         self.assertTrue(df.empty)
-        self.assertEqual(["_row_id", "icd_code"], list(df.columns))
+        self.assertEqual(["icd_code"], list(df.columns))
+        self.assertEqual("_row_id", df.index.name)
         self.assertEqual(1, len(requests))
 
     def test_sort_is_passed_through(self):
