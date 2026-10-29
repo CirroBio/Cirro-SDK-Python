@@ -185,18 +185,14 @@ class ParameterSpecification:
     def __init__(self, form_schema: Union[ProcessParameterSchema, FormSchema]):
         self._form_spec_raw: Dict = form_schema.form.additional_properties
         self._form_spec_ui: Dict = form_schema.ui.additional_properties
+        self._structured_input_raw: Dict = form_schema.structured_inputs.additional_properties
         self.form_spec = _get_fields_in_schema(self._form_spec_raw.get('properties') or {})
 
-        definitions = getattr(form_schema, 'structured_inputs', None)
-        if definitions is None or isinstance(definitions, Unset):
-            definitions = {}
-        else:
-            definitions = definitions.additional_properties
         fields = {name: (path, required)
                   for path, name, required in _get_structured_input_fields(self._form_spec_raw)}
         self.structured_inputs: Dict[str, StructuredInputSpecification] = {
             name: StructuredInputSpecification(name, definition, *fields.get(name, (None, False)))
-            for name, definition in definitions.items()
+            for name, definition in self._structured_input_raw.items()
         }
         """
         Structured inputs (e.g., samplesheets) the process takes, keyed by name.
