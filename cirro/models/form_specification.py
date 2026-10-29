@@ -8,10 +8,10 @@ from cirro_api_client.v1.models import FormSchema, ProcessParameterSchema, Struc
 from cirro.models.cirro_uri import parse_cirro_uri
 
 if TYPE_CHECKING:
-    pass
+    from pandas import DataFrame
 
 # Rows for a structured input, as a list of dicts (one per row) or a pandas DataFrame
-StructuredInputRows = Union[List[Dict[str, Any]], 'pandas.DataFrame']
+StructuredInputRows = Union[List[Dict[str, Any]], 'DataFrame']
 
 # JSON schema formats whose values are references to a file or folder in Cirro
 _PATH_FORMATS = {'file-path', 'file-path-pattern', 'directory-path', 'path'}
