@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import pandas as pd
 from cirro_api_client.v1.models import ProcessParameterSchema, FileFormat, CreateResponse
 
-from cirro.models.cirro_uri import format_cirro_uri, parse_cirro_uri, find_dataset_ids
+from cirro.models.cirro_uri import format_dataset_uri, parse_cirro_uri, find_dataset_ids
 from cirro.models.form_specification import ParameterSpecification
 from cirro.sdk.exceptions import DataPortalInputError
 from cirro.sdk.process import DataPortalProcess
@@ -66,21 +66,21 @@ def _spec() -> ParameterSpecification:
 
 
 def _row(sample='s1', dataset_id='dataset-1', **cells):
-    return {'sample': sample, 'fastq_1': format_cirro_uri(PROJECT_ID, dataset_id, f'{sample}_R1.fastq.gz'), **cells}
+    return {'sample': sample, 'fastq_1': format_dataset_uri(PROJECT_ID, dataset_id, f'{sample}_R1.fastq.gz'), **cells}
 
 
 class TestCirroUri(unittest.TestCase):
     def test_format_and_parse(self):
-        uri = format_cirro_uri(PROJECT_ID, 'dataset-1', 'data/folder/a.fastq.gz')
+        uri = format_dataset_uri(PROJECT_ID, 'dataset-1', 'data/folder/a.fastq.gz')
         self.assertEqual(uri, 'cirro::project-1:dataset:dataset-1/folder/a.fastq.gz')
         parsed = parse_cirro_uri(uri)
         self.assertEqual((parsed.project_id, parsed.id, parsed.path), (PROJECT_ID, 'dataset-1', 'folder/a.fastq.gz'))
-        self.assertIsNone(parse_cirro_uri(format_cirro_uri(PROJECT_ID, 'dataset-1')).path)
+        self.assertIsNone(parse_cirro_uri(format_dataset_uri(PROJECT_ID, 'dataset-1')).path)
         self.assertIsNone(parse_cirro_uri('s3://bucket/datasets/dataset-1/data/a.fastq.gz'))
 
     def test_find_dataset_ids(self):
         value = {'a': [_row(dataset_id='d1'), _row(dataset_id='d2'), _row(dataset_id='d1')],
-                 'b': format_cirro_uri('other-project', 'd3', '')}
+                 'b': format_dataset_uri('other-project', 'd3', '')}
         self.assertEqual(find_dataset_ids(value), ['d1', 'd2', 'd3'])
         self.assertEqual(find_dataset_ids(value, PROJECT_ID), ['d1', 'd2'])
 
