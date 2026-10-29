@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from cirro.cirro_client import CirroApi
 from cirro.config import Constants
-from cirro.models.cirro_uri import format_cirro_uri
+from cirro.models.cirro_uri import format_dataset_uri
 from cirro.models.file import File, PathLike
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.exceptions import DataPortalInputError
@@ -73,7 +73,7 @@ class DataPortalFile(DataPortalAsset, FileReadMixin):
         """
         if self._dataset_id is None or not self.relative_path.startswith("data/"):
             raise DataPortalInputError(f"{self.relative_path} is not a dataset data file")
-        return format_cirro_uri(self._file.access_context.project_id, self._dataset_id, self.relative_path)
+        return format_dataset_uri(self._file.access_context.project_id, self._dataset_id, self.relative_path)
 
     @property
     def metadata(self) -> dict:

@@ -16,7 +16,7 @@ class CirroUri(NamedTuple):
     """Relative to the dataset's `data/` directory, `''` for the whole directory, or None for the dataset itself"""
 
 
-def format_cirro_uri(project_id: str, dataset_id: str, path: Optional[str] = None) -> str:
+def format_dataset_uri(project_id: str, dataset_id: str, path: Optional[str] = None) -> str:
     """
     Builds a Cirro URI referencing a dataset, or a file or folder within it.
 

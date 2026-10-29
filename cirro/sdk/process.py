@@ -111,7 +111,6 @@ class DataPortalProcess(DataPortalAsset):
         spec.print()
         samplesheet = spec.structured_inputs["samplesheet"]
         samplesheet.print()         # the columns each row takes
-        samplesheet.examples        # example rows
         ```
 
         Returns:
@@ -184,18 +183,26 @@ class DataPortalProcess(DataPortalAsset):
         )
         ```
 
-        Rows can also come from a sheet, whose file columns hold Cirro URIs:
+        A sheet's columns rarely match the structured input's exactly. Rename the
+        ones that differ and keep only the columns the structured input defines
+        if needed, or just pass sheet.to_dataframe() directly.
 
         ```python
-        samplesheet = project.get_sheet_by_name("Samplesheet").to_dataframe()
+        spec = process.get_parameter_spec().structured_inputs["samplesheet"]
+        sheet = project.get_sheet_by_name("Samples").to_dataframe()
+
+        samplesheet = (
+            sheet
+            # Sheet column -> structured input column
+            .rename(columns={"sample_id": "sample", "read1": "fastq_1", "read2": "fastq_2"})
+            # Drop sheet columns the structured input doesn't define (e.g., notes, tissue);
+            .filter(items=[column.key for column in spec.columns])
+        )
 
         process.run_analysis(
             name="Output",
             project_id=project.id,
-            structured_inputs={
-                # Drop the sheet's row identifier, which isn't a samplesheet column
-                "samplesheet": samplesheet.drop(columns="_row_id")
-            }
+            structured_inputs={"samplesheet": samplesheet}
         )
         ```
         """
