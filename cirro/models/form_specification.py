@@ -4,12 +4,11 @@ from typing import TYPE_CHECKING, Dict, Any, List, Mapping, Optional, Tuple, Uni
 import jsonschema
 from cirro_api_client.v1.models import FormSchema, ProcessParameterSchema, StructuredInputDefinition, \
     FileFormat, StructuredInput, StructuredInputDataItem, RunAnalysisRequestStructuredFileInputs
-from cirro_api_client.v1.types import Unset
 
 from cirro.models.cirro_uri import parse_cirro_uri
 
 if TYPE_CHECKING:
-    import pandas
+    pass
 
 # Rows for a structured input, as a list of dicts (one per row) or a pandas DataFrame
 StructuredInputRows = Union[List[Dict[str, Any]], 'pandas.DataFrame']
