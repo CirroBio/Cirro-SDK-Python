@@ -169,7 +169,7 @@ class TestRunAnalysisStructuredInputs(unittest.TestCase):
     def test_requires_datasets_without_references(self):
         process, client = self._process()
         client.processes.get_parameter_spec.return_value = ParameterSpecification(
-            ProcessParameterSchema.from_dict({'form': {}, 'ui': {}})
+            ProcessParameterSchema.from_dict({'form': {}, 'ui': {}, 'structuredInputs': {}})
         )
         with self.assertRaisesRegex(DataPortalInputError, 'datasets'):
             process.run_analysis(name='Output', project_id=PROJECT_ID)
