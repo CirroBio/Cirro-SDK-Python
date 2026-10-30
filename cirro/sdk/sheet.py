@@ -16,6 +16,9 @@ from cirro.sdk.exceptions import DataPortalInputError
 # much wider than this can come back as a 502.
 ROWS_PER_PAGE = 1000
 
+# Columns the platform maintains on every sheet (e.g., sys_created_at)
+SYSTEM_COLUMN_PREFIX = "sys_"
+
 
 def query_to_dataframe(fetch_page: Callable[[int, int], SheetQueryResponse],
                        max_rows: int = None) -> 'DataFrame':
@@ -152,33 +155,40 @@ class DataPortalSheet(DataPortalAsset):
     def to_dataframe(self,
                      max_rows: int = None,
                      order_by: str = None,
-                     order: SqlSortOrder = None) -> 'DataFrame':
+                     order: SqlSortOrder = None,
+                     include_system_columns: bool = False) -> 'DataFrame':
         """
         Read the sheet's rows into a Pandas DataFrame.
 
         Pages through the whole sheet, or stops early at `max_rows` if one is
-        given. The `_row_id` column identifies each row for `update_rows` and
-        `delete_rows`.
+        given. The frame is indexed by `_row_id`, which identifies each row for
+        `update_rows` and `delete_rows`.
 
         Args:
             max_rows (int): Stop after this many rows; reads the whole sheet
                 if omitted
             order_by (str): Column to sort by
             order (SqlSortOrder): Sort direction
+            include_system_columns (bool): Keep the columns the platform
+                maintains on every row (e.g., `sys_created_at`), which are
+                left out by default
 
         Returns:
-            `pandas.DataFrame`
+            `pandas.DataFrame` indexed by `_row_id`
         """
         sort = SheetSort(order_by=order_by if order_by is not None else UNSET,
                          order=order if order is not None else UNSET)
-        return query_to_dataframe(
+        df = query_to_dataframe(
             lambda limit, page: self._client.sheets.query_data(
                 project_id=self.project_id,
                 sheet_id=self.id,
                 request=SheetDataRequest(limit=limit, page=page, sort=sort)
             ),
             max_rows=max_rows
-        )
+        ).set_index("_row_id")
+        if not include_system_columns:
+            df = df.loc[:, ~df.columns.str.startswith(SYSTEM_COLUMN_PREFIX)]
+        return df
 
     def insert_rows(self, rows: List[dict]) -> int:
         """
