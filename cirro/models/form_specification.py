@@ -153,7 +153,7 @@ class StructuredInputSpecification:
                 if value not in (None, '') and parse_cirro_uri(value) is None:
                     raise RuntimeError(
                         f'Structured input {self.name} at $[{index}].{column} error: {value!r} is not a Cirro URI. '
-                        'Reference files and folders with cirro.models.cirro_uri.format_cirro_uri'
+                        'Reference files and folders with cirro.models.cirro_uri.format_dataset_uri'
                     )
         return rows
 

@@ -160,7 +160,7 @@ class DataPortalProcess(DataPortalAsset):
             structured_inputs (Dict[str, List[dict] or DataFrame]): Rows for each structured input
              the process takes (see `get_parameter_spec`), keyed by its name.
              Files and folders are referenced with Cirro URIs (see `cirro.sdk.file.DataPortalFile.cirro_uri`
-             and `cirro.models.cirro_uri.format_cirro_uri`).
+             and `cirro.models.cirro_uri.format_dataset_uri`).
 
         Returns:
             dataset_id (str): ID of newly created dataset

@@ -66,7 +66,7 @@ class DataPortalFile(DataPortalAsset, FileReadMixin):
     def cirro_uri(self) -> str:
         """
         Cirro URI referencing this file, for use in analysis parameters
-        and structured inputs (see `cirro.models.cirro_uri.format_cirro_uri`).
+        and structured inputs (see `cirro.models.cirro_uri.format_dataset_uri`).
 
         Only available for files under the `data/` directory of a dataset
         listed with `cirro.sdk.dataset.DataPortalDataset.list_files`.

@@ -30,7 +30,7 @@ def format_dataset_uri(project_id: str, dataset_id: str, path: Optional[str] = N
          Use `''` for the dataset's whole data directory, or omit it to reference the dataset itself.
 
     ```python
-    format_cirro_uri("project-id", "dataset-id", "sample1_R1.fastq.gz")
+    format_dataset_uri("project-id", "dataset-id", "sample1_R1.fastq.gz")
     # 'cirro::project-id:dataset:dataset-id/sample1_R1.fastq.gz'
     ```
     """
@@ -52,7 +52,7 @@ def parse_cirro_uri(value: Any) -> Optional[CirroUri]:
     if len(parts) != 4:
         return None
     tenant_id, project_id, uri_type, resource_id = parts
-    if uri_type not in _DATASET_TYPE or not resource_id:
+    if not uri_type or not resource_id:
         return None
     return CirroUri(tenant_id, project_id, uri_type, resource_id, path if slash else None)
 
