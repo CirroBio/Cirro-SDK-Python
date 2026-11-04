@@ -161,20 +161,6 @@ class TestStructuredInputSpecification(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'bams'):
             spec.validate_params({'genome': 'GRCh38', 'bams': [bams[0], 'a.txt']}, {'samplesheet': [_row()]})
 
-    def test_multiple_path_column_takes_array(self):
-        schema = {**PARAMETER_SCHEMA, 'structuredInputs': {'samplesheet': {
-            'fileFormat': 'JSON',
-            'schema': {'type': 'array', 'items': {'type': 'object', 'properties': {
-                'sample': {'type': 'string'},
-                'reads': {'type': 'string', 'format': 'file-path', 'multiple': True},
-            }}},
-        }}}
-        samplesheet = ParameterSpecification(ProcessParameterSchema.from_dict(schema)).structured_inputs['samplesheet']
-        reads = [format_dataset_uri(PROJECT_ID, 'd1', 'a.fastq.gz'), 's3://bucket/b.fastq.gz']
-        samplesheet.validate_rows([{'sample': 's1', 'reads': reads}])
-        with self.assertRaisesRegex(RuntimeError, r'\$\[0\]\.reads.*not a Cirro or S3 URI'):
-            samplesheet.validate_rows([{'sample': 's1', 'reads': [reads[0], 'b.fastq.gz']}])
-
     def test_rejects_unknown_structured_input(self):
         with self.assertRaisesRegex(RuntimeError, 'Unknown structured input'):
             _spec().build_structured_inputs({'samplesheet': [_row()], 'other': []})

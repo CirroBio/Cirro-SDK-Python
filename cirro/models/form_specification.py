@@ -86,60 +86,35 @@ def _as_multiple_values(field_spec: Dict) -> Dict:
     return {'anyOf': [single, {'type': 'array', 'items': single, 'uniqueItems': True}]}
 
 
-def _normalize_multiple_values_fields(schema: Dict) -> Dict:
+def _get_params_schema(schema: Dict, inherited_removed: frozenset = frozenset()) -> Dict:
     """
-    A copy of an object schema with its `multiple` fields (at any depth) taking arrays of values
+    A copy of the form's JSON schema to validate parameters against:
+    - Without the fields filled by structured inputs, whose rows are passed separately from the parameters
+      and validated against their own schema. Conditional branches are stripped too, since they can declare
+      such fields, or require ones declared alongside them (`inherited_removed`).
+    - With `multiple` fields taking arrays of values
     """
-    normalized = dict(schema)
-    if isinstance(schema.get('properties'), dict):
-        normalized['properties'] = {
-            key: _as_multiple_values(spec) if isinstance(spec, dict) and spec.get('multiple')
-            else _normalize_multiple_values_fields(spec) if isinstance(spec, dict) else spec
-            for key, spec in schema['properties'].items()
-        }
-    if isinstance(schema.get('items'), dict):
-        normalized['items'] = _normalize_multiple_values_fields(schema['items'])
-    for keyword in _SUBSCHEMA_ARRAY_KEYWORDS:
-        if isinstance(schema.get(keyword), list):
-            normalized[keyword] = [_normalize_multiple_values_fields(s) if isinstance(s, dict) else s
-                                   for s in schema[keyword]]
-    for keyword in _SUBSCHEMA_KEYWORDS:
-        if isinstance(schema.get(keyword), dict):
-            normalized[keyword] = _normalize_multiple_values_fields(schema[keyword])
-    if isinstance(schema.get('dependencies'), dict):
-        normalized['dependencies'] = {
-            key: _normalize_multiple_values_fields(dep) if isinstance(dep, dict) else dep
-            for key, dep in schema['dependencies'].items()
-        }
-    return normalized
-
-
-def _without_structured_input_fields(schema: Dict, inherited_removed: frozenset = frozenset()) -> Dict:
-    """
-    A copy of the form's JSON schema without the fields filled by structured inputs,
-    whose rows are passed separately from the parameters and validated against their own schema.
-    Conditional branches are stripped too, since they can declare such fields, or require
-    ones declared alongside them (`inherited_removed`).
-    """
-    stripped = dict(schema)
+    params_schema = dict(schema)
     properties = schema.get('properties')
     removed = set(inherited_removed)
     if isinstance(properties, dict):
         removed |= {key for key, spec in properties.items() if _is_structured_input_field(spec)}
-        stripped['properties'] = {
-            key: _without_structured_input_fields(spec) if isinstance(spec, dict) else spec
+        params_schema['properties'] = {
+            key: spec if not isinstance(spec, dict)
+            else _as_multiple_values(spec) if spec.get('multiple')
+            else _get_params_schema(spec)
             for key, spec in properties.items()
             if key not in removed
         }
     if isinstance(schema.get('required'), list):
-        stripped['required'] = [key for key in schema['required'] if key not in removed]
+        params_schema['required'] = [key for key in schema['required'] if key not in removed]
 
     # Branches apply at this same path, so they share the fields removed here
     removed = frozenset(removed)
 
-    def strip(subschema):
+    def branch(subschema):
         if isinstance(subschema, dict):
-            return _without_structured_input_fields(subschema, removed)
+            return _get_params_schema(subschema, removed)
         if isinstance(subschema, list):
             # Property dependency: names of properties to require
             return [key for key in subschema if key not in removed]
@@ -147,13 +122,13 @@ def _without_structured_input_fields(schema: Dict, inherited_removed: frozenset 
 
     for keyword in _SUBSCHEMA_ARRAY_KEYWORDS:
         if isinstance(schema.get(keyword), list):
-            stripped[keyword] = [strip(s) for s in schema[keyword]]
+            params_schema[keyword] = [branch(s) for s in schema[keyword]]
     for keyword in _SUBSCHEMA_KEYWORDS:
         if keyword in schema:
-            stripped[keyword] = strip(schema[keyword])
+            params_schema[keyword] = branch(schema[keyword])
     if isinstance(schema.get('dependencies'), dict):
-        stripped['dependencies'] = {key: strip(dep) for key, dep in schema['dependencies'].items()}
-    return stripped
+        params_schema['dependencies'] = {key: branch(dep) for key, dep in schema['dependencies'].items()}
+    return params_schema
 
 
 def _is_s3_uri(value: Any) -> bool:
@@ -226,7 +201,7 @@ class StructuredInputSpecification:
         """
         rows = _to_rows(rows)
         try:
-            jsonschema.validate(instance=rows, schema=_normalize_multiple_values_fields(self.schema))
+            jsonschema.validate(instance=rows, schema=self.schema)
         except jsonschema.ValidationError as e:
             raise RuntimeError(f'Structured input {self.name} at {e.json_path} error: {e.message}') from e
 
@@ -235,15 +210,13 @@ class StructuredInputSpecification:
         for index, row in enumerate(rows):
             for column in path_columns:
                 value = row.get(column)
-                # A `multiple` column holds a list of paths
-                for path in value if isinstance(value, list) else [value]:
-                    if path in (None, '') or _is_s3_uri(path) or parse_cirro_uri(path) is not None:
-                        continue
-                    raise RuntimeError(
-                        f'Structured input {self.name} at $[{index}].{column} error: '
-                        f'{path!r} is not a Cirro or S3 URI. '
-                        'Reference files and folders in a dataset with cirro.models.cirro_uri.format_dataset_uri'
-                    )
+                if value in (None, '') or _is_s3_uri(value) or parse_cirro_uri(value) is not None:
+                    continue
+                raise RuntimeError(
+                    f'Structured input {self.name} at $[{index}].{column} error: '
+                    f'{value!r} is not a Cirro or S3 URI. '
+                    'Reference files and folders in a dataset with cirro.models.cirro_uri.format_dataset_uri'
+                )
         return rows
 
     def to_request(self, rows: StructuredInputRows) -> StructuredInput:
@@ -306,9 +279,8 @@ class ParameterSpecification:
             if spec.field_path and isinstance(_get_by_path(params, spec.field_path), list):
                 raise RuntimeError(f'Parameter {spec.field_path} is a structured input, '
                                    f'pass its rows in structured_inputs["{spec.name}"] instead of params')
-        schema = _normalize_multiple_values_fields(_without_structured_input_fields(self._form_spec_raw))
         try:
-            jsonschema.validate(instance=params, schema=schema)
+            jsonschema.validate(instance=params, schema=_get_params_schema(self._form_spec_raw))
         except jsonschema.ValidationError as e:
             raise RuntimeError(f'Parameter at {e.json_path} error: {e.message}') from e
         self.build_structured_inputs(structured_inputs)
