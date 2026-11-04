@@ -50,6 +50,10 @@ class ExecutionService(BaseService):
         )
         cirro.execution.run_analysis("project-id", request)
         ```
+
+        Processes which take structured inputs (e.g., a samplesheet) accept their rows in
+        `structured_inputs`, built with
+        `cirro.models.form_specification.ParameterSpecification.build_structured_inputs`.
         """
 
         form_spec = get_process_parameters.sync(
@@ -57,10 +61,15 @@ class ExecutionService(BaseService):
             client=self._api_client
         )
 
+        structured_inputs = request.structured_inputs
         ParameterSpecification(
             form_spec
         ).validate_params(
-            request.params.to_dict() if request.params else {}
+            request.params.to_dict() if request.params else {},
+            {
+                name: [row.to_dict() for row in structured_input.data]
+                for name, structured_input in structured_inputs.additional_properties.items()
+            } if structured_inputs else None
         )
 
         return run_analysis.sync(
