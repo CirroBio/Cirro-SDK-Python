@@ -114,6 +114,67 @@ class TestStructuredInputSpecification(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, r'structured_inputs\["samplesheet"\]'):
             _spec().validate_params({'genome': 'GRCh38', 'input': [_row()]})
 
+    def test_structured_input_fields_in_conditional_branches(self):
+        si_field = {'type': 'string', 'schema': 'samplesheet'}
+        schema = {**PARAMETER_SCHEMA, 'form': {
+            'type': 'object',
+            'required': ['mode'],
+            'properties': {'mode': {'type': 'string', 'enum': ['samplesheet', 'contrasts']}},
+            'dependencies': {'mode': {'oneOf': [
+                {'properties': {'mode': {'const': 'samplesheet'}, 'input': si_field}, 'required': ['input']},
+                {'properties': {'mode': {'const': 'contrasts'}}},
+            ]}},
+            'if': {'properties': {'mode': {'const': 'contrasts'}}},
+            'then': {'properties': {'options': {'properties': {
+                'contrasts': {'type': 'string', 'schema': 'contrasts'}}}}},
+        }}
+        spec = ParameterSpecification(ProcessParameterSchema.from_dict(schema))
+
+        samplesheet = spec.structured_inputs['samplesheet']
+        self.assertEqual(samplesheet.field_path, 'input')
+        # Only required when its branch applies
+        self.assertFalse(samplesheet.required)
+        self.assertEqual(spec.structured_inputs['contrasts'].field_path, 'options.contrasts')
+
+        # The branch's requirement on the field is stripped along with the field
+        spec.validate_params({'mode': 'samplesheet'}, {'samplesheet': [_row()]})
+        with self.assertRaisesRegex(RuntimeError, r'structured_inputs\["samplesheet"\]'):
+            spec.validate_params({'mode': 'samplesheet', 'input': [_row()]})
+
+    def test_branch_can_require_field_declared_alongside_it(self):
+        form = {**PARAMETER_SCHEMA['form'], 'required': ['genome'],
+                'if': {'properties': {'genome': {'const': 'GRCh38'}}},
+                'then': {'required': ['input']},
+                'dependencies': {'genome': ['input']}}
+        spec = ParameterSpecification(ProcessParameterSchema.from_dict({**PARAMETER_SCHEMA, 'form': form}))
+        spec.validate_params({'genome': 'GRCh38'}, {'samplesheet': [_row()]})
+
+    def test_multiple_path_field_takes_array(self):
+        form = {**PARAMETER_SCHEMA['form'], 'properties': {
+            **PARAMETER_SCHEMA['form']['properties'],
+            'bams': {'type': 'string', 'format': 'file-path', 'pattern': r'\.bam$', 'multiple': True},
+        }}
+        spec = ParameterSpecification(ProcessParameterSchema.from_dict({**PARAMETER_SCHEMA, 'form': form}))
+        bams = [format_dataset_uri(PROJECT_ID, 'd1', 'a.bam'), 's3://bucket/b.bam']
+        spec.validate_params({'genome': 'GRCh38', 'bams': bams}, {'samplesheet': [_row()]})
+        spec.validate_params({'genome': 'GRCh38', 'bams': bams[0]}, {'samplesheet': [_row()]})
+        with self.assertRaisesRegex(RuntimeError, 'bams'):
+            spec.validate_params({'genome': 'GRCh38', 'bams': [bams[0], 'a.txt']}, {'samplesheet': [_row()]})
+
+    def test_multiple_path_column_takes_array(self):
+        schema = {**PARAMETER_SCHEMA, 'structuredInputs': {'samplesheet': {
+            'fileFormat': 'JSON',
+            'schema': {'type': 'array', 'items': {'type': 'object', 'properties': {
+                'sample': {'type': 'string'},
+                'reads': {'type': 'string', 'format': 'file-path', 'multiple': True},
+            }}},
+        }}}
+        samplesheet = ParameterSpecification(ProcessParameterSchema.from_dict(schema)).structured_inputs['samplesheet']
+        reads = [format_dataset_uri(PROJECT_ID, 'd1', 'a.fastq.gz'), 's3://bucket/b.fastq.gz']
+        samplesheet.validate_rows([{'sample': 's1', 'reads': reads}])
+        with self.assertRaisesRegex(RuntimeError, r'\$\[0\]\.reads.*not a Cirro or S3 URI'):
+            samplesheet.validate_rows([{'sample': 's1', 'reads': [reads[0], 'b.fastq.gz']}])
+
     def test_rejects_unknown_structured_input(self):
         with self.assertRaisesRegex(RuntimeError, 'Unknown structured input'):
             _spec().build_structured_inputs({'samplesheet': [_row()], 'other': []})
@@ -125,10 +186,11 @@ class TestStructuredInputSpecification(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'is not of type'):
             samplesheet.validate_rows([_row(replicate='one')])
 
-    def test_requires_cirro_uris_for_paths(self):
+    def test_requires_cirro_or_s3_uris_for_paths(self):
         samplesheet = _spec().structured_inputs['samplesheet']
-        with self.assertRaisesRegex(RuntimeError, r'\$\[0\]\.fastq_1.*not a Cirro URI'):
-            samplesheet.validate_rows([{'sample': 's1', 'fastq_1': 's3://bucket/a.fastq.gz'}])
+        samplesheet.validate_rows([{'sample': 's1', 'fastq_1': 's3://bucket/a.fastq.gz'}])
+        with self.assertRaisesRegex(RuntimeError, r'\$\[0\]\.fastq_1.*not a Cirro or S3 URI'):
+            samplesheet.validate_rows([{'sample': 's1', 'fastq_1': 'data/a.fastq.gz'}])
 
     def test_accepts_dataframe(self):
         samplesheet = _spec().structured_inputs['samplesheet']
