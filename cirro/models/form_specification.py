@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Dict, Any, List, Mapping, Optional, Tuple, Uni
 import jsonschema
 from cirro_api_client.v1.models import FormSchema, ProcessParameterSchema, StructuredInputDefinition, \
     FileFormat, StructuredInput, StructuredInputDataItem, RunAnalysisRequestStructuredFileInputs
+from cirro_api_client.v1.types import UNSET, Unset
 
 from cirro.models.cirro_uri import parse_cirro_uri
 
@@ -246,7 +247,11 @@ class ParameterSpecification:
     def __init__(self, form_schema: Union[ProcessParameterSchema, FormSchema]):
         self._form_spec_raw: Dict = form_schema.form.additional_properties
         self._form_spec_ui: Dict = form_schema.ui.additional_properties
-        self._structured_input_raw: Dict = form_schema.structured_inputs.additional_properties
+        # A FormSchema has no structured inputs, and they are optional in a ProcessParameterSchema
+        structured_inputs = form_schema.structured_inputs \
+            if isinstance(form_schema, ProcessParameterSchema) else UNSET
+        self._structured_input_raw: Dict = {} if isinstance(structured_inputs, Unset) \
+            else structured_inputs.additional_properties
         self.form_spec = _get_fields_in_schema(self._form_spec_raw.get('properties') or {})
 
         fields = {name: (path, required)

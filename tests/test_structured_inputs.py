@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import Mock
 
 import pandas as pd
-from cirro_api_client.v1.models import ProcessParameterSchema, FileFormat, CreateResponse
+from cirro_api_client.v1.models import ProcessParameterSchema, FormSchema, FileFormat, CreateResponse
 
 from cirro.models.cirro_uri import format_dataset_uri, parse_cirro_uri, find_dataset_ids
 from cirro.models.form_specification import ParameterSpecification
@@ -99,6 +99,14 @@ class TestStructuredInputSpecification(unittest.TestCase):
         contrasts = spec.structured_inputs['contrasts']
         self.assertEqual(contrasts.field_path, 'options.contrasts')
         self.assertFalse(contrasts.required)
+
+    def test_schema_without_structured_inputs(self):
+        form = {'type': 'object', 'properties': {'genome': {'type': 'string'}}}
+        for form_schema in [ProcessParameterSchema.from_dict({'form': form, 'ui': {}}),
+                            FormSchema.from_dict({'form': form, 'ui': {}})]:
+            spec = ParameterSpecification(form_schema)
+            self.assertEqual(spec.structured_inputs, {})
+            spec.validate_params({'genome': 'GRCh38'})
 
     def test_validate_params_skips_structured_input_fields(self):
         spec = _spec()
