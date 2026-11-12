@@ -8,7 +8,7 @@ from cirro_api_client.v1.api.processes import validate_file_requirements
 from cirro_api_client.v1.errors import CirroException, UnexpectedStatus
 from cirro_api_client.v1.models import Dataset, DatasetDetail, ProcessDetail, \
     Status, Tag, ArtifactType, NamedItem, ValidateFileRequirementsRequest, \
-    CostResponse
+    CostResponse, DatasetCopyOrigin
 
 from cirro.cirro_client import CirroApi
 from cirro.config import Constants
@@ -203,6 +203,14 @@ class DataPortalDataset(DataPortalAsset):
             )
             for dataset_id in self.source_dataset_ids
         ]
+
+    @property
+    def copied_from(self) -> List[DatasetCopyOrigin]:
+        """
+        The datasets (or S3 locations) this dataset copied its files from,
+        if it was created with `cirro.sdk.project.DataPortalProject.copy_dataset`
+        """
+        return self._get_detail().copied_from or []
 
     @property
     def params(self) -> dict:
