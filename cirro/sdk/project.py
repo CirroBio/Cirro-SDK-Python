@@ -1,27 +1,44 @@
 import uuid
 from functools import cache
 from time import sleep
-from typing import List, TYPE_CHECKING, Union
+from typing import Any, List, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from pandas import DataFrame
 
 from cirro_api_client.v1.models import Project, UploadDatasetRequest, Dataset, Sample, Tag, Status, \
-    TableSheetInput, ViewSheetInput, DashboardInput
+    TableSheetInput, ViewSheetInput, DashboardInput, CopyDatasetRequest, FileMapping
 
 from cirro.cirro_client import CirroApi
 from cirro.file_utils import get_files_in_directory
+from cirro.models.cirro_uri import format_dataset_uri
 from cirro.sdk.asset import DataPortalAssets, DataPortalAsset
 from cirro.sdk.dashboard import DataPortalDashboard, DataPortalDashboards, DATA_STUDIO_TYPE, \
     RECORD_SCHEMA_VERSION
 from cirro.sdk.dataset import DataPortalDataset, DataPortalDatasets
 from cirro.sdk.exceptions import DataPortalAssetNotFound, DataPortalInputError
+from cirro.sdk.file import DataPortalFile
 from cirro.sdk.helpers import parse_process_name_or_id
 from cirro.sdk.process import DataPortalProcess
 from cirro.sdk.reference import DataPortalReference, DataPortalReferences
 from cirro.sdk.reference_type import DataPortalReferenceType, DataPortalReferenceTypes
 from cirro.sdk.sheet import DataPortalSheet, DataPortalSheets, query_to_dataframe
 from cirro.services.service_helpers import list_all_datasets
+
+
+def _to_file_mapping(source: Any) -> FileMapping:
+    """Normalize a source given to `DataPortalProject.copy_dataset` into what to copy"""
+    if isinstance(source, FileMapping):
+        return source
+    if isinstance(source, DataPortalDataset):
+        # The whole data folder of the dataset
+        return FileMapping(src=format_dataset_uri(source.project_id, source.id, ''))
+    if isinstance(source, DataPortalFile):
+        return FileMapping(src=source.cirro_uri)
+    if isinstance(source, str):
+        return FileMapping(src=source)
+    raise DataPortalInputError(f"Cannot copy from '{source}': "
+                               "expected a dataset, file, FileMapping, or Cirro / S3 URI")
 
 
 class DataPortalProject(DataPortalAsset):
@@ -444,11 +461,118 @@ class DataPortalProject(DataPortalAsset):
             files=files
         )
 
-        # Return the dataset which was created, which might take a second to update
+        return self._get_created_dataset(create_response.id)
+
+    def copy_dataset(
+        self,
+        sources: List[Union[DataPortalDataset, DataPortalFile, FileMapping, str]],
+        name: str = None,
+        description: str = None,
+        process: Union[DataPortalProcess, str] = None,
+        tags: List[str] = None,
+        run_details_from: Union[DataPortalDataset, str] = None,
+        source_dataset_ids: List[str] = None,
+    ) -> DataPortalDataset:
+        """
+        Create a new dataset in this project by copying files and folders from
+        other datasets (in this project, or shared with it) or from S3.
+
+        Use it to copy a dataset from another project, take a subset of a
+        dataset's files, or combine several datasets into one.
+
+        The copy runs in the background: the dataset which is returned will
+        have the status `RUNNING` until all files have been copied.
+
+        Args:
+            sources (list): What to copy. Each item is one of
+                a `cirro.sdk.dataset.DataPortalDataset` (all of its data files),
+                a `cirro.sdk.file.DataPortalFile` (a single data file),
+                a Cirro URI (see `cirro.models.cirro_uri.format_dataset_uri`)
+                or S3 URI of a file or folder (folders end in `/`),
+                or a `cirro_api_client.v1.models.FileMapping`, which also sets
+                the destination path within the new dataset.
+                Files may come from at most 40 datasets.
+            name (str): Name of the new dataset. Required unless every file
+                comes from one dataset, in which case it defaults to that dataset's name.
+            description (str): Description of the new dataset
+                (defaults to that of the source dataset, when there is only one)
+            process (str | DataPortalProcess): Data type of the new dataset, referenced by name, ID, or object.
+                Defaults to that of the source datasets if they all share one.
+                Required when no file comes from a dataset.
+            tags (List[str]): Optional list of tags to apply to the dataset
+                (defaults to those of the source dataset, when there is only one)
+            run_details_from (DataPortalDataset | str): Dataset (or its Cirro URI) to also copy
+                the run details (params, reports, logs) from. Must be one of the datasets being copied from.
+            source_dataset_ids (List[str]): IDs of the datasets in this project that the new dataset
+                derives from (its lineage). Defaults to those of the source datasets.
+
+        Returns:
+            `cirro.sdk.dataset.DataPortalDataset`: the newly created dataset.
+
+        Raises:
+            DataPortalInputError: if no sources are provided, or one is of an unsupported type.
+
+        ```python
+        from cirro import DataPortal
+        from cirro_api_client.v1.models import FileMapping
+
+        portal = DataPortal()
+        source = portal.get_dataset(project="Source Project", dataset="Sequencing Run 1")
+        project = portal.get_project_by_name("Destination Project")
+
+        # Copy a whole dataset, along with its run details
+        copied = project.copy_dataset([source], run_details_from=source)
+
+        # Combine a file, a folder in S3, and a renamed file into one dataset
+        combined = project.copy_dataset(
+            [
+                source.get_file("data/sample1_R1.fastq.gz"),
+                "s3://bucket/folder/",
+                FileMapping(src=source.get_file("data/sample1_R2.fastq.gz").cirro_uri,
+                            dest="renamed/sample1_R2.fastq.gz")
+            ],
+            name="Combined dataset",
+            process="Paired DNAseq (FASTQ)"
+        )
+        ```
+        """
+        if not sources:
+            raise DataPortalInputError("Must provide at least one source to copy from")
+        # A single source would otherwise be iterated over (character by character, for a string)
+        if isinstance(sources, (DataPortalDataset, DataPortalFile, FileMapping, str)):
+            sources = [sources]
+
+        if process is not None:
+            process = parse_process_name_or_id(process, self._client).id
+
+        if isinstance(run_details_from, DataPortalDataset):
+            run_details_from = format_dataset_uri(run_details_from.project_id, run_details_from.id)
+
+        # Normalize into Tag object
+        if tags is not None:
+            tags = [Tag(value=value) for value in tags]
+
+        # Anything left as None falls back to defaults
+        copy_request = CopyDatasetRequest(
+            files=[_to_file_mapping(source) for source in sources],
+            run_details_from=run_details_from,
+            name=name,
+            description=description,
+            tags=tags,
+            process_id=process,
+            source_dataset_ids=source_dataset_ids,
+        )
+
+        create_response = self._client.datasets.copy(project_id=self.id, copy_request=copy_request)
+
+        return self._get_created_dataset(create_response.id)
+
+    def _get_created_dataset(self, dataset_id: str) -> DataPortalDataset:
+        """Return a dataset which was just created, which might take a second to update"""
         max_attempts = 5
         for attempt in range(max_attempts):
             try:
-                return self.get_dataset_by_id(create_response.id)
+                return self.get_dataset_by_id(dataset_id)
             except DataPortalAssetNotFound as e:
                 if attempt == max_attempts - 1:
                     raise e

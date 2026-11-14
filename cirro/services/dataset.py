@@ -3,10 +3,10 @@ from pathlib import Path
 from typing import List, Optional, Union, Dict
 
 from cirro_api_client.v1.api.datasets import get_datasets, get_dataset, import_public_dataset, upload_dataset, \
-    update_dataset, delete_dataset, get_dataset_manifest
+    update_dataset, delete_dataset, get_dataset_manifest, copy_dataset
 from cirro_api_client.v1.api.sharing import get_shared_datasets
 from cirro_api_client.v1.models import ImportDataRequest, UploadDatasetRequest, UpdateDatasetRequest, Dataset, \
-    DatasetDetail, CreateResponse, UploadDatasetCreateResponse, FileEntry
+    DatasetDetail, CreateResponse, UploadDatasetCreateResponse, FileEntry, CopyDatasetRequest
 from cirro.file_utils import is_hidden_file
 from cirro.models.assets import DatasetAssets, Artifact
 from cirro.models.dataset import DatasetValidationResponse
@@ -100,6 +100,44 @@ class DatasetService(FileEnabledService):
         ```
         """
         return import_public_dataset.sync(project_id=project_id, client=self._api_client, body=import_request)
+
+    def copy(self, project_id: str, copy_request: CopyDatasetRequest) -> CreateResponse:
+        """
+        Creates a dataset in this project by copying files and folders from
+        datasets or from S3 buckets the project can read.
+
+        This can be used to copy a whole dataset, a subset of its files, or to combine several datasets into one.
+        The copy runs in the background; the new dataset is available once its status is `COMPLETED`.
+
+        Args:
+            project_id (str): ID of the Project to create the dataset in
+            copy_request (cirro_api_client.v1.models.CopyDatasetRequest):
+
+        Returns:
+            ID of the created dataset
+
+        ```python
+        from cirro_api_client.v1.models import CopyDatasetRequest, FileMapping
+        from cirro.cirro_client import CirroApi
+        from cirro.models.cirro_uri import format_dataset_uri
+
+        cirro = CirroApi()
+        request = CopyDatasetRequest(
+            name="Copied dataset",
+            files=[
+                # A whole dataset (the trailing slash denotes a folder)
+                FileMapping(src=format_dataset_uri("source-project-id", "dataset-id", "")),
+                # A single file, renamed
+                FileMapping(src=format_dataset_uri("source-project-id", "other-dataset-id", "sample1_R1.fastq.gz"),
+                            dest="renamed/sample1_R1.fastq.gz"),
+                # A folder in S3
+                FileMapping(src="s3://bucket/folder/", dest="from_s3/")
+            ]
+        )
+        cirro.datasets.copy("project-id", request)
+        ```
+        """
+        return copy_dataset.sync(project_id=project_id, client=self._api_client, body=copy_request)
 
     def create(self, project_id: str, upload_request: UploadDatasetRequest) -> UploadDatasetCreateResponse:
         """
