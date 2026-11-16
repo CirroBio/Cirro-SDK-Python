@@ -4,7 +4,7 @@ import os
 import sys
 from pathlib import Path
 
-from cirro_api_client.v1.models import UploadDatasetRequest, Status, Executor
+from cirro_api_client.v1.models import UploadDatasetRequest, Status, Executor, Tag
 
 from cirro.cirro_client import CirroApi
 from cirro.cli.interactive.auth_args import gather_auth_config
@@ -93,7 +93,8 @@ def run_ingest(input_params: UploadArguments, interactive=False):
         process_id=process.id,
         name=input_params['name'],
         description=input_params['description'],
-        expected_files=files
+        expected_files=files,
+        tags=[Tag(value=tag) for tag in input_params['tag']]
     )
 
     project_id = get_id_from_name(projects, input_params['project'])
