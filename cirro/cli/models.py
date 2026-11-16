@@ -20,6 +20,7 @@ class UploadArguments(TypedDict):
     include_hidden: bool
     interactive: bool
     file: Optional[list[str]]
+    tag: Optional[list[str]]
     threads: int
 
 

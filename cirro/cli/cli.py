@@ -101,6 +101,10 @@ def download(**kwargs):
               help='Relative path of the file(s) to upload (optional, can be used multiple times)',
               default=[],
               multiple=True)
+@click.option('--tag',
+              help='Tag to apply to the dataset (optional, can be used multiple times)',
+              default=[],
+              multiple=True)
 @click.option('-i', '--interactive',
               help='Gather arguments interactively',
               is_flag=True, default=False)

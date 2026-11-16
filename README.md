@@ -72,13 +72,14 @@ Options:
   --data-type, --process TEXT  Name or ID of the data type (--process is deprecated)
   --data-directory TEXT        Directory you wish to upload
   --file TEXT                  Relative path of the file(s) to upload (optional, can be used multiple times)
+  --tag TEXT                   Tag to apply to the dataset (optional, can be used multiple times)
   -i, --interactive            Gather arguments interactively
   --include-hidden             Include hidden files in the upload (e.g., files starting with .)
   --help                       Show this message and exit.
 ```
 
 ```bash
-$ cirro upload --project "Test Project 1" --name "test" --file "sample1.fastq.gz" --file "sample2.fastq.gz" --data-directory "~/data" --data-type "Paired DNAseq (FASTQ)" 
+$ cirro upload --project "Test Project 1" --name "test" --file "sample1.fastq.gz" --file "sample2.fastq.gz" --data-directory "~/data" --data-type "Paired DNAseq (FASTQ)" --tag "study-x" --tag "batch: 2"
 ```
 
 #### Resuming an upload:
@@ -188,6 +189,7 @@ $ cirro upload --interactive
 ? What type of files?  Illumina Sequencing Run
 ? What is the name of this dataset?  test
 ? Enter a description of the dataset (optional)
+? Enter tags for the dataset, separated by commas (optional)  study-x, batch: 2
 ```
 
 ## Python Usage

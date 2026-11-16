@@ -52,6 +52,18 @@ def ask_description(input_value: str) -> str:
     return answers['description']
 
 
+def ask_tags(input_value: List[str]) -> List[str]:
+    tags_prompt = {
+        'type': 'input',
+        'name': 'tags',
+        'message': 'Enter tags for the dataset, separated by commas (optional)',
+        'default': ', '.join(input_value or [])
+    }
+
+    answers = prompt_wrapper(tags_prompt)
+    return [tag.strip() for tag in answers['tags'].split(',') if tag.strip()]
+
+
 def confirm_data_files(data_directory: str, files: List[str]):
     stats = get_files_stats([
         Path(data_directory) / file
@@ -174,4 +186,5 @@ def gather_upload_arguments(input_params: UploadArguments, projects: List[Projec
     default_name = input_params.get('name') or data_directory_name
     input_params['name'] = ask_name(default_name)
     input_params['description'] = ask_description(input_params.get('description'))
+    input_params['tag'] = ask_tags(input_params.get('tag'))
     return input_params, files
